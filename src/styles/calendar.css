@@ -178,61 +178,224 @@
  * chip (styles/obtask.css) — scoped here under .obtask-calendar so the
  * calendar's stronger override doesn't affect the feed.
  *
- * Every event shares one neutral surface; priority is shown only via the
- * border-inline-start color (plus, for urgent, a very light tint) — solid
- * per-priority fills read as loud/alarm-like against Obsidian's own muted
- * palette, which this plugin otherwise sticks to everywhere else.
+ * A bordered slab (even a thin one) reads as a UI chrome element, not a
+ * line of text — Obsidian's own lists mark things with a leading dot/icon,
+ * not a box. So month/all-day events go "dot + title" instead: no border,
+ * no fill, just a small priority-coloured dot before the title (set via
+ * --obtask-dot-color below, consumed by the ::before rule further down).
+ * Only the week/day *timed* grid (an actual time block, not a marker) keeps
+ * a bordered surface — see the ".ec-time-grid .ec-body" rules at the end of
+ * this section.
  */
-.obtask-calendar .obtask-event {
+.obtask-calendar .obtask-priority-urgent.obtask-event {
+	--obtask-dot-color: var(--color-red);
+}
+
+.obtask-calendar .obtask-priority-high.obtask-event {
+	--obtask-dot-color: var(--color-orange);
+}
+
+.obtask-calendar .obtask-priority-normal.obtask-event {
+	--obtask-dot-color: var(--interactive-accent);
+}
+
+.obtask-calendar .obtask-priority-low.obtask-event {
+	--obtask-dot-color: var(--text-faint);
+}
+
+/*
+ * Month view + the week/day all-day row (both are `.ec-day-grid`-style
+ * layouts — see the DOM notes on `.ec-time-grid .ec-body .ec-event` below
+ * for why time-grid's *timed* blocks are excluded from this rule): no
+ * border, no fill colour — but always a subtle container surface
+ * (`--background-modifier-hover`), not transparent-until-hover. A
+ * borderless event that's also invisible at rest reads as loose text
+ * floating in the grid rather than a discrete, clickable row; a quiet
+ * always-on surface plus the dot is what keeps it "row", not "slab".
+ * Hover steps one shade stronger to stay discoverable as interactive —
+ * `--background-modifier-border` (a neutral, slightly darker/more opaque
+ * gray than `--background-modifier-hover`), not `--background-modifier
+ * -active-hover`: that variable is Obsidian's "selected AND hovered" tint
+ * and resolves to an accent-tinted overlay in the default theme, which
+ * read as an odd purple wash on a plain (unselected) hover here — nothing
+ * in this file maps event colour to `--interactive-accent`/`--color-accent`
+ * itself, it was this one variable choice.
+ */
+.obtask-calendar .ec-day-grid .ec-event,
+.obtask-calendar .ec-all-day .ec-event {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
-	border-inline-start: 3px solid transparent;
+	border-inline-start: none;
 	border-radius: var(--radius-s);
 	padding: var(--size-4-1) var(--size-4-2);
 	font-size: var(--font-ui-smaller);
 	box-shadow: none;
 }
 
-/* due: a deadline marker -> dashed accent. scheduled: a planned block -> solid accent. */
-.obtask-calendar .obtask-event--due {
-	border-inline-start-style: dashed;
-}
-
-.obtask-calendar .obtask-event--scheduled {
-	border-inline-start-style: solid;
-}
-
-.obtask-calendar .obtask-priority-urgent.obtask-event {
-	background-color: rgba(var(--color-red-rgb), 0.12);
-	border-inline-start-color: var(--color-red);
-}
-
-.obtask-calendar .obtask-priority-high.obtask-event {
-	border-inline-start-color: var(--color-orange);
-}
-
-.obtask-calendar .obtask-priority-normal.obtask-event {
-	border-inline-start-color: var(--interactive-accent);
-}
-
-.obtask-calendar .obtask-priority-low.obtask-event {
-	border-inline-start-color: var(--text-faint);
+.obtask-calendar .ec-day-grid .ec-event:hover,
+.obtask-calendar .ec-all-day .ec-event:hover {
+	background-color: var(--background-modifier-border);
+	color: var(--text-normal);
 }
 
 /*
- * Small horizontal inset from the day-grid cell's edges (month/week
- * all-day row) — events otherwise touch the cell border. Scoped to
- * `.ec-day-grid` (not time-grid's timed events, which size themselves to
- * overlapping time columns): the library already narrows `.ec-event`'s
- * inline-size by `--ec-event-col-gap` to leave a gap on one edge (see the
- * vendored stylesheet's base `.ec-event { inline-size: calc(100% -
- * var(--ec-event-col-gap)); }`), so the margin added here is subtracted
- * back out of that same calc instead of just layered on top of it, which
- * would push the event past its grid cell on narrow days.
+ * Time text ("14:00 Title") makes month-view rows noisy for what's really
+ * just a due/scheduled marker, not a scheduled call — dropped in favour of
+ * the dot alone. Scoped to `.ec-day-grid` only: the all-day row never
+ * carries a time (all-day by definition), and time-grid's timed blocks
+ * keep their time label (below).
  */
-.obtask-calendar .ec-day-grid .ec-event {
-	margin-inline: var(--size-4-1);
+.obtask-calendar .ec-day-grid .ec-event-time {
+	display: none;
+}
+
+/*
+ * The dot: a `::before` on `.ec-event-body` — NOT on `.ec-event-title`
+ * itself — so it's a genuine flex *item* sitting next to the title rather
+ * than living inside the title's own inline text flow. `.ec-event-body` is
+ * already `display: flex; flex-direction: row` for day-grid/all-day (the
+ * vendored stylesheet); adding `align-items: center` there and centering
+ * the dot on the cross axis (`align-self: center`, no `vertical-align`)
+ * lines its centre up on the title's actual rendered midline regardless of
+ * line-height/font-metric quirks that `vertical-align: middle` is
+ * sensitive to. Keeping the dot off the title also means the title's own
+ * `overflow: hidden; text-overflow: ellipsis` (set by the library, applies
+ * to `.ec-day-grid`/`.ec-all-day`/`.ec-timeline` titles) still truncates
+ * only the text — the dot is a separate, never-clipped flex item next to
+ * it, not prepended content inside the truncated box. Colour comes from
+ * `--obtask-dot-color` (set above per `.obtask-priority-*`), inherited
+ * down from the ancestor `.obtask-event` element.
+ *
+ * due (a deadline marker) -> a ring (inset box-shadow, transparent fill).
+ * scheduled (a planned block) -> a filled dot. Same shapes used consistently
+ * everywhere a dot appears, including the timed-block title below.
+ */
+.obtask-calendar .ec-day-grid .ec-event-body,
+.obtask-calendar .ec-all-day .ec-event-body {
+	align-items: center;
+}
+
+.obtask-calendar .ec-day-grid .ec-event-body::before,
+.obtask-calendar .ec-all-day .ec-event-body::before {
+	content: "";
+	flex: none;
+	align-self: center;
+	inline-size: 7px;
+	block-size: 7px;
+	margin-inline-end: var(--size-4-2);
+	border-radius: 50%;
+	background-color: var(--obtask-dot-color, var(--text-faint));
+}
+
+.obtask-calendar .ec-day-grid .obtask-event--due .ec-event-body::before,
+.obtask-calendar .ec-all-day .obtask-event--due .ec-event-body::before {
+	background-color: transparent;
+	box-shadow: inset 0 0 0 2px var(--obtask-dot-color, var(--text-faint));
+}
+
+.obtask-calendar .ec-event-title {
+	line-height: var(--line-height-tight);
+}
+
+/*
+ * Uniform inset from the day-grid cell's edges (month view, and the
+ * week/day all-day row — `.ec-all-day` needs the exact same treatment,
+ * previously missing here, which is why its events hugged the column's
+ * left/top edges with visibly more room on the right/bottom). All FOUR
+ * sides get the same `var(--size-4-1)`, overriding the library's own
+ * asymmetric defaults: `inline-size: calc(100% - var(--ec-event-col-gap))`
+ * (a *left-aligned* box, leaving the gap only on the end/right side) and
+ * `margin-block-end: var(--ec-event-col-gap)` (a *bottom-only* margin, no
+ * top). The `margin` shorthand below resets all four longhands at once —
+ * including that block-end one — instead of layering another value on top
+ * of it; the horizontal component is subtracted back out of the
+ * inline-size calc too, so the box never overflows its grid cell.
+ */
+.obtask-calendar .ec-day-grid .ec-event,
+.obtask-calendar .ec-all-day .ec-event {
+	margin: var(--size-4-1);
 	inline-size: calc(100% - var(--ec-event-col-gap) - (var(--size-4-1) * 2));
+}
+
+/*
+ * Week/day *timed* blocks (an actual duration or point-in-time marker
+ * placed on the hour grid, not a plain due/scheduled marker) keep a real
+ * surface — a block floating in empty grid space with nothing but a dot
+ * reads as barely-there. `.ec-body` is the time-grid's scrollable slot
+ * area (theme option in the vendored bundle), a sibling of `.ec-all-day` —
+ * scoping to it (not just `.ec-time-grid .ec-event`) keeps the all-day row
+ * on the dot-only rule above rather than picking up a surface here too.
+ * Priority reads via a solid `border-inline-start` bar (no dashed style
+ * anywhere, per the maintainer's "broken ladder" note); due/scheduled
+ * still reads via the same ring/filled dot before the title.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+	border-radius: var(--radius-s);
+	border-inline-start: 2px solid var(--obtask-dot-color, var(--text-faint));
+	box-shadow: none;
+}
+
+.obtask-calendar .ec-time-grid .ec-body .ec-event:hover {
+	background-color: var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+/*
+ * Uniform edge inset for timed blocks, same reasoning and same four-side
+ * `margin` shorthand as the day-grid/all-day rule above. EC lays these out
+ * with `inline-size: calc(100% - var(--ec-event-col-gap))` (left-aligned,
+ * gap on the right only) and no inline `inset-inline-start`/`inline-size`/
+ * margin style of its own *unless* two events overlap the same time slot
+ * (see `Event.svelte`'s `chunk.group` branch, only present when
+ * overlapping) — `.ec-event` is `position: relative` here (confirmed via a
+ * live DOM probe), not absolutely positioned, so a normal `margin` inset
+ * applies on all four sides exactly like any other box, shrinking the
+ * block a few px into its time-slot allocation rather than filling it
+ * edge-to-edge. In the common non-overlapping case that leaves the CSS
+ * free to narrow the box further; an overlapping pair falls back to EC's
+ * own inline sizing (inline styles always win), an acceptable trade-off
+ * for a rare case.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event {
+	margin: var(--size-4-1);
+	inline-size: calc(100% - var(--ec-event-col-gap) - (var(--size-4-1) * 2));
+}
+
+/*
+ * Time-grid's `.ec-event-body` stacks `.ec-event-time` above
+ * `.ec-event-title` (`flex-direction: column`, the library's default —
+ * only day-grid/all-day/timeline switch it to `row`), so the day-grid
+ * trick above (dot as a flex-item sibling of the title inside the body)
+ * would push the dot onto its own line instead of next to the title text.
+ * Here the title makes itself the flex row instead: the dot stays a
+ * `::before`, but as a real flex item (`flex: none; align-self: center`)
+ * of `.ec-event-title` rather than inline content inside it — no
+ * `vertical-align` guessing. Time-grid titles carry no ellipsis truncation
+ * of their own in the vendored stylesheet (only day-grid/all-day/timeline
+ * do), so turning the title into a flex container doesn't cost anything
+ * here the way it would up in the day-grid rule above.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event-title {
+	display: flex;
+	align-items: center;
+}
+
+.obtask-calendar .ec-time-grid .ec-body .ec-event-title::before {
+	content: "";
+	flex: none;
+	align-self: center;
+	inline-size: 7px;
+	block-size: 7px;
+	margin-inline-end: var(--size-4-2);
+	border-radius: 50%;
+	background-color: var(--obtask-dot-color, var(--text-faint));
+}
+
+.obtask-calendar .ec-time-grid .ec-body .obtask-event--due .ec-event-title::before {
+	background-color: transparent;
+	box-shadow: inset 0 0 0 2px var(--obtask-dot-color, var(--text-faint));
 }
 
 /*
@@ -249,4 +412,88 @@
 .obtask-calendar .ec-toolbar > * {
 	flex-wrap: wrap;
 	row-gap: var(--size-4-2);
+}
+
+/*
+ * Button groups — the library fuses every `.ec-button-group` (prev/next;
+ * the month/week/day trio) into one seamless pill (`.ec-button
+ * -group`'s `.ec-button:not(:first-child)`/`:not(:last-child)` zero out the
+ * touching radii, plus a -1px overlap margin to collapse the shared
+ * border). That reads fine against the library's own bordered-box buttons,
+ * but ours are borderless flat fills (`.ec-button` above) — with the
+ * border gone the seam between fused buttons all but disappears, so e.g.
+ * "Previous"/"Next" look like one indivisible block. Un-fusing (a real
+ * gap, each button keeping its own full radius) restores a visible
+ * separation for prev/next. The month/week/day trio gets its own,
+ * different treatment below (a shadcn-Tabs-style track) which overrides
+ * this base rule for that one group via `:has()`.
+ */
+.obtask-calendar .ec-button-group {
+	display: inline-flex;
+	gap: var(--size-2-2);
+}
+
+.obtask-calendar .ec-button-group .ec-button:not(:first-child) {
+	border-start-start-radius: var(--button-radius);
+	border-end-start-radius: var(--button-radius);
+	margin-inline-start: 0;
+}
+
+.obtask-calendar .ec-button-group .ec-button:not(:last-child) {
+	border-start-end-radius: var(--button-radius);
+	border-end-end-radius: var(--button-radius);
+}
+
+/*
+ * The month/week/day view switcher, styled as a shadcn-Tabs-style
+ * segmented control (tabs "list" track + raised active "trigger") instead
+ * of the plain unfused-button treatment every other `.ec-button-group`
+ * gets above — a trio that toggles between three *mutually exclusive*
+ * views of the same data reads more like a tab strip than a row of
+ * independent commands (today/prev/next). EC gives every button group the
+ * identical `.ec-button-group` class regardless of which buttons it holds
+ * (see `Buttons.svelte`'s `ec-${button}` per-button class, e.g.
+ * `.ec-dayGridMonth`/`.ec-timeGridWeek`/`.ec-timeGridDay`/`.ec-prev`/
+ * `.ec-next` — confirmed against the vendored source, not documented in
+ * the public API), so `:has(.ec-dayGridMonth)` is what scopes this to
+ * *only* the view trio and leaves the prev/next pair on the plain
+ * unfused-button rules above.
+ */
+.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) {
+	gap: var(--size-2-1);
+	padding: var(--size-2-1);
+	border-radius: var(--radius-m);
+	background-color: var(--background-modifier-hover);
+}
+
+.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button {
+	background-color: transparent;
+	color: var(--text-muted);
+	border: none;
+	box-shadow: none;
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-medium);
+	line-height: 1;
+	padding: var(--size-2-2) var(--size-4-3);
+	border-radius: var(--radius-s);
+}
+
+.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button:not(:disabled):hover {
+	background-color: transparent;
+	color: var(--text-normal);
+}
+
+/* Active tab: a raised "card" (opaque fill + shadow) sitting above the
+ * track, exactly like shadcn's Tabs — not a filled-accent pill, which
+ * would read as a primary action rather than "the currently open view". */
+.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button.ec-active {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+	box-shadow: var(--shadow-s);
+}
+
+.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button.ec-active:not(:disabled):hover {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
 }

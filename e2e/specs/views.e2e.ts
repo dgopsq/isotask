@@ -488,6 +488,13 @@ describe("Views", function () {
 			// this one shows the month view with events for visual checks.
 			if (process.env["E2E_SCREENSHOT"] === "1") {
 				await saveScreenshot("calendar-month");
+
+				// A separate hover screenshot: moves the mouse onto an event so
+				// the `:hover` background (`--background-modifier-border`, not
+				// the accent-tinted `--background-modifier-active-hover`) is
+				// actually visible in the capture, not just in the stylesheet.
+				await browser.$(`.${cssClass("event")}`).moveTo();
+				await saveScreenshot("calendar-hover");
 			}
 		});
 

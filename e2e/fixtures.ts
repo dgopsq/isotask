@@ -93,6 +93,7 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 	}
 
 	const overdue = dueWithBucket(-4);
+	const highPriorityOverdue = dueWithBucket(-1);
 	const dueToday = dueWithBucket(0);
 	const soon = dueWithBucket(2);
 	const later = dueWithBucket(20);
@@ -142,6 +143,31 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			title: "No date task",
 			frontmatter: { type: "task", status: "todo" },
 			body: "Generated e2e fixture: no date.",
+			bucket: "no-date",
+		},
+		{
+			filename: "Write M1 plan.md",
+			title: "Write M1 plan",
+			// A second `priority: high` task, due yesterday (within the current
+			// month) — the calendar month view's dot colour reads urgent/high
+			// via `--color-red`/`--color-orange`, and every *other* fixture task
+			// is `priority: normal` (the interactive-accent dot), so nothing
+			// exercised those colours in a calendar screenshot without this one.
+			frontmatter: { type: "task", status: "todo", due: highPriorityOverdue.due, priority: "high" },
+			body: "Generated e2e fixture: high priority, due yesterday.",
+			bucket: highPriorityOverdue.bucket,
+		},
+		{
+			filename: "Team sync.md",
+			title: "Team sync",
+			// A timed `scheduled` + `duration` (M3 Wave 3 fields), today — every
+			// other fixture task is date-only, landing in the calendar's all-day
+			// row; this is the only one that gives the week/day time grid an
+			// actual timed block to render. No `due`, so — like "No date task"
+			// — it falls into the Feed's "no-date" bucket (the Feed's default
+			// `dateSource` is "due", which ignores `scheduled`).
+			frontmatter: { type: "task", status: "todo", scheduled: `${today}T09:00`, duration: "60", priority: "urgent" },
+			body: "Generated e2e fixture: timed scheduled block.",
 			bucket: "no-date",
 		},
 	];
