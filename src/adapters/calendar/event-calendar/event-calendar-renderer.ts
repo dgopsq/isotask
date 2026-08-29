@@ -70,6 +70,9 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			setView: (view) => {
 				calendar.setOption("view", toEventCalendarView(view));
 			},
+			setFirstDay: (firstDay) => {
+				calendar.setOption("firstDay", toEventCalendarFirstDay(firstDay));
+			},
 			goTo: (date) => {
 				calendar.setOption("date", date);
 			},

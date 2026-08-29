@@ -4,6 +4,7 @@ import { Plugin, TFile } from "obsidian";
 import "@/styles/calendar.css";
 import "@/styles/obtask.css";
 
+import { EventCalendarRenderer } from "@/adapters/calendar/event-calendar/event-calendar-renderer";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
 import { VaultTaskStore } from "@/adapters/obsidian/task-store";
@@ -44,6 +45,7 @@ export default class ObtaskPlugin extends Plugin {
 		});
 		const clock = createObsidianClock();
 		const notifier = createObsidianNotifier();
+		const calendarRenderer = new EventCalendarRenderer();
 
 		const appDeps: AppDeps = {
 			store,
@@ -64,6 +66,7 @@ export default class ObtaskPlugin extends Plugin {
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 			getWeekStart: () => this.pluginSettings.weekStart,
+			renderer: calendarRenderer,
 			setStatus,
 			setDate,
 			notifier,

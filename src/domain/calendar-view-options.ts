@@ -48,8 +48,23 @@ const CalendarEventsSourceSchema = v.fallback(
 	DEFAULT_CALENDAR_VIEW_OPTIONS.events,
 );
 
+/**
+ * Bases' `BasesDropdownOption` only supports string option keys/`default`
+ * (`options: Record<string, string>`, `default?: string` in obsidian.d.ts —
+ * verified against the type, there is no numeric-keyed dropdown variant), so
+ * the `firstDay` dropdown registered in `views/bases/register.ts` uses the
+ * digit strings "0".."6" as its option keys, and `config.get("firstDay")`
+ * comes back as one of those strings rather than a number. This schema
+ * accepts both: the digit strings (from a real Bases dropdown) and raw
+ * numbers 0-6 (from a directly-constructed config, e.g. in tests).
+ */
+const NumericFirstDaySchema = v.pipe(
+	v.picklist(["0", "1", "2", "3", "4", "5", "6"]),
+	v.transform((value): Weekday => Number(value) as Weekday),
+);
+
 const FirstDaySchema = v.fallback(
-	v.union([v.literal("default"), v.picklist([0, 1, 2, 3, 4, 5, 6])]),
+	v.union([v.literal("default"), v.picklist([0, 1, 2, 3, 4, 5, 6]), NumericFirstDaySchema]),
 	DEFAULT_CALENDAR_VIEW_OPTIONS.firstDay,
 );
 

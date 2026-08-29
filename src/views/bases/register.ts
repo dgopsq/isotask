@@ -3,11 +3,13 @@ import { Notice } from "obsidian";
 
 import type { makeSetDate } from "@/app/set-date";
 import type { makeSetStatus } from "@/app/set-status";
+import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
 import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
+import type { CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
 import { CalendarBasesView } from "@/views/bases/calendar/calendar-view";
 import { FeedBasesView } from "@/views/bases/feed/feed-view";
@@ -40,11 +42,75 @@ const feedViewOptions: BasesAllOptions[] = [
 	},
 ];
 
+/** Monday-first, matching `domain/dates.ts`'s `Weekday` (0=Mon..6=Sun). */
+const WEEKDAY_LABELS: Readonly<Record<Weekday, string>> = {
+	0: "Monday",
+	1: "Tuesday",
+	2: "Wednesday",
+	3: "Thursday",
+	4: "Friday",
+	5: "Saturday",
+	6: "Sunday",
+};
+
+/**
+ * Bases-native view options for the calendar. Keys/defaults mirror
+ * `domain/calendar-view-options.ts#DEFAULT_CALENDAR_VIEW_OPTIONS`;
+ * `parseCalendarViewOptions` reads these back out of `BasesViewConfig` in
+ * `calendar-view.ts`.
+ *
+ * `firstDay`'s dropdown options use digit-string keys ("0".."6") because
+ * `BasesDropdownOption.options` is `Record<string, string>` — there is no
+ * numeric-keyed dropdown in Bases' own API — and `parseCalendarViewOptions`
+ * accepts those digit strings alongside raw numbers (see
+ * `calendar-view-options.ts`'s `FirstDaySchema`).
+ */
+function calendarViewOptions(getWeekStart: () => Weekday): BasesAllOptions[] {
+	return [
+		{
+			key: "initialView",
+			type: "dropdown",
+			displayName: "Initial view",
+			default: DEFAULT_CALENDAR_VIEW_OPTIONS.initialView,
+			options: { month: "Month", week: "Week", day: "Day", list: "List" },
+		},
+		{
+			key: "events",
+			type: "dropdown",
+			displayName: "Events",
+			default: DEFAULT_CALENDAR_VIEW_OPTIONS.events,
+			options: { both: "Due and scheduled", due: "Due only", scheduled: "Scheduled only" },
+		},
+		{
+			key: "firstDay",
+			type: "dropdown",
+			displayName: "First day of week",
+			// Populated from the plugin's week-start setting at the moment
+			// Bases asks for this view's options (see `registerBasesView`'s
+			// `options: (config) => [...]` closure below) — a freshly-added
+			// calendar view starts matching the plugin setting, but stays
+			// overridable per `.base` file, same as `dateSource` for the feed.
+			default: String(getWeekStart()),
+			options: {
+				default: "Default (plugin setting)",
+				"0": WEEKDAY_LABELS[0],
+				"1": WEEKDAY_LABELS[1],
+				"2": WEEKDAY_LABELS[2],
+				"3": WEEKDAY_LABELS[3],
+				"4": WEEKDAY_LABELS[4],
+				"5": WEEKDAY_LABELS[5],
+				"6": WEEKDAY_LABELS[6],
+			},
+		},
+	];
+}
+
 export interface RegisterViewsDeps {
 	readonly app: App;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
+	readonly renderer: CalendarRenderer;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly notifier: Notifier;
@@ -76,7 +142,11 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				app: deps.app,
 				getPropertyKeys: deps.getPropertyKeys,
 				getStatuses: deps.getStatuses,
+				getWeekStart: deps.getWeekStart,
+				renderer: deps.renderer,
+				notifier: deps.notifier,
 			}),
+		options: () => calendarViewOptions(deps.getWeekStart),
 	});
 
 	const enabled = feedRegistered && calendarRegistered;

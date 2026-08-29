@@ -52,6 +52,19 @@ describe("parseCalendarViewOptions", () => {
 		it.each([undefined, null, "", "monday", 7, -1, 1.5, {}, []])("falls back to the default for %p", (value) => {
 			expect(parseCalendarViewOptions(configFrom({ firstDay: value })).firstDay).toBe(DEFAULT_CALENDAR_VIEW_OPTIONS.firstDay);
 		});
+
+		// Bases' dropdown option can only persist string keys (obsidian.d.ts's
+		// `BasesDropdownOption.options: Record<string, string>`), so the
+		// `firstDay` dropdown in `views/bases/register.ts` uses digit-string
+		// keys ("0".."6") — `config.get("firstDay")` returns one of those
+		// strings from a real Bases view, not a number.
+		it.each([
+			["0", 0],
+			["3", 3],
+			["6", 6],
+		] as const)("accepts the digit string %p as Weekday %p", (value, expected) => {
+			expect(parseCalendarViewOptions(configFrom({ firstDay: value })).firstDay).toBe(expected);
+		});
 	});
 
 	it("each field's fallback is independent — one bad key doesn't affect the others", () => {

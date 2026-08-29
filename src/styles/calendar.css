@@ -9,6 +9,19 @@
  */
 @import "@event-calendar/core/index.css";
 
+/*
+ * One line above the calendar root, shown only when at least one entry in
+ * view failed to parse as a task (mirrors the feed's per-row invalid
+ * rendering, but a calendar has no per-row slot to render an invalid entry
+ * into, so this is a single muted count instead — see calendar-view.ts).
+ */
+.obtask-calendar__invalid {
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
+	font-style: italic;
+	padding: var(--size-4-1) var(--size-4-2) 0 var(--size-4-2);
+}
+
 .obtask-calendar .ec {
 	/* Main colors -> the Obsidian scale closest to each role. */
 	--ec-color-50: var(--background-secondary);

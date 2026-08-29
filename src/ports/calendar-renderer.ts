@@ -32,6 +32,15 @@ export interface CalendarOptions {
 export interface CalendarHandle {
 	readonly setEvents: (events: readonly CalendarEvent[]) => void;
 	readonly setView: (view: CalendarViewKind) => void;
+	/**
+	 * Added in M3 Wave 3: the `obtask-calendar` view resolves `firstDay:
+	 * "default"` to `getWeekStart()` and re-applies it on every
+	 * `onDataUpdated` (a `firstDay` config change re-renders like any other
+	 * option), without remounting — remounting would lose the user's
+	 * navigated date. Not part of the original Wave 1 port sketch, which had
+	 * no live-update path to drive it from yet.
+	 */
+	readonly setFirstDay: (firstDay: Weekday) => void;
 	readonly goTo: (date: IsoDate) => void;
 	readonly next: () => void;
 	readonly prev: () => void;
