@@ -4,7 +4,6 @@ import "@/styles/obtask.css";
 
 import type { ObtaskSettings } from "@/adapters/obsidian/settings";
 import { parseSettings } from "@/adapters/obsidian/settings";
-import { DEFAULT_STATUSES } from "@/domain/status";
 import { ObtaskSettingTab } from "@/settings/settings-tab";
 import { registerViews } from "@/views/bases/register";
 
@@ -23,9 +22,7 @@ export default class ObtaskPlugin extends Plugin {
 		registerViews(this, {
 			app: this.app,
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
-			// The status list is not yet user-configurable (M1) — the feed view reads it
-			// through this accessor so wiring that up later doesn't touch the views.
-			getStatuses: () => DEFAULT_STATUSES,
+			getStatuses: () => this.pluginSettings.statuses,
 			getWeekStart: () => this.pluginSettings.weekStart,
 		});
 

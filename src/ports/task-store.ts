@@ -29,4 +29,6 @@ export interface TaskStore {
 	readonly exists: (path: TaskPath) => Promise<boolean>;
 	/** The note's body, excluding the frontmatter block. */
 	readonly readBody: (path: TaskPath) => Promise<Result<string, TaskStoreError>>;
+	/** The note's frontmatter exactly as stored, for callers (e.g. transitions) that need to copy properties verbatim. */
+	readonly rawFrontmatter: (path: TaskPath) => Promise<Result<Readonly<Record<string, FrontmatterValue>>, TaskStoreError>>;
 }

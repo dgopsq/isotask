@@ -1,8 +1,10 @@
 import type { App, Plugin, SettingDefinitionItem } from "obsidian";
 import { PluginSettingTab } from "obsidian";
 
-import type { Weekday } from "@/domain/dates";
 import type { ObtaskSettings } from "@/adapters/obsidian/settings";
+import type { Weekday } from "@/domain/dates";
+import type { PropertyKeys } from "@/domain/property-keys";
+import { StatusesModal } from "@/ui/statuses-modal";
 
 const WEEKDAY_LABELS: Readonly<Record<Weekday, string>> = {
 	0: "Monday",
@@ -18,23 +20,91 @@ const WEEKDAY_OPTIONS: Record<string, string> = Object.fromEntries(
 	Object.entries(WEEKDAY_LABELS),
 );
 
+interface PropertyKeyControlDef {
+	readonly key: keyof PropertyKeys;
+	readonly name: string;
+	readonly desc: string;
+}
+
+const PROPERTY_KEY_CONTROLS: readonly PropertyKeyControlDef[] = [
+	{ key: "markerKey", name: "Marker property key", desc: 'The frontmatter key that identifies a task note, e.g. "type".' },
+	{ key: "markerValue", name: "Marker property value", desc: 'The value that key must have, e.g. "task".' },
+	{ key: "status", name: "Status property key", desc: "The frontmatter key holding the task's status." },
+	{ key: "priority", name: "Priority property key", desc: "The frontmatter key holding the task's priority." },
+	{ key: "due", name: "Due property key", desc: "The frontmatter key holding the task's due date." },
+	{ key: "scheduled", name: "Scheduled property key", desc: "The frontmatter key holding the task's scheduled date." },
+	{ key: "duration", name: "Duration property key", desc: "The frontmatter key holding the task's duration, in minutes." },
+	{ key: "repeat", name: "Repeat property key", desc: "The frontmatter key holding the task's recurrence rule." },
+	{ key: "project", name: "Project property key", desc: "The frontmatter key holding the task's project." },
+	{ key: "tags", name: "Tags property key", desc: "The frontmatter key holding the task's tags." },
+	{ key: "created", name: "Created property key", desc: "The frontmatter key holding the date the task was created." },
+	{ key: "completed", name: "Completed property key", desc: "The frontmatter key holding the date the task was completed." },
+];
+
+type ScalarSettingKey = "taskFolder" | "tasksBasePath" | "newTaskFilenameTemplate" | "spawnFilenameTemplate" | "weekStart";
+type SettingKey = keyof PropertyKeys | ScalarSettingKey;
+
+function isPropertyKeySetting(key: string): key is keyof PropertyKeys {
+	return PROPERTY_KEY_CONTROLS.some((control) => control.key === key);
+}
+
+/**
+ * One entry per `ScalarSettingKey`, enforced by the `Record` type itself
+ * (a missing key is a compile error) rather than a `switch` — `key` arrives
+ * from Obsidian as a plain `string`, so a `switch` on it can't be narrowed
+ * enough for `@typescript-eslint/switch-exhaustiveness-check` to verify.
+ */
+const SCALAR_SETTINGS: Readonly<
+	Record<
+		ScalarSettingKey,
+		{
+			readonly get: (settings: ObtaskSettings) => unknown;
+			readonly set: (settings: ObtaskSettings, value: unknown) => ObtaskSettings;
+		}
+	>
+> = {
+	taskFolder: {
+		get: (settings) => settings.taskFolder,
+		set: (settings, value) => ({ ...settings, taskFolder: String(value) }),
+	},
+	tasksBasePath: {
+		get: (settings) => settings.tasksBasePath,
+		set: (settings, value) => ({ ...settings, tasksBasePath: String(value) }),
+	},
+	newTaskFilenameTemplate: {
+		get: (settings) => settings.newTaskFilenameTemplate,
+		set: (settings, value) => ({ ...settings, newTaskFilenameTemplate: String(value) }),
+	},
+	spawnFilenameTemplate: {
+		get: (settings) => settings.spawnFilenameTemplate,
+		set: (settings, value) => ({ ...settings, spawnFilenameTemplate: String(value) }),
+	},
+	weekStart: {
+		get: (settings) => String(settings.weekStart),
+		set: (settings, value) => ({ ...settings, weekStart: Number(value) as Weekday }),
+	},
+};
+
+function isScalarSetting(key: string): key is ScalarSettingKey {
+	return Object.prototype.hasOwnProperty.call(SCALAR_SETTINGS, key);
+}
+
 export interface SettingsTabDeps {
 	readonly getSettings: () => ObtaskSettings;
 	readonly setSettings: (settings: ObtaskSettings) => Promise<void>;
 }
 
-type SettingKey = "taskFolder" | "markerKey" | "markerValue" | "weekStart";
-
 /**
- * Minimal M0 settings tab: task folder, marker key/value, week start.
- * Everything else (status list editing, other property-key mappings) is
- * TBD (M1) — see `docs/ROADMAP.md`.
+ * Settings tab, built with the declarative `getSettingDefinitions()` API
+ * (Obsidian 1.13+): each control's `key` is resolved through
+ * `getControlValue`/`setControlValue`, which read and write through `deps`
+ * rather than `this.plugin.settings` (the `PluginSettingTab` default) since
+ * settings live behind the `getSettings`/`setSettings` deps instead.
  *
- * Uses the declarative `getSettingDefinitions()` API (Obsidian 1.13+):
- * each control's `key` is resolved through `getControlValue`/
- * `setControlValue`, which read and write through `deps` rather than
- * `this.plugin.settings` (the `PluginSettingTab` default) since settings
- * live behind the `getSettings`/`setSettings` deps instead.
+ * The status list has no scalar control of its own — reordering, adding and
+ * deleting entries doesn't fit a single text/dropdown/toggle control — so it
+ * is edited in `src/ui/statuses-modal.ts`, opened from a `SettingDefinitionAction`
+ * row (the declarative API's equivalent of a standalone button setting).
  */
 export class ObtaskSettingTab extends PluginSettingTab {
 	private readonly deps: SettingsTabDeps;
@@ -47,24 +117,60 @@ export class ObtaskSettingTab extends PluginSettingTab {
 	override getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
 		return [
 			{
-				name: "Task folder",
-				desc: "Where new task notes are created.",
-				control: { type: "text", key: "taskFolder" },
+				type: "group",
+				heading: "General",
+				items: [
+					{
+						name: "Task folder",
+						desc: "Where new task notes are created.",
+						control: { type: "text", key: "taskFolder" },
+					},
+					{
+						name: "Tasks base path",
+						desc: 'Vault path of the .base file used by the plugin\'s "Open tasks" command, e.g. "Tasks.base".',
+						control: { type: "text", key: "tasksBasePath" },
+					},
+					{
+						name: "New task filename template",
+						desc: 'Filename (without extension) for a newly created task note. Supports "{{title}}".',
+						control: { type: "text", key: "newTaskFilenameTemplate" },
+					},
+					{
+						name: "Spawn filename template",
+						desc: 'Filename (without extension) for a note spawned from a completed recurring task. Supports "{{title}}" and "{{due}}".',
+						control: { type: "text", key: "spawnFilenameTemplate" },
+					},
+					{
+						name: "Week starts on",
+						desc: "Used by the feed view's this week / next week buckets.",
+						control: { type: "dropdown", key: "weekStart", options: WEEKDAY_OPTIONS },
+					},
+				],
 			},
 			{
-				name: "Marker property key",
-				desc: 'The frontmatter key that identifies a task note, e.g. "type".',
-				control: { type: "text", key: "markerKey" },
+				type: "group",
+				heading: "Statuses",
+				items: [
+					{
+						name: "Manage statuses…",
+						desc: "Add, edit, reorder or delete the statuses tasks can have.",
+						action: () => {
+							new StatusesModal(this.app, {
+								getStatuses: () => this.deps.getSettings().statuses,
+								setStatuses: (statuses) => this.deps.setSettings({ ...this.deps.getSettings(), statuses }),
+							}).open();
+						},
+					},
+				],
 			},
 			{
-				name: "Marker property value",
-				desc: 'The value that key must have, e.g. "task".',
-				control: { type: "text", key: "markerValue" },
-			},
-			{
-				name: "Week starts on",
-				desc: "Used by the feed view's this week / next week buckets.",
-				control: { type: "dropdown", key: "weekStart", options: WEEKDAY_OPTIONS },
+				type: "group",
+				heading: "Property keys",
+				items: PROPERTY_KEY_CONTROLS.map((control) => ({
+					name: control.name,
+					desc: control.desc,
+					control: { type: "text" as const, key: control.key },
+				})),
 			},
 		];
 	}
@@ -72,17 +178,11 @@ export class ObtaskSettingTab extends PluginSettingTab {
 	override getControlValue(key: string): unknown {
 		const settings = this.deps.getSettings();
 
-		if (key === "taskFolder") {
-			return settings.taskFolder;
+		if (isPropertyKeySetting(key)) {
+			return settings.propertyKeys[key];
 		}
-		if (key === "markerKey") {
-			return settings.propertyKeys.markerKey;
-		}
-		if (key === "markerValue") {
-			return settings.propertyKeys.markerValue;
-		}
-		if (key === "weekStart") {
-			return String(settings.weekStart);
+		if (isScalarSetting(key)) {
+			return SCALAR_SETTINGS[key].get(settings);
 		}
 		return undefined;
 	}
@@ -90,26 +190,14 @@ export class ObtaskSettingTab extends PluginSettingTab {
 	override setControlValue(key: string, value: unknown): void | Promise<void> {
 		const settings = this.deps.getSettings();
 
-		if (key === "taskFolder") {
-			return this.deps.setSettings({ ...settings, taskFolder: String(value) });
-		}
-		if (key === "markerKey") {
+		if (isPropertyKeySetting(key)) {
 			return this.deps.setSettings({
 				...settings,
-				propertyKeys: { ...settings.propertyKeys, markerKey: String(value) },
+				propertyKeys: { ...settings.propertyKeys, [key]: String(value) },
 			});
 		}
-		if (key === "markerValue") {
-			return this.deps.setSettings({
-				...settings,
-				propertyKeys: { ...settings.propertyKeys, markerValue: String(value) },
-			});
-		}
-		if (key === "weekStart") {
-			return this.deps.setSettings({
-				...settings,
-				weekStart: Number(value) as Weekday,
-			});
+		if (isScalarSetting(key)) {
+			return this.deps.setSettings(SCALAR_SETTINGS[key].set(settings, value));
 		}
 		return undefined;
 	}
