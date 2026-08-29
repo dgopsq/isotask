@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { canonicalizeFrontmatter } from "@/domain/canonicalize";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
+import type { StatusConfig } from "@/domain/status";
 import { DEFAULT_STATUSES } from "@/domain/status";
+import type { StatusId } from "@/domain/task";
 
 const keys = DEFAULT_PROPERTY_KEYS;
 const statuses = DEFAULT_STATUSES;
@@ -37,6 +39,19 @@ describe("canonicalizeFrontmatter", () => {
 			const result = canonicalizeFrontmatter({ status: "in progress" }, keys, statuses);
 			expect(result.frontmatter['status']).toBe("in-progress");
 			expect(result.fixes).toEqual([{ key: "status", from: "in progress", to: "in-progress", reason: "status-label" }]);
+		});
+
+		it("prefers an id match over a label match when both could apply", () => {
+			// Second status's label ("done") collides with the first status's id
+			// ("done"); an id match must win, so "Done" resolves to the first
+			// status rather than the second.
+			const collidingStatuses: readonly StatusConfig[] = [
+				{ id: "done" as StatusId, label: "Complete", kind: "done" },
+				{ id: "archived" as StatusId, label: "done", kind: "cancelled" },
+			];
+			const result = canonicalizeFrontmatter({ status: "Done" }, keys, collidingStatuses);
+			expect(result.frontmatter['status']).toBe("done");
+			expect(result.fixes).toEqual([{ key: "status", from: "Done", to: "done", reason: "status-case" }]);
 		});
 
 		it("leaves a genuinely unknown status unchanged", () => {
@@ -89,6 +104,12 @@ describe("canonicalizeFrontmatter", () => {
 			expect(result.frontmatter['duration']).toBe(45);
 		});
 
+		it("converts \"0\" to the number 0", () => {
+			const result = canonicalizeFrontmatter({ duration: "0" }, keys, statuses);
+			expect(result.frontmatter['duration']).toBe(0);
+			expect(result.fixes).toEqual([{ key: "duration", from: "0", to: 0, reason: "duration-string" }]);
+		});
+
 		it("leaves a non-integer duration string unchanged", () => {
 			const result = canonicalizeFrontmatter({ duration: "45.5" }, keys, statuses);
 			expect(result.frontmatter['duration']).toBe("45.5");
@@ -104,6 +125,7 @@ describe("canonicalizeFrontmatter", () => {
 		it("leaves an already-numeric duration untouched", () => {
 			const result = canonicalizeFrontmatter({ duration: 45 }, keys, statuses);
 			expect(result.fixes).toEqual([]);
+			expect(result.frontmatter['duration']).toBe(45);
 		});
 	});
 
