@@ -58,6 +58,10 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   `--interactive-accent`, `--interactive-accent-hover`, `--color-red`, `--color-orange`,
   `--color-yellow`, `--color-green`, `--color-blue`, `--color-purple`.
 
+- **Every `Setting` row gets a `setDesc()`**. Since Obsidian 1.13 the base stylesheet top-aligns
+  `.setting-item` (`align-items: flex-start`); a row without a description shows its label above the
+  control's centre. Core rows always carry a description, so do ours — no CSS workaround.
+
 ## Obsidian API usage rules
 
 - Frontmatter **writes**: always `app.fileManager.processFrontMatter(file, fn)`. Never construct
@@ -153,6 +157,15 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   (`^10.3.0`) rather than the newest release — mocha keeps module-level state used for the
   `import { describe } from "mocha"` pattern, and two different copies of the package (ours vs.
   the framework's own nested one) silently break it.
+
+### Probing Obsidian's live DOM/CSS
+
+When a layout question can't be answered from the API docs (Obsidian's CSS is not greppable
+from the asar), write a throwaway spec `e2e/specs/zz-probe.e2e.ts` that opens the UI in question
+and `browser.execute()`s a function returning `getBoundingClientRect()` / `getComputedStyle()`
+values or matching `document.styleSheets` rules, writes the JSON to a scratch file, and run it
+alone with `pnpm exec wdio run wdio.conf.mts --spec e2e/specs/zz-probe.e2e.ts`. Delete the spec
+afterwards; never commit it.
 
 ## Renaming the plugin
 
