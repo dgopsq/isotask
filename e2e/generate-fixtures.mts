@@ -19,11 +19,22 @@ import { buildFixtures, noteContent } from "./fixtures.ts";
  * no I/O beyond the directory listing and reads, so this step stays instant.
  */
 
+const vaultDir = fileURLToPath(new URL("./vault/", import.meta.url));
 const tasksDir = join(fileURLToPath(new URL("./vault/Tasks/", import.meta.url)));
 const verbose = process.env["E2E_VERBOSE"] === "1";
 
+/**
+ * Vault-root fixtures (outside `Tasks/`) that e2e "Actions" specs create
+ * during a run (`e2e/specs/views.e2e.ts`'s convert-note-to-task test) and
+ * mutate in place — unlike `Tasks/`, nothing here is desired at rest, so
+ * every run starts by deleting them rather than diffing content.
+ */
+const staleVaultRootFiles = ["Plain.md"];
+
 async function main(): Promise<void> {
 	await mkdir(tasksDir, { recursive: true });
+
+	await Promise.all(staleVaultRootFiles.map((name) => rm(join(vaultDir, name), { force: true })));
 
 	const fixtures = buildFixtures();
 
@@ -32,11 +43,20 @@ async function main(): Promise<void> {
 		desired.set(task.filename, noteContent(task.frontmatter, task.body));
 	}
 	desired.set(fixtures.invalid.filename, noteContent(fixtures.invalid.frontmatter, fixtures.invalid.body));
+	// The recurring fixture is mutated in place by the "Complete recurring
+	// task" e2e test (status/completed change, a next-occurrence note is
+	// spawned alongside it) — including it in `desired` means the diff below
+	// rewrites it back to its pristine state whenever a previous run left it
+	// mutated, and the stray-file sweep removes any spawned occurrence note
+	// (e.g. "Recurring task 2026-09-05.md") since only the exact fixture
+	// filenames below are kept.
+	desired.set(fixtures.recurring.filename, noteContent(fixtures.recurring.frontmatter, fixtures.recurring.body));
 
 	const existingFiles = await readdir(tasksDir);
 	// Stray files not in this run's desired set (e.g. leftovers from a
-	// previous day's date-relative filenames) get removed; matching files
-	// are checked below and only rewritten if their content actually changed.
+	// previous day's date-relative filenames, or a previous e2e run's
+	// spawned/created notes) get removed; matching files are checked below
+	// and only rewritten if their content actually changed.
 	await Promise.all(
 		existingFiles.filter((name) => !desired.has(name)).map((name) => rm(join(tasksDir, name), { force: true })),
 	);

@@ -44,10 +44,25 @@ export interface FixtureInvalidTask {
 	readonly body: string;
 }
 
+/**
+ * A weekly-recurring task, due today, used by `e2e/specs/views.e2e.ts`'s
+ * "Actions" suite to exercise complete -> spawn-next-occurrence. Kept
+ * separate from `tasks` (rather than folded in) so it never affects the
+ * Feed view's bucket-structure assertions, which iterate `tasks` directly.
+ */
+export interface FixtureRecurringTask {
+	readonly filename: string;
+	readonly title: string;
+	readonly due: IsoDate;
+	readonly frontmatter: Readonly<Record<string, string>>;
+	readonly body: string;
+}
+
 export interface Fixtures {
 	readonly today: IsoDate;
 	readonly tasks: readonly FixtureTask[];
 	readonly invalid: FixtureInvalidTask;
+	readonly recurring: FixtureRecurringTask;
 }
 
 function isoDate(date: Date): IsoDate {
@@ -118,7 +133,15 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 		body: "Generated e2e fixture: invalid status and date, on purpose.",
 	};
 
-	return { today, tasks, invalid };
+	const recurring: FixtureRecurringTask = {
+		filename: "Recurring task.md",
+		title: "Recurring task",
+		due: today,
+		frontmatter: { type: "task", status: "todo", due: today, repeat: "FREQ=WEEKLY" },
+		body: "Generated e2e fixture: recurring weekly task.",
+	};
+
+	return { today, tasks, invalid, recurring };
 }
 
 /**
