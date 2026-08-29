@@ -59,7 +59,7 @@ are not in `package.json` yet — added back when the calendar adapter and recur
       title link, date/priority chips, project link, tags) — upgrading the M0 plain-row rendering.
 - [ ] Feed view options (date source, show empty buckets, show completed at bottom).
 - [ ] Row actions: status menu, date modal.
-- [ ] "Create tasks base" command generates `Tasks.base`.
+- [x] "Create tasks base" command generates `Tasks.base` (landed in M1).
 
 ## M3 — Calendar (read-only)
 
