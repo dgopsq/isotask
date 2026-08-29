@@ -63,8 +63,8 @@ export interface Task {
 export type TaskParseError =
 	| { readonly kind: "not-a-task" }
 	| { readonly kind: "missing-status" }
-	| { readonly kind: "unknown-status"; readonly value: string }
-	| { readonly kind: "invalid-priority"; readonly value: string }
+	| { readonly kind: "unknown-status"; readonly value: string; readonly allowed: readonly string[] }
+	| { readonly kind: "invalid-priority"; readonly value: string; readonly allowed: readonly string[] }
 	| { readonly kind: "invalid-date"; readonly property: string; readonly value: string }
 	| { readonly kind: "invalid-duration"; readonly value: string }
 	| { readonly kind: "invalid-tags"; readonly value: string }

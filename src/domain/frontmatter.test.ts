@@ -77,7 +77,11 @@ describe("parseTask", () => {
 		const result = parseTask(path, "Buy milk", { type: "task", status: "someday" }, keys, statuses);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error).toContainEqual({ kind: "unknown-status", value: "someday" });
+			expect(result.error).toContainEqual({
+				kind: "unknown-status",
+				value: "someday",
+				allowed: statuses.map((status) => status.id),
+			});
 		}
 	});
 
@@ -85,7 +89,11 @@ describe("parseTask", () => {
 		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", priority: "asap" }, keys, statuses);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error).toContainEqual({ kind: "invalid-priority", value: "asap" });
+			expect(result.error).toContainEqual({
+				kind: "invalid-priority",
+				value: "asap",
+				allowed: ["low", "normal", "high", "urgent"],
+			});
 		}
 	});
 
@@ -124,6 +132,104 @@ describe("parseTask", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error).toHaveLength(2);
+		}
+	});
+});
+
+describe("parseTask — lenient parse, canonical write", () => {
+	it("accepts a status with surrounding whitespace", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: " todo " }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.status).toBe("todo");
+		}
+	});
+
+	it("accepts a differently-cased status id", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "Done" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.status).toBe("done");
+		}
+	});
+
+	it("accepts a status label in place of its id", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "In progress" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.status).toBe("in-progress");
+		}
+	});
+
+	it("still fails unknown-status for a value that resolves to neither an id nor a label", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "someday" }, keys, statuses);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContainEqual({
+				kind: "unknown-status",
+				value: "someday",
+				allowed: statuses.map((status) => status.id),
+			});
+		}
+	});
+
+	it("accepts a mixed-case priority", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", priority: "HIGH" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.priority).toBe("high");
+		}
+	});
+
+	it("accepts a numeric-string duration", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", duration: "45" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.duration).toBe(45);
+		}
+	});
+
+	it("still fails invalid-duration for a non-integer numeric string", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", duration: "45.5" }, keys, statuses);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContainEqual({ kind: "invalid-duration", value: "45.5" });
+		}
+	});
+
+	it("accepts a space-separated datetime", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", due: "2026-09-01 09:00" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.due).toBe("2026-09-01T09:00");
+		}
+	});
+
+	it("accepts an ISO datetime with seconds, dropping them", () => {
+		const result = parseTask(
+			path,
+			"Buy milk",
+			{ type: "task", status: "todo", due: "2026-09-01T09:00:00" },
+			keys,
+			statuses,
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.due).toBe("2026-09-01T09:00");
+		}
+	});
+
+	it("still fails invalid-date for a timezone-suffixed value", () => {
+		const result = parseTask(
+			path,
+			"Buy milk",
+			{ type: "task", status: "todo", due: "2026-09-01T09:00:00Z" },
+			keys,
+			statuses,
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContainEqual({ kind: "invalid-date", property: "due", value: "2026-09-01T09:00:00Z" });
 		}
 	});
 });

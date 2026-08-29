@@ -1,5 +1,6 @@
 import * as v from "valibot";
 
+import { canonicalizeFrontmatter } from "@/domain/canonicalize";
 import type { TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
@@ -68,7 +69,9 @@ function parseStatus(value: unknown, statuses: readonly StatusConfig[]): Result<
 		return err({ kind: "missing-status" });
 	}
 	const id = parsed.output as StatusId;
-	return findStatus(statuses, id).some ? ok(id) : err({ kind: "unknown-status", value: parsed.output });
+	return findStatus(statuses, id).some
+		? ok(id)
+		: err({ kind: "unknown-status", value: parsed.output, allowed: statuses.map((status) => status.id) });
 }
 
 function parsePriority(value: unknown): Result<Priority, TaskParseError> {
@@ -76,7 +79,7 @@ function parsePriority(value: unknown): Result<Priority, TaskParseError> {
 		return ok("normal");
 	}
 	const parsed = v.safeParse(PrioritySchema, value);
-	return parsed.success ? ok(parsed.output) : err({ kind: "invalid-priority", value: describeValue(value) });
+	return parsed.success ? ok(parsed.output) : err({ kind: "invalid-priority", value: describeValue(value), allowed: PRIORITIES });
 }
 
 function parseOptionalDate(value: unknown, property: string): Result<TaskDate | undefined, TaskParseError> {
@@ -145,16 +148,21 @@ export function parseTask(
 		return err([{ kind: "not-a-task" }]);
 	}
 
-	const status = parseStatus(raw[keys.status], statuses);
-	const priority = parsePriority(raw[keys.priority]);
-	const due = parseOptionalDate(raw[keys.due], keys.due);
-	const scheduled = parseOptionalDate(raw[keys.scheduled], keys.scheduled);
-	const duration = parseOptionalDuration(raw[keys.duration]);
-	const repeat = parseOptionalRepeat(raw[keys.repeat]);
-	const project = parseOptionalProject(raw[keys.project]);
-	const tags = parseTags(raw[keys.tags]);
-	const created = parseOptionalDate(raw[keys.created], keys.created);
-	const completed = parseOptionalDate(raw[keys.completed], keys.completed);
+	// Lenient parse, canonical write (ADR 0010): unambiguous variants (whitespace,
+	// status-label vs. id, numeric-string duration, ...) are folded to their
+	// canonical form before validation, so only genuinely invalid values fail below.
+	const { frontmatter } = canonicalizeFrontmatter(raw, keys, statuses);
+
+	const status = parseStatus(frontmatter[keys.status], statuses);
+	const priority = parsePriority(frontmatter[keys.priority]);
+	const due = parseOptionalDate(frontmatter[keys.due], keys.due);
+	const scheduled = parseOptionalDate(frontmatter[keys.scheduled], keys.scheduled);
+	const duration = parseOptionalDuration(frontmatter[keys.duration]);
+	const repeat = parseOptionalRepeat(frontmatter[keys.repeat]);
+	const project = parseOptionalProject(frontmatter[keys.project]);
+	const tags = parseTags(frontmatter[keys.tags]);
+	const created = parseOptionalDate(frontmatter[keys.created], keys.created);
+	const completed = parseOptionalDate(frontmatter[keys.completed], keys.completed);
 
 	const results: readonly Result<unknown, TaskParseError>[] = [
 		status,

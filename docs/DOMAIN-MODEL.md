@@ -202,3 +202,32 @@ Frontmatter parsing never throws and never crashes a view. `domain/frontmatter.t
 - A `repeat` present without a usable anchor (`due`/`scheduled`) is treated as a parse *warning*,
   not a hard error: the task still renders and behaves normally, it simply never spawns on
   completion.
+
+### Lenient parse, canonical write
+
+Task frontmatter is edited as free text in Obsidian's Properties panel, so unambiguous but
+non-canonical variants are common — trailing whitespace, a status *label* typed instead of its id,
+a scalar tag, a duration typed as a quoted number, a datetime typed with a space instead of `T`.
+Rejecting all of these would make a task silently vanish from every view over a typo. Per ADR 0010,
+`domain/frontmatter.ts` runs `domain/canonicalize.ts`'s `canonicalizeFrontmatter` over the raw
+frontmatter before validating it, so `parseTask` accepts:
+
+- **status** — leading/trailing whitespace; any case variant of a configured status `id`
+  (`"Done"` → `done`); any case variant of a configured status *label* (`"In progress"` →
+  `in-progress`). A value matching neither an id nor a label is left as-is and still fails with
+  `unknown-status`.
+- **priority** — leading/trailing whitespace and any case variant, if the lower-cased result is a
+  known `Priority` (`"HIGH"` → `high`). Anything else still fails with `invalid-priority`.
+- **duration** — a non-negative-integer *string* becomes a number (`"45"` → `45`). A decimal or
+  negative string is left as-is and still fails with `invalid-duration`.
+- **tags** — unchanged from the parser's existing behaviour: a scalar string becomes a
+  one-element list.
+- **due/scheduled/created/completed** — `YYYY-MM-DD HH:mm` and `YYYY-MM-DD HH:mm:ss`
+  (space-separated) and `YYYY-MM-DDTHH:mm:ss` (seconds included) all fold to the canonical
+  `YYYY-MM-DDTHH:mm`; surrounding whitespace is trimmed. Timezone-suffixed values (`Z`, `+01:00`,
+  ...) are never accepted — dates are local wall-clock only (ADR 0008).
+
+`canonicalizeFrontmatter` also reports, per key, the exact patch (`from`/`to`/`reason`) that would
+make the note canonical — the plugin never applies this patch automatically; a future
+user-triggered linter command is expected to offer it (ADR 0010). Canonicalizing already-canonical
+frontmatter is a no-op (zero fixes), and only the configured property keys are ever touched.
