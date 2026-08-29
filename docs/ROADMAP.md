@@ -63,15 +63,15 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 
 ## M3 — Calendar (read-only)
 
-- [ ] `domain/calendar-events.ts`: `eventsForTask` (pure, tested).
-- [ ] `CalendarRenderer` port finalized (already sketched in `src/ports/calendar-renderer.ts`).
-- [ ] Event Calendar (`@event-calendar/core`) adapter implementing the port in
+- [x] `domain/calendar-events.ts`: `eventsForTask` (pure, tested).
+- [x] `CalendarRenderer` port finalized (already sketched in `src/ports/calendar-renderer.ts`).
+- [x] Event Calendar (`@event-calendar/core`) adapter implementing the port in
       `src/adapters/calendar/` (see that directory's `README.md`); add `@event-calendar/core` back
       to `package.json`.
-- [ ] Event derivation (`scheduled`/`due` events per the `events` view option).
-- [ ] Theming: Event Calendar CSS variables mapped to Obsidian theme variables
+- [x] Event derivation (`scheduled`/`due` events per the `events` view option).
+- [x] Theming: Event Calendar CSS variables mapped to Obsidian theme variables
       (`src/styles/calendar.css`); priority-to-color mapping.
-- [ ] Calendar view options (initial view, events source, first day of week) — replacing the M0
+- [x] Calendar view options (initial view, events source, first day of week) — replacing the M0
       placeholder view.
 
 ## M4 — Calendar interactions

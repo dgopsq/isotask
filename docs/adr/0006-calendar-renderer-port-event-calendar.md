@@ -38,6 +38,34 @@ Negative:
   set events, click/drop/resize callbacks); an Event-Calendar-specific feature that doesn't fit
   the port abstraction can't be used without widening the port.
 
+## Bundle size (measured, M3 Wave 3)
+
+Before this wave, `main.js` had `EventCalendarRenderer` written (Wave 2) but not yet constructed or
+imported anywhere — esbuild's tree-shaking dropped `@event-calendar/core` (and the Svelte runtime
+it pulls in) from the bundle entirely, so a build at `7da81b4` (the tip of Wave 2) doesn't yet carry
+the library's real cost. Wiring `EventCalendarRenderer` into `main.ts` (Wave 3) is what actually
+pulls it in:
+
+| | `main.js` raw | `main.js` gzip |
+|---|---|---|
+| `7da81b4` (Wave 2 tip, adapter unused) | 100,581 B (~98 KiB) | 30,197 B (~29 KiB) |
+| After Wave 3 (adapter wired into `main.ts`) | 234,953 B (~229 KiB) | 76,162 B (~74 KiB) |
+| Delta | +134,372 B | +45,965 B (~45 KiB) |
+
+The ~45 KiB gz delta is above this ADR's original ~35 KiB gz estimate for Event Calendar alone —
+plausibly the Svelte 5 runtime and/or the three imported plugins (`DayGrid`, `TimeGrid`, `List`)
+cost more once actually bundled than the unminified `dist/index.js` size suggested at decision time
+(see the M3 plan's "`@event-calendar/core` facts" for that estimate's basis). More notably, this
+ADR's Context cites a **~150 KiB minified** budget for the whole plugin, and the measured minified
+`main.js` (~229 KiB raw) is already over it — the raw/minified number is the one to hold against a
+"minified" budget, not the gzip figure, and rrule/date-fns/valibot (already in the bundle before
+M3) account for some of the pre-existing gap too. This wasn't caught during Wave 2 because the
+adapter sat unconstructed and tree-shaken out until Wave 3 wired it in; flagging here rather than
+quietly treating the budget as met — a follow-up should either revisit the budget number or look at
+trimming (e.g. checking whether Event Calendar's Svelte runtime can be shared/slimmed, or whether
+the ~150 KiB figure was gzip-based all along and just mislabeled "minified" when this ADR was
+written).
+
 ## Alternatives considered
 
 - **FullCalendar v6.** Rejected: larger bundle footprint than Event Calendar and uses an internal

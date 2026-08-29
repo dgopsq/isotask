@@ -97,6 +97,54 @@ covers option changes too. The probe found this by inspecting the runtime "bases
 prototype chain (`leaf.view.controller.view` is the actual registered `BasesView` instance) and
 calling `config.set()` on it directly, rather than driving Bases' own options-panel DOM.
 
+## Data flow: Bases calendar view render path
+
+```
+Bases (.base file)                     obtask-calendar BasesView
+┌─────────────────────┐   entries      ┌──────────────────────────────────┐
+│ filters/sort/group   ├───────────────▶ for each group, for each entry:   │
+│ (owned by Bases)     │                │   entry.file                    │
+└─────────────────────┘                │       │                         │
+                                        │       ▼                         │
+                             metadataCache.getFileCache(file)             │
+                                        │       │ .frontmatter            │
+                                        │       ▼                         │
+                                domain/frontmatter.ts (parse)             │
+                                        │       │ Result<Task, Error[]>   │
+                                        │       ▼                         │
+                              domain/calendar-events.ts#eventsForTask     │
+                              (up to 2 events/task: due, scheduled)       │
+                                        │       │                         │
+                                        │       ▼                         │
+                              ports.CalendarRenderer.mount(...) — once —  │
+                              then CalendarHandle.setEvents/setView/      │
+                              setFirstDay on every later onDataUpdated    │
+                                        └──────────────────────────────────┘
+```
+
+**Outer Bases groups are ignored**: `groupedData`'s groups make sense for the feed (a heading per
+group) but not for a single continuous timeline, so `eventsForTask` is called across every group's
+entries and every task's events land on the same calendar — there is no per-group calendar
+section.
+
+**Mount happens once, not on every render.** The first `onDataUpdated` creates the `.obtask-calendar`
+root and calls `CalendarRenderer.mount(...)`; every subsequent `onDataUpdated` (a real data change,
+or a view-option change via `config.set()` — same reactivity finding as the feed, above) instead
+calls the already-mounted `CalendarHandle`'s `setEvents`/`setView`/`setFirstDay`. Destroying and
+recreating the widget on every update would reset Event Calendar's internal navigation state
+(whatever month/week/day the user had navigated to) back to today — the handle exists precisely so
+a view-option or data change doesn't do that. The handle is torn down once, in the view's
+`onunload()` (`BasesView` extends `Component`, so this is the same `Component` lifecycle hook every
+other view/registration in this codebase relies on — see `docs/CONVENTIONS.md`).
+
+An entry that fails to parse is not rendered as a calendar event (a calendar has no per-row slot to
+show an "invalid task" the way a feed row can); the view instead shows a small muted count line
+above the calendar root when at least one entry in view is invalid.
+
+`firstDay: "default"` (the option's own default — see `domain/calendar-view-options.ts`) resolves
+to `getWeekStart()` at render time, not at option-registration time, so it always tracks the
+current plugin setting for a view that has never had `firstDay` explicitly overridden.
+
 ## Data flow: complete-task path
 
 ```
@@ -170,11 +218,15 @@ use-cases (never imported directly by `domain`).
   idempotently if the target path already exists).
 - **Notifier** — user-visible feedback without coupling `app` to Obsidian's `Notice`. Method:
   `notify(message: string): void`.
-- **CalendarRenderer** — abstracts the calendar widget library. Methods: `mount(container:
-  HTMLElement, options: CalendarOptions): CalendarHandle`, `setEvents(handle, events:
-  CalendarEvent[]): void`, `onEventClick(handle, cb)`, `onEventDrop(handle, cb)`,
-  `onSlotClick(handle, cb)`, `destroy(handle): void`. Exact shape is finalized in M3 — TBD (M3)
-  for the full type.
+- **CalendarRenderer** — abstracts the calendar widget library (`src/ports/calendar-renderer.ts`,
+  finalized M3). One method, `mount(container: HTMLElement, options: CalendarOptions):
+  CalendarHandle`; `CalendarOptions` carries `initialView`/`firstDay`/`editable?` plus an all-optional
+  `CalendarCallbacks` (`onEventClick`/`onEventMoved`/`onSlotClick` — unwired in M3, `callbacks: {}`;
+  M4's extension point). The returned `CalendarHandle` is how a view drives an already-mounted
+  calendar without remounting it: `setEvents`, `setView`, `setFirstDay`, `goTo`, `next`, `prev`,
+  `today`, `destroy`. `CalendarEvent`/`CalendarViewKind` are domain types
+  (`domain/calendar-events.ts`, `domain/calendar-view-options.ts`), imported by the port rather than
+  defined in it — they're derived data, not part of the widget-abstraction surface.
 - **PathResolver** — vault-path concerns kept out of `domain`. Methods: `exists(path: TaskPath):
   boolean`, `normalize(path: string): TaskPath`, `resolveSpawnPath(seriesTitle: string, nextDue:
   TaskDate): TaskPath` (applies the configured spawned-occurrence filename template).

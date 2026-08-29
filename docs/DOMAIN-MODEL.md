@@ -179,8 +179,16 @@ Each task can contribute up to two calendar events, controlled by the `events` v
   case a timed (typically zero-duration/marker) event at that time.
 
 A task with both `due` and `scheduled` set and `events: both` produces two separate calendar
-events for the same task. Event color follows `priority` via Obsidian's `--color-*` palette
-variables (exact mapping TBD (M3)).
+events for the same task. Event color follows `priority` by reusing the feed's existing
+`domain/task.ts#priorityChipClass` mapping — no new priority-to-color table. The adapter
+(`event-calendar-mapping.ts#toEventCalendarEvent`) attaches `obtask-priority-<priority>` as one of
+the event's `classNames`, and `styles/calendar.css` maps each to an Obsidian `--color-*` variable,
+scoped under `.obtask-calendar` so it doesn't affect the feed's own (differently-styled) priority
+chip: `urgent`/`high` set the event's background (`--color-red`/`--color-orange`) plus
+`--text-on-accent` text; `normal`/`low` leave the background alone and only tint the event's
+left-edge accent bar (`--text-muted`/`--text-faint`). No recurrence expansion: `eventsForTask`
+never reads `repeat` — one note is one occurrence (ADR 0005), so a recurring task's calendar
+presence is exactly its own `due`/`scheduled` values, with no future-occurrence events synthesized.
 
 ## Parse-error policy
 
