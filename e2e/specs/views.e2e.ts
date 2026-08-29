@@ -803,6 +803,83 @@ describe("Views", function () {
 		});
 
 		/**
+		 * Day view's time grid is the same `.ec-time-grid` theme as week
+		 * (just one column instead of seven — see the `ec-week-view` test
+		 * above), so it renders the same timed blocks with the same
+		 * `@container obtask-event` height-query rule (`calendar.css`) that
+		 * hides `.ec-event-time` in a too-short block. "Team sync" (1-hour,
+		 * `slotHeight: 32` -> ~32px block) is below the rule's 3.5em/~42px
+		 * threshold and must hide its time line; "Planning session"
+		 * (2-hour, ~64px block, `e2e/fixtures.ts`) is above it and must
+		 * show a non-empty one.
+		 */
+		it("hides the time line in a too-short timed block but shows it in a tall one (day view)", async function () {
+			await browser.executeObsidian(({ app }) => {
+				const leaves = app.workspace.getLeavesOfType("bases");
+				const leaf = leaves[0];
+				if (leaf === undefined) {
+					throw new Error("no bases leaf found");
+				}
+				const outerView = leaf.view as unknown as {
+					controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+				};
+				outerView.controller.view.config.set("initialView", "day");
+			});
+
+			await browser.$(`.${cssClass("calendar")} .ec-day-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const timedEventEl = browser.$(`.${cssClass("calendar")} .ec-time-grid .ec-body .ec-event`);
+			await timedEventEl.waitForExist({ timeout: SELECT_TIMEOUT });
+
+			// Scroll the time grid's own scroll container to the top, same
+			// reasoning as the week-view screenshot above: EC auto-scrolls to
+			// the current wall-clock time on mount, which can push the
+			// morning/afternoon blocks used here out of frame.
+			await browser.execute((calendarCls) => {
+				const main = document.querySelector(`.${calendarCls} .ec-main`);
+				if (main !== null) {
+					main.scrollTop = 0;
+				}
+			}, cssClass("calendar"));
+
+			async function timeLineOf(title: string): Promise<{ readonly display: string; readonly text: string | null } | null> {
+				return browser.execute(
+					(bodyCls, titleCls, timeCls, wantedTitle) => {
+						for (const body of Array.from(document.querySelectorAll(`.${bodyCls}`))) {
+							const titleEl = body.querySelector(`.${titleCls}`);
+							if (titleEl?.textContent !== wantedTitle) {
+								continue;
+							}
+							const timeEl = body.querySelector(`.${timeCls}`);
+							if (timeEl === null) {
+								return null;
+							}
+							return { display: getComputedStyle(timeEl).display, text: timeEl.textContent };
+						}
+						return null;
+					},
+					"ec-event-body",
+					"ec-event-title",
+					"ec-event-time",
+					title,
+				);
+			}
+
+			const teamSyncTime = await timeLineOf("Team sync");
+			expect(teamSyncTime).not.toBeNull();
+			expect(teamSyncTime?.display).toEqual("none");
+
+			const planningTime = await timeLineOf("Planning session");
+			expect(planningTime).not.toBeNull();
+			expect(planningTime?.display).not.toEqual("none");
+			expect((planningTime?.text ?? "").trim().length).toBeGreaterThan(0);
+
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("calendar-day");
+			}
+		});
+
+		/**
 		 * "Deadline call" (`due: <today>T14:30`, no `scheduled` — see
 		 * `e2e/fixtures.ts`) is the only fixture with a timed `due`. Per ADR
 		 * 0011, a zero-duration point event (a timed `due`, or a timed

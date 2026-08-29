@@ -185,6 +185,21 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			bucket: "no-date",
 		},
 		{
+			filename: "Planning session.md",
+			title: "Planning session",
+			// A 2-hour timed block (>= 2 * slotHeight = 64px, `event-calendar-
+			// renderer.ts`) — tall enough for both the title and the time
+			// line to fit. `views.e2e.ts`'s day-view suite uses this
+			// alongside "Team sync"'s 1-hour block to assert the
+			// `@container` height query in `calendar.css` that hides
+			// `.ec-event-time` in a too-short block: hidden in the 1h block,
+			// visible here. No `due`, so — like the other `scheduled`-only
+			// fixtures — it falls into the Feed's "no-date" bucket.
+			frontmatter: { type: "task", status: "todo", scheduled: `${today}T13:00`, duration: "120", priority: "normal" },
+			body: "Generated e2e fixture: 2-hour timed scheduled block.",
+			bucket: "no-date",
+		},
+		{
 			filename: "Deadline call.md",
 			title: "Deadline call",
 			// A timed `due` with no `scheduled` — `due` never carries a
