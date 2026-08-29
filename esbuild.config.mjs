@@ -19,26 +19,9 @@ const renameCssPlugin = {
 			if (fs.existsSync("main.css")) {
 				fs.renameSync("main.css", "styles.css");
 			}
-			copyToVault();
 		});
 	},
 };
-
-/**
- * When OBSIDIAN_VAULT is set, copy the built plugin into that vault after
- * every build (real files: Obsidian does not reliably see symlinks).
- * `pnpm dev:link <vault>` sets up the folder and prints the env var to use.
- */
-function copyToVault() {
-	const vault = process.env.OBSIDIAN_VAULT;
-	if (!vault) return;
-	const target = `${vault}/.obsidian/plugins/obtask`;
-	fs.mkdirSync(target, { recursive: true });
-	for (const file of ["main.js", "styles.css", "manifest.json"]) {
-		if (fs.existsSync(file)) fs.copyFileSync(file, `${target}/${file}`);
-	}
-	console.log(`copied plugin to ${target}`);
-}
 
 const context = await esbuild.context({
 	banner: {

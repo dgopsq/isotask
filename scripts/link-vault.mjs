@@ -1,8 +1,7 @@
-// Copy the built plugin files into an Obsidian vault for local development.
+// Symlink the built plugin files into an Obsidian vault for local development.
 // Usage: pnpm dev:link /path/to/vault   (or set OBSIDIAN_VAULT)
-// Real copies, not symlinks: Obsidian does not reliably list symlinked plugin
-// files. For continuous updates run `OBSIDIAN_VAULT=/path/to/vault pnpm dev`.
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+// Then run `pnpm dev` and reload the plugin in Obsidian after each build.
+import { existsSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 const vault = process.argv[2] ?? process.env.OBSIDIAN_VAULT;
@@ -20,7 +19,9 @@ const target = resolve(vault, ".obsidian", "plugins", "obtask");
 mkdirSync(target, { recursive: true });
 
 for (const file of ["main.js", "styles.css", "manifest.json"]) {
-	copyFileSync(resolve(repo, file), resolve(target, file));
-	console.log(`copied ${file} -> ${target}`);
+	const link = resolve(target, file);
+	rmSync(link, { force: true });
+	symlinkSync(resolve(repo, file), link);
+	console.log(`${link} -> ${resolve(repo, file)}`);
 }
-console.log(`\nDone. Enable Obtask in Settings → Community plugins. For live rebuilds:\n  OBSIDIAN_VAULT="${vault}" pnpm dev`);
+console.log("\nLinked. Run `pnpm dev`, enable Obtask in Settings → Community plugins, and reload after builds.");
