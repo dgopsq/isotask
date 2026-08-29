@@ -113,6 +113,67 @@ async function clickFeedDateChip(title: string): Promise<void> {
 	}
 }
 
+/** Clicks a feed row's priority control by the row's title text — same technique as `clickFeedDateChip`. */
+async function clickFeedPriorityControl(title: string): Promise<void> {
+	const clicked = await browser.execute(
+		(rowCls, titleCls, priorityCls, wantedTitle) => {
+			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+				const titleEl = row.querySelector(`.${titleCls}`);
+				if (titleEl?.textContent === wantedTitle) {
+					const control = row.querySelector(`.${priorityCls}`);
+					if (control instanceof HTMLElement) {
+						control.click();
+						return true;
+					}
+				}
+			}
+			return false;
+		},
+		cssClass("feed__row"),
+		cssClass("feed__title"),
+		cssClass("feed__priority"),
+		title,
+	);
+	if (!clicked) {
+		throw new Error(`priority control for "${title}" not found in the feed`);
+	}
+}
+
+/**
+ * Dispatches a synthetic `contextmenu` event on a feed row, found by its
+ * title text — real right-click simulation is unreliable in this Electron
+ * build (same rationale as the date-input `dispatchEvent` calls above), so
+ * this drives the row's own `contextmenu` listener directly instead.
+ */
+async function rightClickFeedRow(title: string): Promise<void> {
+	const dispatched = await browser.execute(
+		(rowCls, titleCls, wantedTitle) => {
+			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+				const titleEl = row.querySelector(`.${titleCls}`);
+				if (titleEl?.textContent === wantedTitle) {
+					const rect = row.getBoundingClientRect();
+					row.dispatchEvent(
+						new MouseEvent("contextmenu", {
+							bubbles: true,
+							cancelable: true,
+							clientX: rect.left + 10,
+							clientY: rect.top + 5,
+						}),
+					);
+					return true;
+				}
+			}
+			return false;
+		},
+		cssClass("feed__row"),
+		cssClass("feed__title"),
+		title,
+	);
+	if (!dispatched) {
+		throw new Error(`row for "${title}" not found in the feed`);
+	}
+}
+
 async function inputAt(modalCls: string, type: string, index: number): Promise<WebdriverIO.Element> {
 	const els = await browser.$$(`.${modalCls} input[type="${type}"]`).getElements();
 	const el = els[index];
@@ -347,6 +408,80 @@ describe("Views", function () {
 			await waitForFrontmatter(path, "due", (v) => v === newDue, `${path} due date never updated via the feed's date chip`);
 			const fm = await frontmatterOf(path);
 			expect(fm?.["due"]).toEqual(newDue);
+		});
+
+		it("priority control opens buildPriorityMenu and dispatches setPriority on pick", async function () {
+			// Defaults to "normal" (no explicit `priority` in its frontmatter,
+			// per `e2e/fixtures.ts`), so picking "High" is an observable change.
+			const task = fixtures.tasks[2];
+			if (task === undefined) {
+				throw new Error("expected fixtures.tasks[2] (This week or next week task) to exist");
+			}
+			const path = `Tasks/${task.filename}`;
+
+			await clickFeedPriorityControl(task.title);
+
+			for (const label of ["Low", "Normal", "High", "Urgent"]) {
+				await browser.$(`.menu-item-title=${label}`).waitForDisplayed({ timeout: SELECT_TIMEOUT });
+			}
+
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("feed-priority-menu");
+			}
+
+			await browser.$(".menu-item-title=High").click();
+
+			await waitForFrontmatter(path, "priority", (v) => v === "high", `${path} priority never updated via the feed's priority control`);
+			const fm = await frontmatterOf(path);
+			expect(fm?.["priority"]).toEqual("high");
+
+			// The Bases view re-renders on the metadata cache's own "resolved"
+			// event, which can lag a tick behind `waitForFrontmatter`'s cache
+			// read above — poll the row's text rather than reading it once.
+			let rowPriorityText: string | null = null;
+			await browser.waitUntil(
+				async () => {
+					rowPriorityText = await browser.execute(
+						(rowCls, titleCls, priorityCls, wantedTitle) => {
+							for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+								const titleEl = row.querySelector(`.${titleCls}`);
+								if (titleEl?.textContent === wantedTitle) {
+									return row.querySelector(`.${priorityCls}`)?.textContent ?? null;
+								}
+							}
+							return null;
+						},
+						cssClass("feed__row"),
+						cssClass("feed__title"),
+						cssClass("feed__priority"),
+						task.title,
+					);
+					return rowPriorityText === "High";
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "High"` },
+			);
+			expect(rowPriorityText).toEqual("High");
+		});
+
+		it("right-click on a row opens buildTaskEditMenu with a Project… entry", async function () {
+			const task = fixtures.tasks[3];
+			if (task === undefined) {
+				throw new Error("expected fixtures.tasks[3] (Later task) to exist");
+			}
+
+			await rightClickFeedRow(task.title);
+
+			const projectItem = browser.$(".menu-item-title=Project…");
+			await projectItem.waitForDisplayed({ timeout: SELECT_TIMEOUT });
+			expect(await projectItem.isDisplayed()).toBe(true);
+
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("feed-row-context-menu");
+			}
+
+			// Closes the menu without picking anything, so it doesn't leak into
+			// later tests sharing this window.
+			await browser.keys("Escape");
 		});
 	});
 
