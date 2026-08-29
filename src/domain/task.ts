@@ -40,6 +40,18 @@ export function priorityChipClass(priority: Priority): string {
 	return `priority-${priority}`;
 }
 
+const PRIORITY_LABELS: Readonly<Record<Priority, string>> = {
+	low: "Low",
+	normal: "Normal",
+	high: "High",
+	urgent: "Urgent",
+};
+
+/** Human-readable label for a priority, e.g. `"high"` -> `"High"`. Shared by the create-task modal, the feed row's priority control and `ui/priority-menu.ts`. */
+export function priorityLabel(priority: Priority): string {
+	return PRIORITY_LABELS[priority];
+}
+
 export type Minutes = Brand<number, "Minutes">;
 
 /** An RFC 5545 RRULE body only, no `DTSTART` (e.g. `FREQ=WEEKLY;BYDAY=MO`). */

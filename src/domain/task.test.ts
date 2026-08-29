@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PRIORITIES, priorityChipClass, priorityRank } from "@/domain/task";
+import { PRIORITIES, priorityChipClass, priorityLabel, priorityRank } from "@/domain/task";
 
 describe("priorityRank", () => {
 	it("orders priorities low to high", () => {
@@ -28,5 +28,16 @@ describe("priorityChipClass", () => {
 	it("produces a distinct class per priority", () => {
 		const classes = new Set(PRIORITIES.map(priorityChipClass));
 		expect(classes.size).toBe(PRIORITIES.length);
+	});
+});
+
+describe("priorityLabel", () => {
+	it("capitalises each priority", () => {
+		expect(PRIORITIES.map(priorityLabel)).toEqual(["Low", "Normal", "High", "Urgent"]);
+	});
+
+	it("produces a distinct label per priority", () => {
+		const labels = new Set(PRIORITIES.map(priorityLabel));
+		expect(labels.size).toBe(PRIORITIES.length);
 	});
 });
