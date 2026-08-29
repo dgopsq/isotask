@@ -63,6 +63,15 @@ export interface Fixtures {
 	readonly tasks: readonly FixtureTask[];
 	readonly invalid: FixtureInvalidTask;
 	readonly recurring: FixtureRecurringTask;
+	/**
+	 * `scheduled` date on the "Today task" fixture (below `tasks`, alongside
+	 * its `due: today`) — used by `e2e/specs/views.e2e.ts`'s "Calendar view"
+	 * suite to exercise the `events: both` -> `scheduled` view-option switch:
+	 * one task carrying both fields lets the switch be asserted as "the due
+	 * event disappears, the scheduled one stays" on the same note, rather
+	 * than needing to correlate two different fixture tasks.
+	 */
+	readonly todayTaskScheduled: IsoDate;
 }
 
 function isoDate(date: Date): IsoDate {
@@ -87,6 +96,7 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 	const dueToday = dueWithBucket(0);
 	const soon = dueWithBucket(2);
 	const later = dueWithBucket(20);
+	const todayTaskScheduled = isoDate(addDays(now, 3));
 
 	const tasks: readonly FixtureTask[] = [
 		{
@@ -104,7 +114,12 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 		{
 			filename: "Today task.md",
 			title: "Today task",
-			frontmatter: { type: "task", status: "todo", due: dueToday.due },
+			// `scheduled` (M3 Wave 3) alongside `due` so the calendar view's
+			// `events: both` default renders two events for this one note —
+			// see `Fixtures.todayTaskScheduled`. Doesn't affect any Feed
+			// assertion: the feed's default `dateSource` is "due", which
+			// ignores `scheduled` for both anchor and bucket purposes.
+			frontmatter: { type: "task", status: "todo", due: dueToday.due, scheduled: todayTaskScheduled },
 			body: "Generated e2e fixture: due today.",
 			bucket: dueToday.bucket,
 		},
@@ -146,7 +161,7 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 		body: "Generated e2e fixture: recurring weekly task.",
 	};
 
-	return { today, tasks, invalid, recurring };
+	return { today, tasks, invalid, recurring, todayTaskScheduled };
 }
 
 /**

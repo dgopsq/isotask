@@ -365,6 +365,27 @@ describe("Views", function () {
 		});
 	});
 
+	/**
+	 * `.ec` is Event Calendar's own root class (rendered inside our
+	 * `.obtask-calendar` wrapper — see `calendar-view.ts`); `.ec-event` is
+	 * its per-event element, which carries the extra classes
+	 * `event-calendar-mapping.ts#toEventCalendarEvent` attaches
+	 * (`obtask-event`, `obtask-event--due`/`--scheduled`,
+	 * `obtask-priority-*`) alongside Event Calendar's own. Reads every
+	 * rendered event's title text + full class list in one pass so a test
+	 * can filter/assert without a second round trip into the Obsidian window.
+	 */
+	async function readCalendarEvents(): Promise<{ readonly title: string; readonly className: string }[]> {
+		return browser.execute(
+			(eventCls) =>
+				Array.from(document.querySelectorAll(`.${eventCls}`)).map((el) => ({
+					title: el.querySelector(".ec-event-title")?.textContent ?? "",
+					className: el.className,
+				})),
+			cssClass("event"),
+		);
+	}
+
 	describe("Calendar view", function () {
 		before(async function () {
 			// Switch from the default "Feed" view to "Calendar" through the Bases
@@ -374,13 +395,78 @@ describe("Views", function () {
 			await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button").click();
 			await browser.$(".bases-toolbar-menu-item-name=Calendar").click();
 
-			await browser.$(`.${cssClass("calendar")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
 		});
 
-		it("renders the calendar placeholder mentioning the task count", async function () {
-			const el = browser.$(`.${cssClass("calendar")}`);
-			await expect(el).toExist();
-			await expect(el).toHaveText("task(s) in view", { containing: true });
+		it("renders the Event Calendar root inside .obtask-calendar, in the default month view", async function () {
+			await expect(browser.$(`.${cssClass("calendar")} .ec`)).toExist();
+			// Month view renders an `.ec-day-grid` grid and no `.ec-list` — the
+			// inverse of the "list" assertion below.
+			await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).toExist();
+			await expect(browser.$(`.${cssClass("calendar")} .ec-list`)).not.toExist();
+		});
+
+		it("renders the due-today fixture task as a due event with its priority class", async function () {
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task"),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task event never appeared" },
+			);
+
+			const events = await readCalendarEvents();
+			const dueEvent = events.find((e) => e.title === "Today task" && e.className.includes(cssClass("event--due")));
+			expect(dueEvent).toBeDefined();
+			expect(dueEvent?.className).toContain(cssClass(priorityChipClass("normal")));
+		});
+
+		/**
+		 * "Today task" carries both `due` (today) and `scheduled`
+		 * (`fixtures.todayTaskScheduled`) — see `e2e/fixtures.ts`. Default
+		 * `events: both` renders one event per field; switching to
+		 * `events: scheduled` (same `config.set()` path M2 proved re-renders
+		 * with no extra plumbing — see the "Feed view options" describe
+		 * block above) should drop the due event and keep the scheduled one.
+		 */
+		it("re-renders with only the scheduled event when the events option changes to scheduled", async function () {
+			await browser.executeObsidian(({ app }) => {
+				const leaves = app.workspace.getLeavesOfType("bases");
+				const leaf = leaves[0];
+				if (leaf === undefined) {
+					throw new Error("no bases leaf found");
+				}
+				const outerView = leaf.view as unknown as {
+					controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+				};
+				outerView.controller.view.config.set("events", "scheduled");
+			});
+
+			await browser.waitUntil(
+				async () => !(await readCalendarEvents()).some((e) => e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "due event never disappeared after switching to events: scheduled" },
+			);
+
+			const events = await readCalendarEvents();
+			const scheduledEvent = events.find(
+				(e) => e.title === "Today task" && e.className.includes(cssClass("event--scheduled")),
+			);
+			expect(scheduledEvent).toBeDefined();
+			expect(events.some((e) => e.className.includes(cssClass("event--due")))).toBe(false);
+		});
+
+		it("switches the Event Calendar view class when initialView changes to list", async function () {
+			await browser.executeObsidian(({ app }) => {
+				const leaves = app.workspace.getLeavesOfType("bases");
+				const leaf = leaves[0];
+				if (leaf === undefined) {
+					throw new Error("no bases leaf found");
+				}
+				const outerView = leaf.view as unknown as {
+					controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+				};
+				outerView.controller.view.config.set("initialView", "list");
+			});
+
+			await browser.$(`.${cssClass("calendar")} .ec-list`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
 		});
 	});
 
