@@ -1,5 +1,8 @@
 /*
  * Obtask styles. Theme variables only — no hardcoded colors (docs/CONVENTIONS.md).
+ *
+ * Class prefix `obtask-` must match PLUGIN_ID in manifest.json (see
+ * src/plugin-id.ts); renaming = one search/replace here.
  */
 
 .obtask-feed {

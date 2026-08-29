@@ -92,13 +92,27 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   doesn't belong in the fast inner loop or in CI's default gate. Run it locally before a release or
   after touching a Bases view.
 
-  **Running it**: `pnpm test:e2e`. This builds the plugin (`pnpm build`), regenerates the
-  date-relative fixture notes (`tsx e2e/generate-fixtures.mts`), then runs `wdio run
-  wdio.conf.mts`. `wdio-obsidian-service` downloads the latest stable Obsidian app + installer
-  into `.obsidian-cache/` on first run (gitignored; the download is cached across runs) and opens
-  a real, visible Obsidian window against a sandboxed copy of `e2e/vault/` — Obsidian doesn't
-  support headless automation, so this can't run without a display (e.g. a bare CI runner without
-  Xvfb).
+  **Running it**: `pnpm test:e2e`. This builds the plugin with esbuild only (`pnpm build:fast` —
+  no `tsc` pass; typechecking already happens in `pnpm check`), regenerates the date-relative
+  fixture notes (`tsx e2e/generate-fixtures.mts`), then runs `wdio run wdio.conf.mts`.
+  `wdio-obsidian-service` downloads the latest stable Obsidian app + installer into
+  `.obsidian-cache/` on first run (gitignored; the download and the app/installer binaries are
+  cached across runs, so a normal re-run launches Obsidian with no download) and opens a real,
+  visible Obsidian window against a sandboxed copy of `e2e/vault/` — Obsidian doesn't support
+  headless automation, so this can't run without a display (e.g. a bare CI runner without Xvfb).
+  wdio-obsidian-service launches one Obsidian instance per spec *file*, which dominates the run's
+  wall time — that's why the suite is one file (`e2e/specs/views.e2e.ts`) covering both views
+  sharing one `before`-opened session, rather than one file per view.
+
+  **Output is quiet by default** (`pnpm test:e2e`): `wdio.conf.mts` uses a custom
+  `e2e/quiet-reporter.ts` (`logLevel: "silent"`) that prints one line on success
+  (`e2e: N passed in Xs`) and, on failure, only the failing titles, error message, and first 5
+  stack lines — this is read by an AI agent as often as a human, so the output stays small either
+  way. Run `pnpm test:e2e:verbose` (sets `E2E_VERBOSE=1`) for the full `wdio-obsidian-reporter`
+  spec tree plus wdio/service/Obsidian command logging when debugging locally. Screenshots are
+  taken only on a failing test by default (`e2e/screenshots/failure-<slugified-test-title>.png`,
+  via an `afterEach` hook) — the success path writes nothing to `e2e/screenshots/`. Set
+  `E2E_SCREENSHOT=1` to also save an always-on `e2e/screenshots/feed.png` for manual review.
 
   **Fixture generation**: `e2e/vault/` is checked in (a minimal vault with `.obsidian/`
   core-plugins config enabling `bases`/`properties`, and `Tasks.base` with the Feed view listed
@@ -107,18 +121,30 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   `buildFixtures(now)`, which computes each note's due date relative to `now` (`date-fns`, Monday
   week start) and its expected feed bucket by calling the real `bucketFor` from
   `src/domain/buckets.ts` — so the notes and the assertions about them never hard-code a date or a
-  bucket boundary, and the suite passes on any day it runs. `e2e/fixtures.ts` is imported by both
-  the generator and the specs (single source of truth for fixture data); everything under `e2e/`
-  runs via `tsx` (not plain `node`) so the `@/domain/**` path alias resolves the same way it does
-  for `src/`.
+  bucket boundary, and the suite passes on any day it runs. Generation is idempotent: a note whose
+  content hasn't changed since the last run (the common case — reruns on the same day) is left
+  untouched rather than rewritten, so this step is effectively instant on a warm vault; only stray
+  files and notes whose content actually changed (e.g. the date rolled over) get written.
+  `e2e/fixtures.ts` is imported by both the generator and the specs (single source of truth for
+  fixture data); everything under `e2e/` runs via `tsx` (not plain `node`) so the `@/domain/**`
+  path alias resolves the same way it does for `src/`.
 
   **Adding a spec**: drop a new `e2e/specs/<name>.e2e.ts` — `wdio.conf.mts`'s `specs` glob
-  (`./e2e/specs/**/*.e2e.ts`) picks it up automatically. Import `describe`/`it`/`before` from
-  `"mocha"` and `browser`/`expect` from `"@wdio/globals"` explicitly (don't rely on injected
-  globals). Use `browser.executeObsidian(({ app }) => ...)` to drive the Obsidian API (e.g. open a
-  base with `app.workspace.openLinkText(...)`), and prefer the plugin's existing `obtask-*` CSS
-  classes as selectors over adding new ones. Switch a Bases view via its toolbar menu:
-  `browser.$(".bases-toolbar-views-menu .text-icon-button").click()` opens it, then
+  (`./e2e/specs/**/*.e2e.ts`) picks it up automatically, but prefer adding a `describe` block to
+  the existing `e2e/specs/views.e2e.ts` (or another file already sharing its Obsidian session)
+  over a new file, since each spec *file* costs a full Obsidian launch. Import
+  `describe`/`it`/`before` from `"mocha"` and `browser`/`expect` from `"@wdio/globals"` explicitly
+  (don't rely on injected globals). Use `browser.executeObsidian(({ app }) => ...)` to drive the
+  Obsidian API (e.g. open a base with `app.workspace.openLinkText(...)`), and select by the
+  plugin's own CSS classes via `cssClass(...)` from `@/plugin-id` (e.g. `` `.${cssClass("feed")}` ``)
+  rather than a hardcoded `obtask-*` string, so a rename doesn't silently break selectors. Note
+  that `browser.execute(...)` callbacks run inside the Obsidian window, not the Node process
+  running the spec, so anything from outside the callback (including a `cssClass(...)` result)
+  must be passed in as an extra argument to `execute()`, not closed over. Keep selector waits tight
+  (`waitForExist({ timeout: 5_000 })` or less) rather than the wdio default 10s, and never add a
+  fixed `sleep`/pause — a slow wait past a few seconds against an already-open window is a real
+  failure, not something to paper over with a longer timeout. Switch a Bases view via its toolbar
+  menu: `browser.$(".bases-toolbar-views-menu .text-icon-button").click()` opens it, then
   `browser.$(".bases-toolbar-menu-item-name=<View name>").click()` picks a view by name — that
   markup isn't public Bases API, so re-verify it (`pnpm test:e2e`) after an Obsidian version bump.
   When returning a plain object from `browser.execute(...)`, avoid a top-level `error` key — some
@@ -127,6 +153,31 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   (`^10.3.0`) rather than the newest release — mocha keeps module-level state used for the
   `import { describe } from "mocha"` pattern, and two different copies of the package (ours vs.
   the framework's own nested one) silently break it.
+
+## Renaming the plugin
+
+"Obtask" is provisional. Every code-level use of the plugin id/name/CSS prefix is centralised in
+`src/plugin-id.ts`, derived from `manifest.json` (`PLUGIN_ID`, `PLUGIN_NAME`, `VIEW_TYPE_FEED`,
+`VIEW_TYPE_CALENDAR`, `CSS_PREFIX`, `cssClass()`), and `scripts/link-vault.mjs` reads the id from
+`manifest.json` directly — so most of a rename is a single edit plus a search/replace. Checklist:
+
+- `manifest.json`: `id`, `name`, `description`.
+- `package.json`: `name` (and `description` if it still says "Obtask").
+- `src/styles/*.css`: search/replace the `obtask-` class prefix (see the comment at the top of
+  `src/styles/obtask.css`) — CSS class names are literal strings, not derived from
+  `src/plugin-id.ts`.
+- `scripts/link-vault.mjs`: no literal to change — it already reads the vault plugin folder name
+  from `manifest.json`.
+- `e2e/vault/Tasks.base`: the checked-in fixture base's view type ids (`obtask-feed`,
+  `obtask-calendar`) are literals, not generated — update them by hand.
+- `README.md` / `docs/**`: any prose that names the plugin.
+
+**Warning — Bases view type ids are persisted data.** A user's `.base` file stores the view type
+id (`obtask-feed`/`obtask-calendar`) verbatim. Once the plugin has a public release, changing
+`PLUGIN_ID` breaks every `.base` file that already references the old view type id — Obsidian will
+no longer recognise the view. A rename after that point needs a migration that keeps registering
+the old view type ids as aliases (pointing at the same view factories) alongside the new ones,
+rather than a straight cutover.
 
 ## Commit message style
 

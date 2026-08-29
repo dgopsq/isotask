@@ -4,6 +4,7 @@ import { BasesView } from "obsidian";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
+import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 
 export interface CalendarBasesViewDeps {
 	readonly app: App;
@@ -17,7 +18,7 @@ export interface CalendarBasesViewDeps {
  * see `src/adapters/calendar/README.md`.
  */
 export class CalendarBasesView extends BasesView {
-	override type = "obtask-calendar";
+	override type = VIEW_TYPE_CALENDAR;
 
 	private readonly viewContainerEl: HTMLElement;
 	private readonly deps: CalendarBasesViewDeps;
@@ -30,7 +31,7 @@ export class CalendarBasesView extends BasesView {
 
 	override onDataUpdated(): void {
 		this.viewContainerEl.empty();
-		const wrapper = this.viewContainerEl.createDiv({ cls: "obtask-calendar" });
+		const wrapper = this.viewContainerEl.createDiv({ cls: cssClass("calendar") });
 
 		const keys = this.deps.getPropertyKeys();
 		const statuses = this.deps.getStatuses();

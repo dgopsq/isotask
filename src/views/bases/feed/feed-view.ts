@@ -10,6 +10,7 @@ import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
 import type { Task } from "@/domain/task";
+import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 
 const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	overdue: "Overdue",
@@ -33,7 +34,7 @@ export interface FeedBasesViewDeps {
  * tasks. No row actions/menus yet — that's M2.
  */
 export class FeedBasesView extends BasesView {
-	override type = "obtask-feed";
+	override type = VIEW_TYPE_FEED;
 
 	private readonly viewContainerEl: HTMLElement;
 	private readonly deps: FeedBasesViewDeps;
@@ -42,7 +43,7 @@ export class FeedBasesView extends BasesView {
 		super(controller);
 		this.viewContainerEl = containerEl;
 		this.deps = deps;
-		this.viewContainerEl.addClass("obtask-feed");
+		this.viewContainerEl.addClass(cssClass("feed"));
 	}
 
 	override onDataUpdated(): void {
@@ -55,7 +56,7 @@ export class FeedBasesView extends BasesView {
 
 		for (const group of this.data.groupedData) {
 			if (group.hasKey() && group.key !== undefined) {
-				this.viewContainerEl.createEl("h3", { text: group.key.toString(), cls: "obtask-feed__group" });
+				this.viewContainerEl.createEl("h3", { text: group.key.toString(), cls: cssClass("feed__group") });
 			}
 
 			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
@@ -66,26 +67,28 @@ export class FeedBasesView extends BasesView {
 				if (bucketTasks.length === 0) {
 					continue;
 				}
-				this.viewContainerEl.createEl("h4", { text: BUCKET_LABELS[bucket], cls: "obtask-feed__bucket" });
+				this.viewContainerEl.createEl("h4", { text: BUCKET_LABELS[bucket], cls: cssClass("feed__bucket") });
 				for (const task of bucketTasks) {
 					this.renderRow(task, statuses);
 				}
 			}
 
 			for (const entry of invalid) {
-				const row = this.viewContainerEl.createDiv({ cls: "obtask-feed__row obtask-feed__row--invalid" });
-				row.createSpan({ text: entry.path, cls: "obtask-feed__title" });
-				row.createSpan({ text: entry.errors.map((e) => e.kind).join(", "), cls: "obtask-feed__error" });
+				const row = this.viewContainerEl.createDiv({
+					cls: [cssClass("feed__row"), cssClass("feed__row--invalid")],
+				});
+				row.createSpan({ text: entry.path, cls: cssClass("feed__title") });
+				row.createSpan({ text: entry.errors.map((e) => e.kind).join(", "), cls: cssClass("feed__error") });
 			}
 		}
 	}
 
 	private renderRow(task: Task, statuses: readonly StatusConfig[]): void {
-		const row = this.viewContainerEl.createDiv({ cls: "obtask-feed__row" });
+		const row = this.viewContainerEl.createDiv({ cls: cssClass("feed__row") });
 
 		const link = row.createEl("a", {
 			text: task.title,
-			cls: ["internal-link", "obtask-feed__title"],
+			cls: ["internal-link", cssClass("feed__title")],
 			href: task.path,
 		});
 		this.registerDomEvent(link, "click", (evt) => {
@@ -96,12 +99,12 @@ export class FeedBasesView extends BasesView {
 		const statusOption = findStatus(statuses, task.status);
 		row.createSpan({
 			text: statusOption.some ? statusOption.value.label : task.status,
-			cls: "obtask-feed__status",
+			cls: cssClass("feed__status"),
 		});
 
 		const dateText = task.due ?? task.scheduled ?? "";
 		if (dateText.length > 0) {
-			row.createSpan({ text: dateText, cls: "obtask-feed__date" });
+			row.createSpan({ text: dateText, cls: cssClass("feed__date") });
 		}
 	}
 }
