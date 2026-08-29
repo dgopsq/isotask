@@ -64,25 +64,31 @@ export class RecurrenceModal extends Modal {
 		}
 		options[CUSTOM_OPTION_ID] = "Custom…";
 
-		new Setting(contentEl).setName("Repeat").addDropdown((dropdown) =>
-			dropdown
-				.addOptions(options)
-				.setValue(this.selectedId)
-				.onChange((value) => {
-					this.selectedId = value;
-					this.render();
-				}),
-		);
-
-		if (this.selectedId === CUSTOM_OPTION_ID) {
-			new Setting(contentEl).setName("RRULE").addText((text) =>
-				text
-					.setPlaceholder("`FREQ=WEEKLY;BYDAY=MO`")
-					.setValue(this.customValue)
+		new Setting(contentEl)
+			.setName("Repeat")
+			.setDesc("Completing the task creates the next occurrence.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(this.selectedId)
 					.onChange((value) => {
-						this.customValue = value;
+						this.selectedId = value;
+						this.render();
 					}),
 			);
+
+		if (this.selectedId === CUSTOM_OPTION_ID) {
+			new Setting(contentEl)
+				.setName("RRULE")
+				.setDesc("RFC 5545 rule body, e.g. `FREQ=WEEKLY;BYDAY=MO`.")
+				.addText((text) =>
+					text
+						.setPlaceholder("`FREQ=WEEKLY;BYDAY=MO`")
+						.setValue(this.customValue)
+						.onChange((value) => {
+							this.customValue = value;
+						}),
+				);
 		}
 
 		contentEl.createEl("p", {

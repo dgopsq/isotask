@@ -46,22 +46,32 @@ export class DateModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass(cssClass("date-modal"));
 
-		new Setting(contentEl).setName(this.hasTime ? "Date & time" : "Date").addText((text) => {
-			text.inputEl.type = this.hasTime ? "datetime-local" : "date";
-			text.setValue(this.value).onChange((value) => {
-				this.value = value;
-			});
-		});
+		const desc = this.deps.title.toLowerCase().includes("scheduled")
+			? "When you plan to work on it. Shown on the calendar."
+			: "When the task must be done.";
 
-		new Setting(contentEl).setName("Include time").addToggle((toggle) =>
-			toggle.setValue(this.hasTime).onChange((checked) => {
-				// Truncate to the date part when turning time off, so the input
-				// doesn't carry a stale time-of-day the user can no longer see.
-				this.value = checked ? this.value : this.value.slice(0, 10);
-				this.hasTime = checked;
-				this.render();
-			}),
-		);
+		new Setting(contentEl)
+			.setName(this.hasTime ? "Date & time" : "Date")
+			.setDesc(desc)
+			.addText((text) => {
+				text.inputEl.type = this.hasTime ? "datetime-local" : "date";
+				text.setValue(this.value).onChange((value) => {
+					this.value = value;
+				});
+			});
+
+		new Setting(contentEl)
+			.setName("Include time")
+			.setDesc("Adds a time of day to the date.")
+			.addToggle((toggle) =>
+				toggle.setValue(this.hasTime).onChange((checked) => {
+					// Truncate to the date part when turning time off, so the input
+					// doesn't carry a stale time-of-day the user can no longer see.
+					this.value = checked ? this.value : this.value.slice(0, 10);
+					this.hasTime = checked;
+					this.render();
+				}),
+			);
 
 		new Setting(contentEl)
 			.addButton((button) =>

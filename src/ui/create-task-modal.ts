@@ -153,20 +153,23 @@ export class CreateTaskModal extends Modal {
 
 		this.renderTitleField(contentEl);
 
-		this.renderDateField(contentEl, "Due", this.due, (next) => {
+		this.renderDateField(contentEl, "Due", "When the task must be done. Click the clock to include a time.", this.due, (next) => {
 			this.due = next;
 		});
 
 		this.renderPriorityField(contentEl);
 		this.renderRepeatField(contentEl);
 
-		new Setting(contentEl).setName("More options").addToggle((toggle) =>
-			toggle.setValue(this.moreOptionsOpen).onChange((checked) => {
-				this.moreOptionsOpen = checked;
-				sessionMoreOptionsOpen = checked;
-				this.render();
-			}),
-		);
+		new Setting(contentEl)
+			.setName("More options")
+			.setDesc("Folder, status, scheduled date, duration, project and tags.")
+			.addToggle((toggle) =>
+				toggle.setValue(this.moreOptionsOpen).onChange((checked) => {
+					this.moreOptionsOpen = checked;
+					sessionMoreOptionsOpen = checked;
+					this.render();
+				}),
+			);
 
 		if (this.moreOptionsOpen) {
 			this.renderMoreOptions(contentEl);
@@ -189,52 +192,67 @@ export class CreateTaskModal extends Modal {
 	}
 
 	private renderMoreOptions(container: HTMLElement): void {
-		new Setting(container).setName("Folder").addText((text) =>
-			text.setValue(this.folder).onChange((value) => {
-				this.folder = value;
-			}),
-		);
+		new Setting(container)
+			.setName("Folder")
+			.setDesc("Where the note is created.")
+			.addText((text) =>
+				text.setValue(this.folder).onChange((value) => {
+					this.folder = value;
+				}),
+			);
 
 		this.renderStatusField(container);
 
-		this.renderDateField(container, "Scheduled", this.scheduled, (next) => {
+		this.renderDateField(container, "Scheduled", "When you plan to work on it. Shown on the calendar.", this.scheduled, (next) => {
 			this.scheduled = next;
 		});
 
-		new Setting(container).setName("Duration (minutes)").addText((text) => {
-			text.inputEl.type = "number";
-			text.setValue(this.durationText).onChange((value) => {
-				this.durationText = value;
+		new Setting(container)
+			.setName("Duration (minutes)")
+			.setDesc("Length of the scheduled block.")
+			.addText((text) => {
+				text.inputEl.type = "number";
+				text.setValue(this.durationText).onChange((value) => {
+					this.durationText = value;
+				});
 			});
-		});
 
-		new Setting(container).setName("Project").addText((text) =>
-			text
-				.setPlaceholder("Project name or [[link]]")
-				.setValue(this.project)
-				.onChange((value) => {
-					this.project = value;
-				}),
-		);
+		new Setting(container)
+			.setName("Project")
+			.setDesc("Wikilink to a project note, e.g. `[[Launch]]`.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Project name or [[link]]")
+					.setValue(this.project)
+					.onChange((value) => {
+						this.project = value;
+					}),
+			);
 
-		new Setting(container).setName("Tags").addText((text) =>
-			text
-				.setPlaceholder("Comma-separated tags")
-				.setValue(this.tagsText)
-				.onChange((value) => {
-					this.tagsText = value;
-				}),
-		);
+		new Setting(container)
+			.setName("Tags")
+			.setDesc("Comma-separated, without #.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Comma-separated tags")
+					.setValue(this.tagsText)
+					.onChange((value) => {
+						this.tagsText = value;
+					}),
+			);
 	}
 
 	private renderTitleField(container: HTMLElement): void {
 		let inputEl: HTMLInputElement | undefined;
-		new Setting(container).setName("Title").addText((text) => {
-			inputEl = text.inputEl;
-			text.setValue(this.title).onChange((value) => {
-				this.title = value;
+		new Setting(container)
+			.setName("Title")
+			.setDesc("Used as the note name.")
+			.addText((text) => {
+				inputEl = text.inputEl;
+				text.setValue(this.title).onChange((value) => {
+					this.title = value;
+				});
 			});
-		});
 		if (inputEl === undefined) {
 			return;
 		}
@@ -254,14 +272,17 @@ export class CreateTaskModal extends Modal {
 			options[status.id] = status.label;
 		}
 		const firstStatusId = statuses[0]?.id;
-		new Setting(container).setName("Status").addDropdown((dropdown) =>
-			dropdown
-				.addOptions(options)
-				.setValue(this.statusId ?? firstStatusId ?? "")
-				.onChange((value) => {
-					this.statusId = value as StatusId;
-				}),
-		);
+		new Setting(container)
+			.setName("Status")
+			.setDesc("Initial status of the task.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(this.statusId ?? firstStatusId ?? "")
+					.onChange((value) => {
+						this.statusId = value as StatusId;
+					}),
+			);
 	}
 
 	private renderPriorityField(container: HTMLElement): void {
@@ -269,14 +290,17 @@ export class CreateTaskModal extends Modal {
 		for (const priority of PRIORITIES) {
 			options[priority] = PRIORITY_LABELS[priority];
 		}
-		new Setting(container).setName("Priority").addDropdown((dropdown) =>
-			dropdown
-				.addOptions(options)
-				.setValue(this.priority)
-				.onChange((value) => {
-					this.priority = value as Priority;
-				}),
-		);
+		new Setting(container)
+			.setName("Priority")
+			.setDesc("Sorts tasks within a feed bucket.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(this.priority)
+					.onChange((value) => {
+						this.priority = value as Priority;
+					}),
+			);
 	}
 
 	/**
@@ -286,9 +310,16 @@ export class CreateTaskModal extends Modal {
 	 * `datetime-local` (preserving the date part) and re-renders so the
 	 * input's `type` picks up the change.
 	 */
-	private renderDateField(container: HTMLElement, label: string, field: DateFieldState, onChange: (next: DateFieldState) => void): void {
+	private renderDateField(
+		container: HTMLElement,
+		label: string,
+		desc: string,
+		field: DateFieldState,
+		onChange: (next: DateFieldState) => void,
+	): void {
 		new Setting(container)
 			.setName(label)
+			.setDesc(desc)
 			.addText((text) => {
 				text.inputEl.type = field.hasTime ? "datetime-local" : "date";
 				text.setValue(field.value).onChange((value) => {
@@ -314,25 +345,31 @@ export class CreateTaskModal extends Modal {
 		}
 		options[CUSTOM_REPEAT_ID] = "Custom…";
 
-		new Setting(container).setName("Repeat").addDropdown((dropdown) =>
-			dropdown
-				.addOptions(options)
-				.setValue(this.repeatId)
-				.onChange((value) => {
-					this.repeatId = value;
-					this.render();
-				}),
-		);
-
-		if (this.repeatId === CUSTOM_REPEAT_ID) {
-			new Setting(container).setName("RRULE").addText((text) =>
-				text
-					.setPlaceholder("`FREQ=WEEKLY;BYDAY=MO`")
-					.setValue(this.repeatCustom)
+		new Setting(container)
+			.setName("Repeat")
+			.setDesc("Completing the task creates the next occurrence.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(this.repeatId)
 					.onChange((value) => {
-						this.repeatCustom = value;
+						this.repeatId = value;
+						this.render();
 					}),
 			);
+
+		if (this.repeatId === CUSTOM_REPEAT_ID) {
+			new Setting(container)
+				.setName("RRULE")
+				.setDesc("RFC 5545 rule body, e.g. `FREQ=WEEKLY;BYDAY=MO`.")
+				.addText((text) =>
+					text
+						.setPlaceholder("`FREQ=WEEKLY;BYDAY=MO`")
+						.setValue(this.repeatCustom)
+						.onChange((value) => {
+							this.repeatCustom = value;
+						}),
+				);
 		}
 
 		const rule = this.resolveRepeatRule();

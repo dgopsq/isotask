@@ -78,6 +78,11 @@ export class StatusesModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass(cssClass("statuses-modal"));
 
+		new Setting(contentEl)
+			.setName("Statuses")
+			.setDesc("Open: shows as pending. Active: in progress. Done: completes and spawns recurrences. Cancelled: excluded from feeds.")
+			.setHeading();
+
 		this.draft.forEach((status, index) => {
 			this.renderStatusRow(contentEl, status, index);
 		});
