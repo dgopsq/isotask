@@ -325,7 +325,9 @@ describe("Views", function () {
 		it("shows the invalid note with unknown-status and invalid-date errors", function () {
 			expect(invalidRowText).toBeDefined();
 			expect(invalidRowText?.title).toEqual(`Tasks/${fixtures.invalid.filename}`);
-			expect(invalidRowText?.errorText).toEqual("unknown-status, invalid-date");
+			expect(invalidRowText?.errorText).toEqual(
+				'Unknown status "banana" (allowed: todo, in-progress, done, cancelled), Invalid due "not-a-date"',
+			);
 		});
 
 		it("renders the priority, project and tags chips for the extended fixture task", async function () {

@@ -83,3 +83,35 @@ export type TaskParseError =
 	| { readonly kind: "invalid-project"; readonly value: string }
 	/** Warning, not fatal: `repeat` set without a usable anchor (`due`/`scheduled`). */
 	| { readonly kind: "recurrence-without-anchor" };
+
+/**
+ * Human-readable, sentence-case description of a `TaskParseError`, used by
+ * the feed's invalid-task row. `unknown-status`/`invalid-priority` surface
+ * the allowed values so the note can be fixed without opening the settings.
+ */
+export function describeTaskParseError(error: TaskParseError): string {
+	switch (error.kind) {
+		case "not-a-task":
+			return "Not a task note";
+		case "missing-status":
+			return "Missing status";
+		case "unknown-status":
+			return `Unknown status "${error.value}" (allowed: ${error.allowed.join(", ")})`;
+		case "invalid-priority":
+			return `Invalid priority "${error.value}" (allowed: ${error.allowed.join(", ")})`;
+		case "invalid-date":
+			return `Invalid ${error.property} "${error.value}"`;
+		case "invalid-duration":
+			return `Invalid duration "${error.value}"`;
+		case "invalid-tags":
+			return `Invalid tags "${error.value}"`;
+		case "invalid-project":
+			return `Invalid project "${error.value}"`;
+		case "recurrence-without-anchor":
+			return "Recurring task has no due or scheduled date to anchor from";
+		default: {
+			const exhaustive: never = error;
+			return exhaustive;
+		}
+	}
+}

@@ -25,7 +25,7 @@ import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
 import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
-import { priorityChipClass, priorityLabel } from "@/domain/task";
+import { describeTaskParseError, priorityChipClass, priorityLabel } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
@@ -153,7 +153,7 @@ export class FeedBasesView extends BasesView {
 					cls: [cssClass("feed__row"), cssClass("feed__row--invalid")],
 				});
 				row.createSpan({ text: entry.path, cls: cssClass("feed__title") });
-				row.createSpan({ text: entry.errors.map((e) => e.kind).join(", "), cls: cssClass("feed__error") });
+				row.createSpan({ text: entry.errors.map((e) => describeTaskParseError(e)).join(", "), cls: cssClass("feed__error") });
 			}
 		}
 	}
@@ -357,8 +357,21 @@ export class FeedBasesView extends BasesView {
 			menu.showAtPosition({ x: position.clientX, y: position.clientY });
 		};
 
+		// Android WebView fires both our touch-and-hold timer below AND a
+		// native `contextmenu` event for the same long-press, which would
+		// otherwise open the menu twice. `suppressNextContextMenu` lets the
+		// timer claim the gesture so the following `contextmenu` event is
+		// swallowed (still `preventDefault()`ed, so no native menu appears
+		// on top) exactly once. Desktop right-click never sets the flag, so
+		// its `contextmenu` event always opens the menu as before.
+		let suppressNextContextMenu = false;
+
 		this.rows.registerDomEvent(row, "contextmenu", (evt) => {
 			evt.preventDefault();
+			if (suppressNextContextMenu) {
+				suppressNextContextMenu = false;
+				return;
+			}
 			openEditMenu(evt);
 		});
 
@@ -378,6 +391,7 @@ export class FeedBasesView extends BasesView {
 			const { clientX, clientY } = touch;
 			clearLongPress();
 			longPressTimer = window.setTimeout(() => {
+				suppressNextContextMenu = true;
 				openEditMenu({ clientX, clientY });
 			}, 500);
 		});

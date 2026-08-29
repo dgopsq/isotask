@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PRIORITIES, priorityChipClass, priorityLabel, priorityRank } from "@/domain/task";
+import { describeTaskParseError, PRIORITIES, priorityChipClass, priorityLabel, priorityRank } from "@/domain/task";
+import type { TaskParseError } from "@/domain/task";
 
 describe("priorityRank", () => {
 	it("orders priorities low to high", () => {
@@ -39,5 +40,33 @@ describe("priorityLabel", () => {
 	it("produces a distinct label per priority", () => {
 		const labels = new Set(PRIORITIES.map(priorityLabel));
 		expect(labels.size).toBe(PRIORITIES.length);
+	});
+});
+
+describe("describeTaskParseError", () => {
+	it("includes the allowed values for an unknown status", () => {
+		const error: TaskParseError = { kind: "unknown-status", value: "banana", allowed: ["todo", "done"] };
+		expect(describeTaskParseError(error)).toBe('Unknown status "banana" (allowed: todo, done)');
+	});
+
+	it("includes the allowed values for an invalid priority", () => {
+		const error: TaskParseError = { kind: "invalid-priority", value: "hgih", allowed: PRIORITIES };
+		expect(describeTaskParseError(error)).toBe('Invalid priority "hgih" (allowed: low, normal, high, urgent)');
+	});
+
+	it("names the offending property for an invalid date", () => {
+		const error: TaskParseError = { kind: "invalid-date", property: "due", value: "not-a-date" };
+		expect(describeTaskParseError(error)).toBe('Invalid due "not-a-date"');
+	});
+
+	it.each<[TaskParseError, string]>([
+		[{ kind: "not-a-task" }, "Not a task note"],
+		[{ kind: "missing-status" }, "Missing status"],
+		[{ kind: "invalid-duration", value: "abc" }, 'Invalid duration "abc"'],
+		[{ kind: "invalid-tags", value: "5" }, 'Invalid tags "5"'],
+		[{ kind: "invalid-project", value: "5" }, 'Invalid project "5"'],
+		[{ kind: "recurrence-without-anchor" }, "Recurring task has no due or scheduled date to anchor from"],
+	])("describes %o as %s", (error, expected) => {
+		expect(describeTaskParseError(error)).toBe(expected);
 	});
 });
