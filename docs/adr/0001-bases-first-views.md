@@ -31,6 +31,8 @@ Negative:
 - Hard dependency on Obsidian >= 1.10 (Bases view API); no support for older Obsidian.
 - View behavior is bounded by what Bases' view-options and entry model expose; anything Bases
   doesn't support (e.g. arbitrary per-row computed filters) isn't available to the views either.
+- Floor raised to 1.13.0 on 2026-08-29 to use the declarative settings API (settings search);
+  decided by the maintainer ("good to be on the edge").
 
 ## Alternatives considered
 
