@@ -72,7 +72,7 @@ function calendarViewOptions(getWeekStart: () => Weekday): BasesAllOptions[] {
 			type: "dropdown",
 			displayName: "Initial view",
 			default: DEFAULT_CALENDAR_VIEW_OPTIONS.initialView,
-			options: { month: "Month", week: "Week", day: "Day", list: "List" },
+			options: { month: "Month", week: "Week", day: "Day" },
 		},
 		{
 			key: "events",

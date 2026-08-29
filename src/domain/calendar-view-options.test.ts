@@ -23,11 +23,11 @@ describe("parseCalendarViewOptions", () => {
 	});
 
 	describe("initialView", () => {
-		it.each(["day", "week", "month", "list"] as const)("accepts %s", (value) => {
+		it.each(["day", "week", "month"] as const)("accepts %s", (value) => {
 			expect(parseCalendarViewOptions(configFrom({ initialView: value })).initialView).toBe(value);
 		});
 
-		it.each([undefined, null, "", "nope", 42, {}, ["day"]])("falls back to the default for %p", (value) => {
+		it.each([undefined, null, "", "nope", "list", 42, {}, ["day"]])("falls back to the default for %p", (value) => {
 			expect(parseCalendarViewOptions(configFrom({ initialView: value })).initialView).toBe(
 				DEFAULT_CALENDAR_VIEW_OPTIONS.initialView,
 			);

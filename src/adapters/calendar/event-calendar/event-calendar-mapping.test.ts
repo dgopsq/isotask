@@ -32,7 +32,6 @@ describe("toEventCalendarView", () => {
 		["day", "timeGridDay"],
 		["week", "timeGridWeek"],
 		["month", "dayGridMonth"],
-		["list", "listWeek"],
 	] as const satisfies readonly (readonly [CalendarViewKind, string])[])("maps %s to %s", (kind, expected) => {
 		expect(toEventCalendarView(kind)).toBe(expected);
 	});

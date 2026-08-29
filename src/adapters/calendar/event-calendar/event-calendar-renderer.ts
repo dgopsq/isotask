@@ -1,4 +1,4 @@
-import { createCalendar, DayGrid, destroyCalendar, List, TimeGrid } from "@event-calendar/core";
+import { createCalendar, DayGrid, destroyCalendar, TimeGrid } from "@event-calendar/core";
 import type { Calendar } from "@event-calendar/core";
 
 import { toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
@@ -42,7 +42,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 						},
 					};
 
-		const calendar = createCalendar(container, [DayGrid, TimeGrid, List], {
+		const calendar = createCalendar(container, [DayGrid, TimeGrid], {
 			view: toEventCalendarView(options.initialView),
 			firstDay: toEventCalendarFirstDay(options.firstDay),
 			editable: options.editable ?? false,
@@ -50,13 +50,12 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			headerToolbar: {
 				start: "title",
 				center: "",
-				end: "today prev,next dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+				end: "today prev,next dayGridMonth,timeGridWeek,timeGridDay",
 			},
 			// Event Calendar REPLACES its default `buttonText` map with the one
 			// given here (plugins only `assign()` their labels into the
 			// defaults), so every button in `headerToolbar` must be listed or it
-			// renders blank. `listWeek` would otherwise default to "week" and
-			// collide with the time-grid week button.
+			// renders blank.
 			buttonText: {
 				today: "Today",
 				prev: "Previous",
@@ -64,7 +63,6 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				dayGridMonth: "Month",
 				timeGridWeek: "Week",
 				timeGridDay: "Day",
-				listWeek: "List",
 			},
 			events: [],
 			...eventClickOption,

@@ -436,10 +436,10 @@ describe("Views", function () {
 
 		it("renders the Event Calendar root inside .obtask-calendar, in the default month view", async function () {
 			await expect(browser.$(`.${cssClass("calendar")} .ec`)).toExist();
-			// Month view renders an `.ec-day-grid` grid and no `.ec-list` — the
-			// inverse of the "list" assertion below.
+			// Month view renders an `.ec-day-grid` grid and no `.ec-week-view` —
+			// the inverse of the "week" assertion below.
 			await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).toExist();
-			await expect(browser.$(`.${cssClass("calendar")} .ec-list`)).not.toExist();
+			await expect(browser.$(`.${cssClass("calendar")} .ec-week-view`)).not.toExist();
 		});
 
 		it("renders non-blank toolbar button labels, with Month active by default", async function () {
@@ -465,7 +465,7 @@ describe("Views", function () {
 			// event-calendar-renderer.ts — prev/next render between "today"
 			// and the view buttons but carry no text, so they fall out here).
 			const textLabels = buttons.map((b) => b.text.trim()).filter((t) => t.length > 0);
-			expect(textLabels).toEqual(["Today", "Month", "Week", "Day", "List"]);
+			expect(textLabels).toEqual(["Today", "Month", "Week", "Day"]);
 
 			const active = buttons.filter((b) => b.isActive);
 			expect(active).toHaveLength(1);
@@ -484,7 +484,7 @@ describe("Views", function () {
 			expect(dueEvent?.className).toContain(cssClass(priorityChipClass("normal")));
 
 			// The `after` screenshot captures whatever state the last test
-			// leaves (scheduled-only events in the list view, usually empty);
+			// leaves (the week view, after switching `initialView` to "week");
 			// this one shows the month view with events for visual checks.
 			if (process.env["E2E_SCREENSHOT"] === "1") {
 				await saveScreenshot("calendar-month");
@@ -525,7 +525,7 @@ describe("Views", function () {
 			expect(events.some((e) => e.className.includes(cssClass("event--due")))).toBe(false);
 		});
 
-		it("switches the Event Calendar view class when initialView changes to list", async function () {
+		it("switches the Event Calendar view class when initialView changes to week", async function () {
 			await browser.executeObsidian(({ app }) => {
 				const leaves = app.workspace.getLeavesOfType("bases");
 				const leaf = leaves[0];
@@ -535,10 +535,15 @@ describe("Views", function () {
 				const outerView = leaf.view as unknown as {
 					controller: { view: { config: { set: (key: string, value: unknown) => void } } };
 				};
-				outerView.controller.view.config.set("initialView", "list");
+				outerView.controller.view.config.set("initialView", "week");
 			});
 
-			await browser.$(`.${cssClass("calendar")} .ec-list`).waitForExist({ timeout: SELECT_TIMEOUT });
+			// Event Calendar's `timeGridWeek` view themes its root with
+			// `ec-time-grid ec-week-view` (confirmed against the vendored
+			// source, `@event-calendar/core/src/plugins/time-grid/index.js`) —
+			// `.ec-week-view` is the class unique to that view in this app
+			// (the only other views registered are `dayGridMonth`/`timeGridDay`).
+			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
 			await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
 		});
 	});

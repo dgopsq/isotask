@@ -4,10 +4,10 @@ import type { Weekday } from "@/domain/dates";
 
 /**
  * Renderer-agnostic calendar view kind. The Event Calendar adapter maps
- * these onto its own view names (`list` -> `listWeek`, etc.) — see
+ * these onto its own view names (`month` -> `dayGridMonth`, etc.) — see
  * `src/adapters/calendar/event-calendar/README.md` (M3 Wave 2).
  */
-export type CalendarViewKind = "day" | "week" | "month" | "list";
+export type CalendarViewKind = "day" | "week" | "month";
 
 /** Which of a task's dates contribute calendar events — see `domain/calendar-events.ts`. */
 export type CalendarEventsSource = "due" | "scheduled" | "both";
@@ -39,7 +39,7 @@ export interface CalendarViewConfigSource {
 }
 
 const CalendarViewKindSchema = v.fallback(
-	v.picklist(["day", "week", "month", "list"]),
+	v.picklist(["day", "week", "month"]),
 	DEFAULT_CALENDAR_VIEW_OPTIONS.initialView,
 );
 

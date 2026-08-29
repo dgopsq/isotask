@@ -10,9 +10,10 @@ domain `CalendarEvent` -> Event Calendar `EventInput`) and is unit-tested direct
 class itself needs a real DOM `Element` for `createCalendar`, unavailable under vitest's
 `environment: "node"`, so it's exercised at runtime by the Bases view instead.
 
-`mount()` loads only the `DayGrid`, `TimeGrid` and `List` plugins — no `Interaction` (that's an
-M4 extension, needed only for click-to-open/drag/resize/click-empty-slot-create; `CalendarCallbacks`
-is still all-optional and unwired in M3, see `src/ports/calendar-renderer.ts`).
+`mount()` loads only the `DayGrid` and `TimeGrid` plugins — no `List` (the calendar has no list
+view; day/week/month only) and no `Interaction` (that's an M4 extension, needed only for
+click-to-open/drag/resize/click-empty-slot-create; `CalendarCallbacks` is still all-optional and
+unwired in M3, see `src/ports/calendar-renderer.ts`).
 
 Not yet done (M3 Wave 3, `~/agent-notes/obtask/plans/2026-08-29-m3-calendar.md`): wiring
 `EventCalendarRenderer` into `src/views/bases/calendar/calendar-view.ts` and `main.ts`, and

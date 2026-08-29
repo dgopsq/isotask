@@ -23,8 +23,6 @@ export function toEventCalendarView(kind: CalendarViewKind): string {
 			return "timeGridWeek";
 		case "month":
 			return "dayGridMonth";
-		case "list":
-			return "listWeek";
 		default: {
 			const exhaustive: never = kind;
 			return exhaustive;
