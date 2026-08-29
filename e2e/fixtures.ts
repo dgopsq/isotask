@@ -92,7 +92,12 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 		{
 			filename: "Overdue task.md",
 			title: "Overdue task",
-			frontmatter: { type: "task", status: "todo", due: overdue.due },
+			// Extended with priority/project/tags (M2 Wave 3) so the feed row
+			// chip assertions in `views.e2e.ts` have real data to render.
+			// `tags` is a YAML flow-list scalar string — `noteContent` writes
+			// raw scalars, so this parses as a two-element string array with no
+			// renderer change needed.
+			frontmatter: { type: "task", status: "todo", due: overdue.due, priority: "high", project: "Q3 Launch", tags: "[work, urgent]" },
 			body: "Generated e2e fixture: overdue.",
 			bucket: overdue.bucket,
 		},

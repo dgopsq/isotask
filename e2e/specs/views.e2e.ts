@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS } from "@/domain/settings";
 import type { ObtaskSettings } from "@/domain/settings";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
+import { priorityChipClass } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
 
 interface FeedStructureEntry {
@@ -84,6 +85,32 @@ async function waitForFrontmatter(path: string, key: string, predicate: (value: 
 		},
 		{ timeout: SELECT_TIMEOUT, timeoutMsg },
 	);
+}
+
+/** Clicks a feed row's date chip by the row's title text (there's no per-row selector to key off otherwise). Native `.click()` inside the Obsidian window fires the same listeners a real click would. */
+async function clickFeedDateChip(title: string): Promise<void> {
+	const clicked = await browser.execute(
+		(rowCls, titleCls, dateCls, wantedTitle) => {
+			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+				const titleEl = row.querySelector(`.${titleCls}`);
+				if (titleEl?.textContent === wantedTitle) {
+					const chip = row.querySelector(`.${dateCls}`);
+					if (chip instanceof HTMLElement) {
+						chip.click();
+						return true;
+					}
+				}
+			}
+			return false;
+		},
+		cssClass("feed__row"),
+		cssClass("feed__title"),
+		cssClass("feed__date"),
+		title,
+	);
+	if (!clicked) {
+		throw new Error(`date chip for "${title}" not found in the feed`);
+	}
 }
 
 async function inputAt(modalCls: string, type: string, index: number): Promise<WebdriverIO.Element> {
@@ -212,6 +239,129 @@ describe("Views", function () {
 			expect(invalidRowText).toBeDefined();
 			expect(invalidRowText?.title).toEqual(`Tasks/${fixtures.invalid.filename}`);
 			expect(invalidRowText?.errorText).toEqual("unknown-status, invalid-date");
+		});
+
+		it("renders the priority, project and tags chips for the extended fixture task", async function () {
+			const task = fixtures.tasks[0];
+			if (task === undefined) {
+				throw new Error("expected fixtures.tasks[0] (Overdue task) to exist");
+			}
+
+			const chipInfo = await browser.execute(
+				(rowCls, titleCls, priorityCls, projectCls, tagCls, wantedTitle) => {
+					for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+						const titleEl = row.querySelector(`.${titleCls}`);
+						if (titleEl?.textContent !== wantedTitle) {
+							continue;
+						}
+						const priorityEl = row.querySelector(`.${priorityCls}`);
+						const projectEl = row.querySelector(`.${projectCls}`);
+						const tagEls = Array.from(row.querySelectorAll(`.${tagCls}`));
+						return {
+							priorityText: priorityEl?.textContent ?? null,
+							priorityClasses: priorityEl === null ? [] : Array.from(priorityEl.classList),
+							projectText: projectEl?.textContent ?? null,
+							tagTexts: tagEls.map((el) => el.textContent),
+						};
+					}
+					return null;
+				},
+				cssClass("feed__row"),
+				cssClass("feed__title"),
+				cssClass("feed__priority"),
+				cssClass("feed__project"),
+				cssClass("feed__tag"),
+				task.title,
+			);
+
+			expect(chipInfo).not.toBeNull();
+			expect(chipInfo?.priorityText).toEqual("High");
+			expect(chipInfo?.priorityClasses).toContain(cssClass(priorityChipClass("high")));
+			expect(chipInfo?.projectText).toEqual("Q3 Launch");
+			expect(chipInfo?.tagTexts).toEqual(["#work", "#urgent"]);
+		});
+
+		it("date chip opens DateModal pre-filled and dispatches setDate on save", async function () {
+			const task = fixtures.tasks[0];
+			if (task === undefined) {
+				throw new Error("expected fixtures.tasks[0] (Overdue task) to exist");
+			}
+			const path = `Tasks/${task.filename}`;
+
+			await clickFeedDateChip(task.title);
+
+			const modalCls = cssClass("date-modal");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const initialInputValue = await browser.execute((cls) => {
+				const input = document.querySelector(`.${cls} input[type="date"]`);
+				return input instanceof HTMLInputElement ? input.value : null;
+			}, modalCls);
+			expect(initialInputValue).toEqual(task.frontmatter["due"]);
+
+			// Same "set + dispatch input/change" technique as the "Create task
+			// modal" test below: wdio's character-by-character setValue is
+			// unreliable against input[type="date"] in this Electron build.
+			const newDue = format(addDays(parseISO(fixtures.today), 10), "yyyy-MM-dd");
+			await browser.execute(
+				(cls, value) => {
+					const input = document.querySelector(`.${cls} input[type="date"]`);
+					if (input instanceof HTMLInputElement) {
+						input.value = value;
+						input.dispatchEvent(new Event("input", { bubbles: true }));
+						input.dispatchEvent(new Event("change", { bubbles: true }));
+					}
+				},
+				modalCls,
+				newDue,
+			);
+
+			await browser.$(`.${modalCls} button.mod-cta`).click();
+
+			await waitForFrontmatter(path, "due", (v) => v === newDue, `${path} due date never updated via the feed's date chip`);
+			const fm = await frontmatterOf(path);
+			expect(fm?.["due"]).toEqual(newDue);
+		});
+	});
+
+	/**
+	 * Probe-style test (docs/CONVENTIONS.md "Probing Obsidian's live DOM/CSS")
+	 * answering the M2 plan's open question: does editing a Bases-native view
+	 * option (the `dateSource`/`showEmptyBuckets`/`completedAtBottom` options
+	 * registered in `views/bases/register.ts`) actually trigger a re-render
+	 * without any extra plumbing? Empirically: yes — `BasesViewConfig.set()`
+	 * alone (no manual `onDataUpdated()` call) is enough; Bases owns config
+	 * reactivity and calls back into the view itself. `feed-view.ts` needed no
+	 * change for this. Does not drive Bases' own view-options panel UI (that's
+	 * Bases' DOM, not obtask's) — flips the option programmatically instead,
+	 * via an internal (undocumented, not in `obsidian.d.ts`) path found by
+	 * inspecting the runtime "bases" leaf's prototype chain: the leaf's own
+	 * view wraps a `controller` whose `.view` is the actual registered
+	 * `FeedBasesView` instance, which exposes the public `config.set()` API.
+	 */
+	describe("Feed view options", function () {
+		it("re-renders automatically when showEmptyBuckets changes via config.set()", async function () {
+			const emptyBucketCls = cssClass("feed__bucket-empty");
+
+			const before = await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, emptyBucketCls);
+			expect(before).toEqual(0);
+
+			await browser.executeObsidian(({ app }) => {
+				const leaves = app.workspace.getLeavesOfType("bases");
+				const leaf = leaves[0];
+				if (leaf === undefined) {
+					throw new Error("no bases leaf found");
+				}
+				const outerView = leaf.view as unknown as {
+					controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+				};
+				outerView.controller.view.config.set("showEmptyBuckets", true);
+			});
+
+			await browser.$(`.${emptyBucketCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const after = await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, emptyBucketCls);
+			expect(after).toBeGreaterThan(0);
 		});
 	});
 
