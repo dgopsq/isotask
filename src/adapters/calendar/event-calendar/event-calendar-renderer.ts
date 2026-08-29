@@ -47,6 +47,16 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			firstDay: toEventCalendarFirstDay(options.firstDay),
 			editable: options.editable ?? false,
 			height: "auto",
+			// Compact hourly grid: the vendored default (48px/half-hour slot,
+			// ~1150px for a full day) reads as an oversized empty grid for a
+			// task list that's mostly short blocks. One slot per hour at 32px
+			// (~770px/day) still gives a 1-hour block (Event Calendar renders
+			// one slot per timed block, however long) enough height for a
+			// dot+title line, and the tighter `.ec-event` padding in
+			// `calendar.css` keeps a 30-minute block's title readable too —
+			// see `docs/ARCHITECTURE.md`'s calendar section.
+			slotDuration: "01:00:00",
+			slotHeight: 32,
 			headerToolbar: {
 				start: "title",
 				center: "",

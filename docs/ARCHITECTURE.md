@@ -133,6 +133,12 @@ Bases (.base file)                     obtask-calendar BasesView
                                         └──────────────────────────────────┘
 ```
 
+**Compact hourly time grid**: `EventCalendarRenderer` sets `slotDuration: "01:00:00"` and
+`slotHeight: 32` (with `height: "auto"`), so the week/day time grid renders one 32px row per hour
+(a full day ≈770px instead of the vendored default's ≈1150px) while `calendar.css`'s smaller
+event font, tighter padding, and an `!important` `min-height`/`min-block-size` floor (needed to
+beat Event Calendar's own inline sizing) keep a 30-minute block's title fully readable.
+
 **Outer Bases groups are ignored**: `groupedData`'s groups make sense for the feed (a heading per
 group) but not for a single continuous timeline, so `eventsForTask` is called across every group's
 entries and every task's events land on the same calendar — there is no per-group calendar

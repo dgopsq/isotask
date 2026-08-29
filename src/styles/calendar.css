@@ -336,7 +336,35 @@
 	border-inline-start: 2px solid var(--obtask-dot-color, var(--text-faint));
 	box-shadow: none;
 	overflow: hidden;
-	padding: var(--size-4-1) var(--size-4-2);
+	/*
+	 * The compact hourly grid (`slotHeight: 32`, `event-calendar-renderer.ts`)
+	 * gives a 1-hour block ~32px and a 30-minute block ~16px, computed
+	 * straight from the slot height — CSS never sees the block's own
+	 * duration to size it conditionally. At the default day-grid font size
+	 * (~15px, ~20px line height) a 30-minute block's title clipped
+	 * vertically (confirmed via a live DOM probe: an 8px content box against
+	 * a 19.7px title). Matching the day-grid/all-day rows' smaller font
+	 * (`--font-ui-smaller`, ~13px) and trimming the vertical padding buys
+	 * back enough of that 16px for the title to render uncropped; `min-height`
+	 * is the floor for anything shorter still (e.g. a 15-minute block), and
+	 * is deliberately allowed to overflow into the next slot rather than
+	 * clip the title — the "short block: the time line goes first" rule
+	 * below already gives up the time line before the title ever does.
+	 *
+	 * `!important` on `min-block-size` (not just `min-height`) is required,
+	 * not stylistic: Event Calendar positions every timed block with an
+	 * inline `style="block-size: …px; min-block-size: …px; …"` (confirmed
+	 * via a live DOM probe), and an inline style's `min-block-size` wins
+	 * over an external stylesheet's `min-height` for the same computed
+	 * property even though the two are logical/physical aliases of each
+	 * other — inline origin beats stylesheet origin regardless of which
+	 * property name either side used, so only `!important` here can raise
+	 * the floor past the library's own inline value.
+	 */
+	padding: 2px var(--size-4-2);
+	font-size: var(--font-ui-smaller);
+	min-height: 24px !important;
+	min-block-size: 24px !important;
 }
 
 .obtask-calendar .ec-time-grid .ec-body .ec-event:hover {

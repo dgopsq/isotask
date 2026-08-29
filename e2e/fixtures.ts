@@ -170,6 +170,20 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			body: "Generated e2e fixture: timed scheduled block.",
 			bucket: "no-date",
 		},
+		{
+			filename: "Standup.md",
+			title: "Standup",
+			// A 30-minute timed block, later the same day as "Team sync"'s
+			// 1-hour block — the compact hourly time grid (`slotDuration:
+			// "01:00:00"`, `slotHeight: 32`, see `event-calendar-renderer.ts`)
+			// halves a hovable slot to 16px, so this fixture is what the week
+			// screenshot uses to confirm a half-hour block still fits a
+			// readable title. No `due`, so — like "Team sync" — it falls into
+			// the Feed's "no-date" bucket.
+			frontmatter: { type: "task", status: "todo", scheduled: `${today}T11:00`, duration: "30", priority: "normal" },
+			body: "Generated e2e fixture: 30-minute timed scheduled block.",
+			bucket: "no-date",
+		},
 	];
 
 	const invalid: FixtureInvalidTask = {
