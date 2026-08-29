@@ -4,6 +4,7 @@ import { BasesView } from "obsidian";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask } from "@/domain/calendar-events";
+import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import { parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
@@ -41,6 +42,14 @@ export class CalendarBasesView extends BasesView {
 	private readonly deps: CalendarBasesViewDeps;
 	private handle: CalendarHandle | undefined;
 	private invalidLineEl: HTMLElement | undefined;
+	/**
+	 * The view/firstDay last pushed to the handle. `onDataUpdated` fires on
+	 * every vault change, and the user may have switched views in the
+	 * calendar's own toolbar since the last one — re-applying the configured
+	 * `initialView` unconditionally would snap them back. Only a change to the
+	 * option itself is pushed.
+	 */
+	private applied: { readonly view: CalendarViewKind; readonly firstDay: Weekday } | undefined;
 
 	constructor(controller: QueryController, containerEl: HTMLElement, deps: CalendarBasesViewDeps) {
 		super(controller);
@@ -79,17 +88,25 @@ export class CalendarBasesView extends BasesView {
 				callbacks: {},
 			});
 			this.handle = handle;
+			this.applied = { view: options.initialView, firstDay };
 		}
 
 		handle.setEvents(events);
-		handle.setView(options.initialView);
-		handle.setFirstDay(firstDay);
+		const applied = this.applied;
+		if (applied?.view !== options.initialView) {
+			handle.setView(options.initialView);
+		}
+		if (applied?.firstDay !== firstDay) {
+			handle.setFirstDay(firstDay);
+		}
+		this.applied = { view: options.initialView, firstDay };
 		this.renderInvalidLine(invalidCount);
 	}
 
 	override onunload(): void {
 		this.handle?.destroy();
 		this.handle = undefined;
+		this.applied = undefined;
 		super.onunload();
 	}
 
