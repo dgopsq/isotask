@@ -52,11 +52,19 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				center: "",
 				end: "today prev,next dayGridMonth,timeGridWeek,timeGridDay,listWeek",
 			},
+			// Event Calendar REPLACES its default `buttonText` map with the one
+			// given here (plugins only `assign()` their labels into the
+			// defaults), so every button in `headerToolbar` must be listed or it
+			// renders blank. `listWeek` would otherwise default to "week" and
+			// collide with the time-grid week button.
 			buttonText: {
-				// Event Calendar's List plugin defaults `listWeek`'s label to
-				// "week" too, which would collide with the time-grid week
-				// button in the switcher — "list" disambiguates them.
-				listWeek: "list",
+				today: "Today",
+				prev: "Previous",
+				next: "Next",
+				dayGridMonth: "Month",
+				timeGridWeek: "Week",
+				timeGridDay: "Day",
+				listWeek: "List",
 			},
 			events: [],
 			...eventClickOption,
