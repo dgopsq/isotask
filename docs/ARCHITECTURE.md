@@ -1,0 +1,178 @@
+# Architecture
+
+This design was decided on 2026-08-29. Obtask is hexagonal (ports and adapters) with a
+functional core / imperative shell split. There is no framework and no Effect — the core is
+plain TypeScript functions over immutable data.
+
+## Layers
+
+```
+src/
+  domain/      pure. Types, frontmatter parse/serialise, statuses, buckets, recurrence,
+               transitions. No `obsidian` import. 100% unit-tested with vitest.
+  ports/       interfaces the core needs: Clock, TaskStore, Notifier, CalendarRenderer,
+               PathResolver.
+  app/         use-cases: createTask, setStatus (incl. complete -> spawn), rescheduleTask,
+               convertNoteToTask, generateBaseFile. Pure orchestration over ports; unit-tested
+               with in-memory fakes.
+  adapters/
+    obsidian/  TaskStore over Vault + MetadataCache + fileManager.processFrontMatter; Clock;
+               Notifier (Notice); settings persistence (loadData/saveData + valibot schema).
+    calendar/event-calendar/  CalendarRenderer implementation. Only file tree allowed to import
+               `@event-calendar/*`.
+  views/bases/feed/, views/bases/calendar/   BasesView subclasses: thin, map entries -> domain,
+               call renderers, dispatch actions to app use-cases.
+  ui/          small DOM renderers + modals (TaskCreateModal, DateModal, RecurrencePicker,
+               StatusMenu). createEl only; no innerHTML.
+  settings/    SettingsTab (Setting API), settings type + defaults + migration.
+  styles/      obtask.css, calendar.css (theme-variable mappings only).
+  main.ts      composition root.
+```
+
+Dependency direction is strictly inward: `views`/`ui`/`settings`/`adapters` depend on `app`,
+which depends on `ports` and `domain`. `domain` and `ports` depend on nothing in this repo.
+`app` never imports an adapter directly — it receives ports through its function/use-case
+arguments, wired up in `main.ts`.
+
+## Data flow: Bases feed view render path
+
+```
+Bases (.base file)                     obtask-feed BasesView
+┌─────────────────────┐   entries      ┌──────────────────────────────┐
+│ filters/sort/group   ├───────────────▶ for each entry:              │
+│ (owned by Bases)     │                │   entry.file                │
+└─────────────────────┘                │       │                     │
+                                        │       ▼                     │
+                             metadataCache.getFileCache(file)         │
+                                        │       │ .frontmatter        │
+                                        │       ▼                     │
+                                domain/frontmatter.ts (parse)         │
+                                        │       │                     │
+                                        │       ▼ Result<Task, Error[]>│
+                                        │  domain/buckets.ts           │
+                                        │  (Overdue/Today/.../No date)│
+                                        │       │                     │
+                                        │       ▼                     │
+                                ui renderer (createEl rows)           │
+                                        └──────────────────────────────┘
+```
+
+The domain parser (`domain/frontmatter.ts`) is the single source of truth for turning raw
+frontmatter into a `Task`; it is independent of Bases' own value objects. A note that fails to
+parse renders as an "invalid task" row with the reason and is excluded from buckets, but the view
+never hides it outright — Bases decides visibility via its filters.
+
+## Data flow: complete-task path
+
+```
+user action (status Menu / command)
+        │
+        ▼
+view action handler  ──calls──▶  app/setStatus.ts (use-case)
+        │                              │
+        │                              ├─ domain/transitions.ts: validate + compute new status,
+        │                              │  set/clear `completed` per statuses table
+        │                              │
+        │                              ├─ ports.TaskStore.write(path, patch)
+        │                              │      │
+        │                              │      ▼
+        │                              │  adapters/obsidian TaskStore
+        │                              │      → app.fileManager.processFrontMatter(file, fn)
+        │                              │
+        │                              └─ if transition entered a `done`-kind status:
+        │                                    domain/recurrence.ts computes next occurrence
+        │                                    (rrule.after(anchor, inclusive=false))
+        │                                       │
+        │                                       ▼
+        │                                 ports.TaskStore.create(draft)
+        │                                       │
+        │                                       ▼
+        │                                 adapters/obsidian TaskStore
+        │                                    → vault.create(path, body) or Notice if the
+        │                                      spawned path already exists (idempotent)
+        ▼
+ports.Notifier.notify(...) on error / spawn result
+```
+
+## Data flow: calendar reschedule path
+
+```
+user drags/resizes an event (desktop) or long-presses + drags (touch)
+        │
+        ▼
+CalendarRenderer adapter (event-calendar) fires its native drop/resize callback
+        │
+        ▼
+obtask-calendar BasesView action handler
+        │
+        ▼
+app/rescheduleTask.ts (use-case)
+        │  - domain: recompute due/scheduled (+duration) from the new slot
+        ▼
+ports.TaskStore.write(path, patch)
+        │
+        ▼
+adapters/obsidian TaskStore → app.fileManager.processFrontMatter(file, fn)
+        │
+        ▼
+metadataCache change event fires → Bases re-queries → view re-renders with new data
+```
+Click on an empty calendar slot follows the same shape but calls `app/createTask.ts` instead,
+pre-filled with the clicked date.
+
+## Ports
+
+Each port is an interface in `src/ports`, implemented by an adapter and consumed only by `app`
+use-cases (never imported directly by `domain`).
+
+- **Clock** — the only source of "now" the core is allowed to use, so tests can inject a fixed
+  time. Methods: `now(): TaskDate` (current local wall-clock instant, same string shape as
+  frontmatter dates).
+- **TaskStore** — all task persistence. Methods: `list(): Task[]` (or an async iterable — see
+  `docs/DOMAIN-MODEL.md`/TBD (M1) for exact signature), `read(path: TaskPath): Task | undefined`,
+  `write(path: TaskPath, patch: Partial<TaskDraft>): Promise<Result<void, Error>>` (goes through
+  `processFrontMatter`), `create(draft: TaskDraft): Promise<Result<TaskPath, Error>>` (fails
+  idempotently if the target path already exists).
+- **Notifier** — user-visible feedback without coupling `app` to Obsidian's `Notice`. Method:
+  `notify(message: string): void`.
+- **CalendarRenderer** — abstracts the calendar widget library. Methods: `mount(container:
+  HTMLElement, options: CalendarOptions): CalendarHandle`, `setEvents(handle, events:
+  CalendarEvent[]): void`, `onEventClick(handle, cb)`, `onEventDrop(handle, cb)`,
+  `onSlotClick(handle, cb)`, `destroy(handle): void`. Exact shape is finalized in M3 — TBD (M3)
+  for the full type.
+- **PathResolver** — vault-path concerns kept out of `domain`. Methods: `exists(path: TaskPath):
+  boolean`, `normalize(path: string): TaskPath`, `resolveSpawnPath(seriesTitle: string, nextDue:
+  TaskDate): TaskPath` (applies the configured spawned-occurrence filename template).
+
+## Composition root
+
+`main.ts` is the plugin's only imperative shell entry point and the only place that decides
+which concrete adapter implements which port (e.g. the Event Calendar adapter is the sole
+`CalendarRenderer` — swapping calendar libraries later means writing a new adapter and changing
+one line here). On `onload()` it:
+
+1. Loads and migrates settings (`src/settings`).
+2. Constructs adapters (`ObsidianTaskStore`, `ObsidianClock`, `ObsidianNotifier`,
+   `EventCalendarRenderer`, ...), each closed over `this.app`.
+3. Registers Bases views via `this.registerBasesView(type, { name, icon, factory, options })` for
+   `obtask-feed` and `obtask-calendar`.
+4. Registers commands, the settings tab, file-menu and editor-menu entries, and the optional
+   ribbon icon.
+
+Everything registered through `register*`/`add*` Obsidian APIs (`registerEvent`,
+`registerDomEvent`, `registerInterval`, `addCommand`, `addSettingTab`, `registerBasesView`) is
+torn down automatically by the `Plugin` base class when the plugin unloads — there is no manual
+`onunload()` cleanup to write as long as every side-effecting registration goes through one of
+those methods.
+
+## Why views never filter
+
+Bases already owns which notes appear, their order, grouping, and property visibility — that is
+the point of building on Bases instead of a bespoke query engine. `obtask-feed` and
+`obtask-calendar` render exactly the entry set Bases hands them; the feed view's own bucket
+computation is presentation (mapping already-selected tasks to time buckets and rows), not
+filtering. If a view silently dropped or reordered entries beyond what its declared view options
+say, it would diverge from what the user configured in the `.base` file and from what every other
+Bases view (e.g. the generated `All tasks` table) shows for the same file. Keeping filter/sort/
+group exclusively in Bases keeps the plugin's surface area small and its behavior predictable
+across views.
