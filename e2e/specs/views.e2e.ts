@@ -489,11 +489,37 @@ describe("Views", function () {
 			if (process.env["E2E_SCREENSHOT"] === "1") {
 				await saveScreenshot("calendar-month");
 
-				// A separate hover screenshot: moves the mouse onto an event so
+				// A separate hover screenshot: moves the mouse onto one event so
 				// the `:hover` background (`--background-modifier-border`, not
 				// the accent-tinted `--background-modifier-active-hover`) is
 				// actually visible in the capture, not just in the stylesheet.
-				await browser.$(`.${cssClass("event")}`).moveTo();
+				// `moveTo()` alone doesn't *prove* the hover fired — a prior
+				// version of this test saved a screenshot right after `moveTo()`
+				// with no assertion, and it turned out pixel-identical to
+				// `calendar-month.png` (the hover never actually landed on the
+				// element by the time the capture ran). So: read the hovered
+				// event's own `background-color` and a second, untouched
+				// event's, and assert they differ *before* trusting the
+				// screenshot — a real signal that `:hover` actually applied,
+				// not just that `moveTo()` resolved.
+				const eventEls = await browser.$$(`.${cssClass("event")}`).getElements();
+				await expect(eventEls).toBeElementsArrayOfSize({ gte: 2 });
+				const [hoveredEl, otherEl] = eventEls;
+				if (hoveredEl === undefined || otherEl === undefined) {
+					throw new Error("expected at least two calendar events for the hover comparison");
+				}
+
+				await hoveredEl.moveTo();
+				// `:hover` is a live CSS pseudo-class, not something that
+				// commits on a rAF/transition — the 150ms pause guards against
+				// the (Electron/chromedriver) input event and the subsequent
+				// style read racing each other, not against any CSS animation.
+				await browser.pause(150);
+
+				const hoveredColor = await hoveredEl.getCSSProperty("background-color");
+				const otherColor = await otherEl.getCSSProperty("background-color");
+				expect(hoveredColor.value).not.toEqual(otherColor.value);
+
 				await saveScreenshot("calendar-hover");
 			}
 		});
@@ -576,6 +602,28 @@ describe("Views", function () {
 					async () => (await readCalendarEvents()).some((e) => e.title === "Today task"),
 					{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task event never reappeared for the week screenshot" },
 				);
+
+				// "Team sync" (`scheduled` + `duration`, today 09:00) is the
+				// only fixture that renders as a genuine timed block in the
+				// time grid, not just an all-day marker — see fixtures.ts.
+				// `.ec-body` (the time-grid's scrollable slot area, see
+				// calendar.css's own scoping) is required here, not just
+				// `.ec-time-grid .ec-event` — the all-day row is *also* nested
+				// under `.ec-time-grid` as a sibling of `.ec-body`, so the
+				// looser selector matches an all-day event first. `height:
+				// "auto"` renders the full 00:00-24:00 grid (see the EC option
+				// notes above `EventCalendarRenderer`), so without scrolling,
+				// 09:00 can land below the fold and the screenshot would miss
+				// the very block this test exists to check.
+				const timedEventEl = browser.$(`.${cssClass("calendar")} .ec-time-grid .ec-body .ec-event`);
+				await timedEventEl.waitForExist({ timeout: SELECT_TIMEOUT });
+				await browser.execute(
+					(el) => {
+						el.scrollIntoView({ block: "center" });
+					},
+					await timedEventEl.getElement(),
+				);
+
 				await saveScreenshot("calendar-week");
 			}
 		});

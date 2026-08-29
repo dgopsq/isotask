@@ -335,6 +335,8 @@
 	border-radius: var(--radius-s);
 	border-inline-start: 2px solid var(--obtask-dot-color, var(--text-faint));
 	box-shadow: none;
+	overflow: hidden;
+	padding: var(--size-4-1) var(--size-4-2);
 }
 
 .obtask-calendar .ec-time-grid .ec-body .ec-event:hover {
@@ -364,28 +366,72 @@
 }
 
 /*
- * Time-grid's `.ec-event-body` stacks `.ec-event-time` above
- * `.ec-event-title` (`flex-direction: column`, the library's default —
- * only day-grid/all-day/timeline switch it to `row`), so the day-grid
- * trick above (dot as a flex-item sibling of the title inside the body)
- * would push the dot onto its own line instead of next to the title text.
- * Here the title makes itself the flex row instead: the dot stays a
- * `::before`, but as a real flex item (`flex: none; align-self: center`)
- * of `.ec-event-title` rather than inline content inside it — no
- * `vertical-align` guessing. Time-grid titles carry no ellipsis truncation
- * of their own in the vendored stylesheet (only day-grid/all-day/timeline
- * do), so turning the title into a flex container doesn't cost anything
- * here the way it would up in the day-grid rule above.
+ * Time-grid's `.ec-event-body` is `display: flex; flex-direction: column`
+ * (the library's default — only day-grid/all-day/timeline switch it to
+ * `row`), with exactly two direct children/flex items: `<time
+ * class="ec-event-time">` then `<h4 class="ec-event-title">`, in that DOM
+ * order (confirmed against the vendored bundle's `Event` render function —
+ * time always renders before title for non-all-day events). The desired
+ * *visual* order is the opposite (title line, then time line), so `order`
+ * below flips them without touching markup — `.ec-event-body`'s default
+ * `align-items: stretch` already gives both items the container's full
+ * width, so neither needs an explicit inline-size.
+ *
+ * The dot is a `::before` on `.ec-event-title` itself, kept as plain inline
+ * content (an `inline-block` circle + `vertical-align: middle`, NOT a flex
+ * item of a `display: flex` title) — deliberately: `.ec-event-title` is a
+ * flex ITEM of `.ec-event-body`, and if it were *also* `display: flex` to
+ * lay out "dot, then title text" as its own flex items, the title's raw
+ * text would be wrapped in an anonymous flex-item box that
+ * `overflow`/`text-overflow` set on the flex container can't reach —
+ * ellipsis silently never fires (CSS Flexbox's "runs of inline-level
+ * content are wrapped in an anonymous block box" rule; only the container's
+ * own bounds get `overflow: hidden`, per-item ellipsis needs to live on the
+ * actual box holding the text). Keeping `.ec-event-title` a plain
+ * (non-flex) box means the `::before` dot and the title text are one
+ * ordinary inline run inside it, so `white-space: nowrap; overflow: hidden;
+ * text-overflow: ellipsis` set directly on `.ec-event-title` truncates the
+ * text correctly — the dot, coming first, is never itself clipped.
+ *
+ * Both lines get `flex-shrink: 0` so a too-short block never compresses
+ * either line's own text — instead, given `.ec-event-body`'s
+ * `overflow: hidden` a few rules up (below), whichever line runs past the
+ * bottom edge simply gets clipped there. Since title is `order: 1` (drawn
+ * first, flush with the top) and time is `order: 2` (drawn second, right
+ * below it), a short block clips the time line first and leaves the title
+ * fully visible — per the maintainer's brief: "short blocks: the time line
+ * gets cut, never the title."
+ *
+ * `position: static` overrides the vendored stylesheet's own `.ec-time-grid
+ * .ec-event-title { position: sticky; inset-block-start:
+ * var(--ec-header-height); }` — a feature for TALL, multi-hour blocks: as
+ * you scroll down *through* a block that spans several hours, the title
+ * stays pinned near the top of the viewport instead of scrolling out of
+ * view above it. For an ordinary short block that sticky offset instead
+ * pins the title to a viewport-relative `y` that has nothing to do with
+ * this reordered 2-line layout, landing it visually on top of the
+ * (normal-flow) time line below — confirmed by screenshot: title and time
+ * text rendered superimposed at the same spot, not stacked. `position:
+ * static` puts the title back in plain, in-flow flex layout, which is all
+ * this fixed-height, always-short two-line block needs.
  */
+.obtask-calendar .ec-time-grid .ec-body .ec-event-body {
+	overflow: hidden;
+}
+
 .obtask-calendar .ec-time-grid .ec-body .ec-event-title {
-	display: flex;
-	align-items: center;
+	order: 1;
+	flex-shrink: 0;
+	position: static;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 .obtask-calendar .ec-time-grid .ec-body .ec-event-title::before {
 	content: "";
-	flex: none;
-	align-self: center;
+	display: inline-block;
+	vertical-align: middle;
 	inline-size: 7px;
 	block-size: 7px;
 	margin-inline-end: var(--size-4-2);
@@ -396,6 +442,26 @@
 .obtask-calendar .ec-time-grid .ec-body .obtask-event--due .ec-event-title::before {
 	background-color: transparent;
 	box-shadow: inset 0 0 0 2px var(--obtask-dot-color, var(--text-faint));
+}
+
+/*
+ * Time line ("09:00–10:00") — second visual line, muted and small like a
+ * timestamp caption, not competing with the title for attention. Explicit
+ * `text-overflow: ellipsis` (the vendored stylesheet gives time-grid's
+ * `.ec-event-time` `overflow: hidden; white-space: nowrap` already, but only
+ * day-grid/timeline get the ellipsis half of that pairing) fixes the
+ * literal reported bug: without it, an overflowing label was hard-clipped
+ * mid-character ("09:00–10:0") instead of trailing off with "…".
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event-time {
+	order: 2;
+	flex-shrink: 0;
+	margin: var(--size-4-1) 0 0 0;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 /*
@@ -427,6 +493,12 @@
  * separation for prev/next. The month/week/day trio gets its own,
  * different treatment below (a shadcn-Tabs-style track) which overrides
  * this base rule for that one group via `:has()`.
+ *
+ * No nested-radius concern here (unlike the tab track below): this base
+ * `.ec-button-group` carries no `background-color`/`padding`/`border-radius`
+ * of its own, so prev/next's buttons aren't rounded corners inset inside a
+ * rounded parent — each is just a free-standing pill with its own full
+ * `--button-radius`, `gap`-separated.
  */
 .obtask-calendar .ec-button-group {
 	display: inline-flex;
@@ -445,28 +517,55 @@
 }
 
 /*
- * The month/week/day view switcher, styled as a shadcn-Tabs-style
- * segmented control (tabs "list" track + raised active "trigger") instead
- * of the plain unfused-button treatment every other `.ec-button-group`
- * gets above — a trio that toggles between three *mutually exclusive*
- * views of the same data reads more like a tab strip than a row of
- * independent commands (today/prev/next). EC gives every button group the
- * identical `.ec-button-group` class regardless of which buttons it holds
- * (see `Buttons.svelte`'s `ec-${button}` per-button class, e.g.
+ * The month/week/day view switcher, styled as a flat segmented control
+ * (tabs "list" track + a plain tinted-overlay active "trigger") instead of
+ * the plain unfused-button treatment every other `.ec-button-group` gets
+ * above — a trio that toggles between three *mutually exclusive* views of
+ * the same data reads more like a tab strip than a row of independent
+ * commands (today/prev/next). EC gives every button group the identical
+ * `.ec-button-group` class regardless of which buttons it holds (see
+ * `Buttons.svelte`'s `ec-${button}` per-button class, e.g.
  * `.ec-dayGridMonth`/`.ec-timeGridWeek`/`.ec-timeGridDay`/`.ec-prev`/
- * `.ec-next` — confirmed against the vendored source, not documented in
- * the public API), so `:has(.ec-dayGridMonth)` is what scopes this to
- * *only* the view trio and leaves the prev/next pair on the plain
- * unfused-button rules above.
+ * `.ec-next` — confirmed against the vendored source, not documented in the
+ * public API), so `:has(.ec-dayGridMonth)` is what scopes this to *only*
+ * the view trio and leaves the prev/next pair on the plain unfused-button
+ * rules above.
+ *
+ * A first pass used a raised "card" active tab (`--background-primary` fill
+ * + `--shadow-s`) on a `--background-modifier-hover` track, shadcn-Tabs
+ * style — but in Obsidian's dark themes `--background-primary` is *darker*
+ * than `--background-modifier-hover`, and `--shadow-s` is a dark rim, so
+ * the "raised" tab read as a sunken well with a dark outline instead.
+ * Dropped the shadow and the fill-vs-track darkness inversion entirely:
+ * track is `--background-secondary` (a real, slightly-recessed surface,
+ * not a translucent hover tint), active tab is
+ * `--background-modifier-hover` — a translucent overlay, so it lands
+ * lighter than the track in dark themes and darker in light ones, either
+ * way reading as "raised above the track" with no shadow needed.
+ *
+ * Nested-radius rule: a rounded child inset by `padding` from a rounded
+ * parent needs a *smaller* radius than the parent, or the two curves don't
+ * run parallel — the child's corner arcs outside the parent's at the same
+ * radius, reading as a clash rather than a concentric pair. The track's
+ * radius is `--radius-m`; each tab sits `--size-2-1` in from it on every
+ * side (the track's own `padding` below, plus prev/next's `gap`, which is
+ * also `--size-2-1`, keeping the tab's inset uniform), so each tab's own
+ * radius is `--radius-m` minus that same `--size-2-1` — not the unrelated
+ * `--radius-s` token a first pass used, which happened to be close but
+ * wasn't actually derived from the track's own geometry. `box-sizing:
+ * border-box` (plus no negative margins) keeps each tab's border box
+ * exactly inside the track's padding box, so the inset the radius math
+ * assumes is the real one.
  */
 .obtask-calendar .ec-button-group:has(.ec-dayGridMonth) {
 	gap: var(--size-2-1);
 	padding: var(--size-2-1);
 	border-radius: var(--radius-m);
-	background-color: var(--background-modifier-hover);
+	background-color: var(--background-secondary);
 }
 
 .obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button {
+	box-sizing: border-box;
 	background-color: transparent;
 	color: var(--text-muted);
 	border: none;
@@ -475,7 +574,7 @@
 	font-weight: var(--font-medium);
 	line-height: 1;
 	padding: var(--size-2-2) var(--size-4-3);
-	border-radius: var(--radius-s);
+	border-radius: calc(var(--radius-m) - var(--size-2-1));
 }
 
 .obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button:not(:disabled):hover {
@@ -483,17 +582,18 @@
 	color: var(--text-normal);
 }
 
-/* Active tab: a raised "card" (opaque fill + shadow) sitting above the
- * track, exactly like shadcn's Tabs — not a filled-accent pill, which
- * would read as a primary action rather than "the currently open view". */
+/* Active tab: a flat tinted overlay, not a filled-accent pill (which would
+ * read as a primary action rather than "the currently open view") and not
+ * a raised card (see the shadow/darkness note above). */
 .obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button.ec-active {
-	background-color: var(--background-primary);
+	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	font-weight: var(--font-semibold);
-	box-shadow: var(--shadow-s);
+	border-radius: calc(var(--radius-m) - var(--size-2-1));
+	box-shadow: none;
 }
 
 .obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button.ec-active:not(:disabled):hover {
-	background-color: var(--background-primary);
+	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
