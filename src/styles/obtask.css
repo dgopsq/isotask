@@ -77,7 +77,16 @@
 }
 
 .obtask-feed__priority {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
 	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.obtask-feed__priority-icon {
+	display: inline-flex;
+	align-items: center;
 }
 
 /*

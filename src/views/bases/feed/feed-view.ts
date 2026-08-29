@@ -4,7 +4,12 @@ import { BasesView, Component, Menu, setIcon } from "obsidian";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { DateField } from "@/app/set-date";
 import type { makeSetDate } from "@/app/set-date";
+import type { makeSetDuration } from "@/app/set-duration";
+import type { makeSetPriority } from "@/app/set-priority";
+import type { makeSetProject } from "@/app/set-project";
+import type { makeSetRecurrence } from "@/app/set-recurrence";
 import type { makeSetStatus } from "@/app/set-status";
+import type { makeSetTags } from "@/app/set-tags";
 import { describeAppError } from "@/app/errors";
 import type { Bucket, DateSource } from "@/domain/buckets";
 import { BUCKET_ORDER, groupIntoBuckets } from "@/domain/buckets";
@@ -19,13 +24,15 @@ import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
-import type { StatusId, Task, TaskPath } from "@/domain/task";
-import { priorityChipClass } from "@/domain/task";
+import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
+import { priorityChipClass, priorityLabel } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import { DateModal } from "@/ui/date-modal";
+import { buildPriorityMenu, priorityIcon } from "@/ui/priority-menu";
 import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
+import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
 const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	overdue: "Overdue",
@@ -41,13 +48,30 @@ const DATE_FIELD_LABELS: Readonly<Record<FeedRowAnchor["field"], string>> = {
 	scheduled: "Scheduled",
 };
 
+/**
+ * A `Menu` forced to render as DOM rather than a native OS context menu.
+ * Obsidian defaults `useNativeMenu` to `true` on macOS when the
+ * `nativeMenus` vault config is unset (`Menu`'s `onload`, verified against
+ * the bundled app bundle) — a native menu can't be keyboard-navigated or
+ * styled the same as the rest of this plugin's UI, and has no DOM to test
+ * against, so every menu this view opens itself forces the DOM path.
+ */
+function newMenu(): Menu {
+	return new Menu().setUseNativeMenu(false);
+}
+
 export interface FeedBasesViewDeps {
 	readonly app: App;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
+	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
+	readonly setDuration: ReturnType<typeof makeSetDuration>;
+	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setProject: ReturnType<typeof makeSetProject>;
+	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
 }
 
@@ -150,9 +174,11 @@ export class FeedBasesView extends BasesView {
 		});
 
 		this.renderDateChip(row, task, dateSource);
-		this.renderPriorityChip(row, task);
+		this.renderPriorityControl(row, task);
 		this.renderProjectLink(row, task);
 		this.renderTags(row, task);
+
+		this.registerRowContextMenu(row, task, statuses);
 	}
 
 	/**
@@ -197,12 +223,41 @@ export class FeedBasesView extends BasesView {
 		});
 	}
 
-	/** Priority chip: base layout class plus one `obtask-priority-<value>` class per `domain/task.ts#priorityChipClass`, mapped to a theme colour in `styles/obtask.css`. */
-	private renderPriorityChip(row: HTMLElement, task: Task): void {
-		const label = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
-		row.createSpan({
-			text: label,
-			cls: [cssClass("feed__priority"), cssClass(priorityChipClass(task.priority))],
+	/**
+	 * Priority control: base layout class plus one `obtask-priority-<value>`
+	 * class per `domain/task.ts#priorityChipClass` (mapped to a theme colour
+	 * in `styles/obtask.css`), same clickable-icon/button-like pattern as the
+	 * status control — opens `buildPriorityMenu` on click/Enter/Space and
+	 * dispatches to `setPriority`.
+	 */
+	private renderPriorityControl(row: HTMLElement, task: Task): void {
+		const control = row.createSpan({
+			cls: [cssClass("feed__priority"), cssClass(priorityChipClass(task.priority)), "clickable-icon"],
+			attr: { role: "button", tabindex: "0" },
+		});
+
+		setIcon(control.createSpan({ cls: cssClass("feed__priority-icon") }), priorityIcon(task.priority));
+		control.createSpan({ text: priorityLabel(task.priority), cls: cssClass("feed__priority-label") });
+
+		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
+			const menu = newMenu();
+			buildPriorityMenu(menu, task.priority, (priority) => {
+				void this.setPriority(task.path, priority);
+			});
+			if (evt instanceof MouseEvent) {
+				menu.showAtMouseEvent(evt);
+			} else {
+				const rect = control.getBoundingClientRect();
+				menu.showAtPosition({ x: rect.left, y: rect.bottom });
+			}
+		};
+
+		this.rows.registerDomEvent(control, "click", openMenu);
+		this.rows.registerDomEvent(control, "keydown", (evt) => {
+			if (evt.key === "Enter" || evt.key === " ") {
+				evt.preventDefault();
+				openMenu(evt);
+			}
 		});
 	}
 
@@ -255,7 +310,7 @@ export class FeedBasesView extends BasesView {
 		});
 
 		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
-			const menu = new Menu();
+			const menu = newMenu();
 			buildStatusMenu(menu, statuses, task.status, (status) => {
 				void this.setStatus(task.path, status.id);
 			});
@@ -276,8 +331,71 @@ export class FeedBasesView extends BasesView {
 		});
 	}
 
+	/**
+	 * Opens `buildTaskEditMenu` (every editable property, `ui/task-edit-menu.ts`)
+	 * at the pointer on right-click, and on a ~500ms touch-and-hold for
+	 * mobile — Obsidian exposes no built-in long-press helper, so this times
+	 * `touchstart`..`touchend`/`touchmove`/`touchcancel` itself via
+	 * `window.setTimeout`, cleared on any of those or (as a safety net) when
+	 * `this.rows` unloads.
+	 */
+	private registerRowContextMenu(row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
+		const openEditMenu = (position: { readonly clientX: number; readonly clientY: number }): void => {
+			const menu = newMenu();
+			buildTaskEditMenu(menu, task, {
+				app: this.deps.app,
+				statuses,
+				setStatus: this.deps.setStatus,
+				setPriority: this.deps.setPriority,
+				setDate: this.deps.setDate,
+				setDuration: this.deps.setDuration,
+				setRecurrence: this.deps.setRecurrence,
+				setProject: this.deps.setProject,
+				setTags: this.deps.setTags,
+				notifier: this.deps.notifier,
+			});
+			menu.showAtPosition({ x: position.clientX, y: position.clientY });
+		};
+
+		this.rows.registerDomEvent(row, "contextmenu", (evt) => {
+			evt.preventDefault();
+			openEditMenu(evt);
+		});
+
+		let longPressTimer: number | undefined;
+		const clearLongPress = (): void => {
+			if (longPressTimer !== undefined) {
+				window.clearTimeout(longPressTimer);
+				longPressTimer = undefined;
+			}
+		};
+
+		this.rows.registerDomEvent(row, "touchstart", (evt) => {
+			const touch = evt.touches[0];
+			if (touch === undefined) {
+				return;
+			}
+			const { clientX, clientY } = touch;
+			clearLongPress();
+			longPressTimer = window.setTimeout(() => {
+				openEditMenu({ clientX, clientY });
+			}, 500);
+		});
+		this.rows.registerDomEvent(row, "touchend", clearLongPress);
+		this.rows.registerDomEvent(row, "touchmove", clearLongPress);
+		this.rows.registerDomEvent(row, "touchcancel", clearLongPress);
+		this.rows.register(clearLongPress);
+	}
+
 	private async setStatus(path: TaskPath, statusId: StatusId): Promise<void> {
 		const result = await this.deps.setStatus(path, statusId);
+		if (!result.ok) {
+			this.deps.notifier.error(describeAppError(result.error));
+		}
+	}
+
+	private async setPriority(path: TaskPath, priority: Priority): Promise<void> {
+		const result = await this.deps.setPriority(path, priority);
 		if (!result.ok) {
 			this.deps.notifier.error(describeAppError(result.error));
 		}

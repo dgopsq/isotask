@@ -2,7 +2,12 @@ import type { App, BasesAllOptions, Plugin } from "obsidian";
 import { Notice } from "obsidian";
 
 import type { makeSetDate } from "@/app/set-date";
+import type { makeSetDuration } from "@/app/set-duration";
+import type { makeSetPriority } from "@/app/set-priority";
+import type { makeSetProject } from "@/app/set-project";
+import type { makeSetRecurrence } from "@/app/set-recurrence";
 import type { makeSetStatus } from "@/app/set-status";
+import type { makeSetTags } from "@/app/set-tags";
 import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
 import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
@@ -112,7 +117,12 @@ export interface RegisterViewsDeps {
 	readonly getWeekStart: () => Weekday;
 	readonly renderer: CalendarRenderer;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
+	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
+	readonly setDuration: ReturnType<typeof makeSetDuration>;
+	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setProject: ReturnType<typeof makeSetProject>;
+	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
 }
 
@@ -128,7 +138,12 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,
 				setStatus: deps.setStatus,
+				setPriority: deps.setPriority,
 				setDate: deps.setDate,
+				setDuration: deps.setDuration,
+				setRecurrence: deps.setRecurrence,
+				setProject: deps.setProject,
+				setTags: deps.setTags,
 				notifier: deps.notifier,
 			}),
 		options: () => feedViewOptions,
