@@ -4,6 +4,7 @@ import { Modal, Notice, Setting, setIcon } from "obsidian";
 import type { StatusConfig, StatusKind } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
+import { IconSuggest } from "@/ui/suggest/icon-suggest";
 
 export interface StatusesModalDeps {
 	readonly getStatuses: () => readonly StatusConfig[];
@@ -140,14 +141,15 @@ export class StatusesModal extends Modal {
 				}),
 		);
 
-		setting.addText((text) =>
+		setting.addText((text) => {
 			text
 				.setPlaceholder("Icon (optional)")
 				.setValue(status.icon ?? "")
 				.onChange((value) => {
 					this.updateDraft(index, (s) => statusWithIcon(s, value));
-				}),
-		);
+				});
+			new IconSuggest(this.app, text.inputEl);
+		});
 
 		if (status.icon !== undefined && status.icon.length > 0) {
 			const preview = setting.controlEl.createSpan({ cls: cssClass("statuses-modal-icon-preview") });

@@ -123,6 +123,32 @@ async function inputAt(modalCls: string, type: string, index: number): Promise<W
 }
 
 /**
+ * Polls the shared `.suggestion-item` popover (used by both `FuzzySuggestModal`
+ * and `AbstractInputSuggest`, see "Set status via suggest modal" above) for an
+ * item whose text contains `text`, returning it once found and displayed.
+ */
+async function waitForSuggestionItem(text: string): Promise<WebdriverIO.Element> {
+	let found: WebdriverIO.Element | undefined;
+	await browser.waitUntil(
+		async () => {
+			const items = await browser.$$(".suggestion-item").getElements();
+			for (const item of items) {
+				if ((await item.getText()).includes(text) && (await item.isDisplayed())) {
+					found = item;
+					return true;
+				}
+			}
+			return false;
+		},
+		{ timeout: SELECT_TIMEOUT, timeoutMsg: `suggestion item containing "${text}" never appeared` },
+	);
+	if (found === undefined) {
+		throw new Error(`suggestion item containing "${text}" never appeared`);
+	}
+	return found;
+}
+
+/**
  * Feed and calendar are exercised in one spec file, sharing one Obsidian
  * session opened once in the top-level `before` below. wdio-obsidian-service
  * launches a fresh Obsidian instance per spec *file* — the dominant cost of
@@ -842,6 +868,38 @@ describe("Actions", function () {
 				timeout: SELECT_TIMEOUT,
 				timeoutMsg: `${createdPath} never became the active file`,
 			});
+		});
+
+		it("suggests an existing note in the Project field and fills in its basename on selection", async function () {
+			await browser.executeObsidianCommand("obtask:create-task");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			// Project lives behind "More options" — there's exactly one toggle
+			// in this modal, so its `.checkbox-container` is unambiguous.
+			await browser.$(`.${modalCls} .checkbox-container`).click();
+
+			const projectInput = browser.$(`.${modalCls} input[placeholder="Project name or [[link]]"]`);
+			await projectInput.waitForExist({ timeout: SELECT_TIMEOUT });
+
+			// First letters of the "Overdue task" fixture note's title (see
+			// e2e/fixtures.ts) — enough to narrow the suggester to one match.
+			await projectInput.setValue("Overdue");
+
+			const suggestion = await waitForSuggestionItem("Overdue task");
+			expect(await suggestion.isDisplayed()).toBe(true);
+
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("create-task-modal-note-suggest");
+			}
+
+			await suggestion.click();
+
+			await browser.waitUntil(async () => (await projectInput.getValue()) === "Overdue task", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: 'Project input never became "Overdue task" after selecting the suggestion',
+			});
+
+			await browser.$(`.${modalCls} button:not(.mod-cta)`).click();
 		});
 	});
 

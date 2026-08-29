@@ -13,6 +13,9 @@ import type { StatusConfig } from "@/domain/status";
 import type { Minutes, Priority, RRuleString, StatusId, TaskPath } from "@/domain/task";
 import { PRIORITIES } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
+import { FolderSuggest } from "@/ui/suggest/folder-suggest";
+import { NoteSuggest } from "@/ui/suggest/note-suggest";
+import { TagSuggest } from "@/ui/suggest/tag-suggest";
 
 export interface CreateTaskModalDeps {
 	readonly app: App;
@@ -195,11 +198,12 @@ export class CreateTaskModal extends Modal {
 		new Setting(container)
 			.setName("Folder")
 			.setDesc("Where the note is created.")
-			.addText((text) =>
+			.addText((text) => {
 				text.setValue(this.folder).onChange((value) => {
 					this.folder = value;
-				}),
-			);
+				});
+				new FolderSuggest(this.deps.app, text.inputEl);
+			});
 
 		this.renderStatusField(container);
 
@@ -220,26 +224,28 @@ export class CreateTaskModal extends Modal {
 		new Setting(container)
 			.setName("Project")
 			.setDesc("Project note, e.g. `[[Launch]]`.")
-			.addText((text) =>
+			.addText((text) => {
 				text
 					.setPlaceholder("Project name or [[link]]")
 					.setValue(this.project)
 					.onChange((value) => {
 						this.project = value;
-					}),
-			);
+					});
+				new NoteSuggest(this.deps.app, text.inputEl);
+			});
 
 		new Setting(container)
 			.setName("Tags")
 			.setDesc("Comma-separated, without #.")
-			.addText((text) =>
+			.addText((text) => {
 				text
 					.setPlaceholder("Comma-separated tags")
 					.setValue(this.tagsText)
 					.onChange((value) => {
 						this.tagsText = value;
-					}),
-			);
+					});
+				new TagSuggest(this.deps.app, text.inputEl);
+			});
 	}
 
 	private renderTitleField(container: HTMLElement): void {
