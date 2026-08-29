@@ -84,4 +84,22 @@ describe("toEventCalendarEvent", () => {
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.classNames).toContain("obtask-event--due");
 	});
+
+	it("prefixes the title with HH:mm for a timed all-day point event", () => {
+		const input = event({ start: date("2026-09-10T09:00"), allDay: true, title: "Budget report" });
+		const mapped = toEventCalendarEvent(input);
+		expect(mapped.title).toBe("09:00 Budget report");
+	});
+
+	it("does not prefix the title for a date-only all-day event", () => {
+		const input = event({ start: date("2026-09-10"), allDay: true, title: "Budget report" });
+		const mapped = toEventCalendarEvent(input);
+		expect(mapped.title).toBe("Budget report");
+	});
+
+	it("does not prefix the title for a timed block (not all-day)", () => {
+		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false, title: "Team sync" });
+		const mapped = toEventCalendarEvent(input);
+		expect(mapped.title).toBe("Team sync");
+	});
 });

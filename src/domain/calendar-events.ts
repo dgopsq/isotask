@@ -30,37 +30,51 @@ function scheduledEvent(task: Task): CalendarEvent | undefined {
 		return undefined;
 	}
 	const timed = isDateTime(task.scheduled);
-	const base: CalendarEvent = {
+	// Timed + a duration -> a real block in the time grid (`end` set,
+	// `allDay: false`). Timed with no duration, and date-only, both become
+	// `allDay: true` chips — a zero-duration event has no length to occupy
+	// on the grid, and drawing it as a 24px rectangle collided with real
+	// timed blocks (ADR 0011); `start` keeps its time component even when
+	// `allDay`, so all-day chips still sort/prefix by time
+	// (`event-calendar-mapping.ts`).
+	if (timed && task.duration !== undefined) {
+		return {
+			id: `${task.path}#scheduled`,
+			taskPath: task.path,
+			title: task.title,
+			start: task.scheduled,
+			end: addMinutes(task.scheduled, task.duration),
+			allDay: false,
+			source: "scheduled",
+			priority: task.priority,
+		};
+	}
+	return {
 		id: `${task.path}#scheduled`,
 		taskPath: task.path,
 		title: task.title,
 		start: task.scheduled,
-		allDay: !timed,
+		allDay: true,
 		source: "scheduled",
 		priority: task.priority,
 	};
-	// Timed + a duration -> a block of that length. Timed with no duration
-	// -> a point-in-time marker (no `end`), per the M3 plan's design
-	// decision. Date-only -> all-day, `end` unused.
-	if (timed && task.duration !== undefined) {
-		return { ...base, end: addMinutes(task.scheduled, task.duration) };
-	}
-	return base;
 }
 
 function dueEvent(task: Task): CalendarEvent | undefined {
 	if (task.due === undefined) {
 		return undefined;
 	}
-	const timed = isDateTime(task.due);
-	// A timed due date is a zero-duration marker (no `end`) — `due` carries
-	// no duration field, unlike `scheduled`.
+	// `due` carries no duration field, so it's always a chip, never a
+	// time-grid block: date-only is genuinely all-day, and a timed due
+	// becomes an all-day chip prefixed with its time (ADR 0011) rather than
+	// a zero-duration time-grid marker — `start` keeps the full datetime
+	// either way.
 	return {
 		id: `${task.path}#due`,
 		taskPath: task.path,
 		title: task.title,
 		start: task.due,
-		allDay: !timed,
+		allDay: true,
 		source: "due",
 		priority: task.priority,
 	};

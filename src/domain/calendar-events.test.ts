@@ -84,9 +84,9 @@ describe("eventsForTask", () => {
 			expect(event).toMatchObject({ allDay: false, start: "2026-09-05T09:00", end: "2026-09-05T09:30" });
 		});
 
-		it("timed scheduled without duration -> timed point-in-time marker, no end", () => {
+		it("timed scheduled without duration -> all-day chip, start keeps its time, no end", () => {
 			const [event] = eventsFor(task({ title: "T", scheduled: date("2026-09-05T09:00") }), "scheduled");
-			expect(event).toMatchObject({ allDay: false, start: "2026-09-05T09:00" });
+			expect(event).toMatchObject({ allDay: true, start: "2026-09-05T09:00" });
 			expect(event?.end).toBeUndefined();
 		});
 
@@ -104,9 +104,9 @@ describe("eventsForTask", () => {
 			expect(event?.end).toBeUndefined();
 		});
 
-		it("timed due -> timed point-in-time marker, no end (duration never applies to due)", () => {
+		it("timed due -> all-day chip, start keeps its time, no end (duration never applies to due)", () => {
 			const [event] = eventsFor(task({ title: "T", due: date("2026-09-10T17:00") }), "due");
-			expect(event).toMatchObject({ allDay: false, start: "2026-09-10T17:00" });
+			expect(event).toMatchObject({ allDay: true, start: "2026-09-10T17:00" });
 			expect(event?.end).toBeUndefined();
 		});
 	});

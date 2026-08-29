@@ -493,6 +493,23 @@
 }
 
 /*
+ * The week view's columns are much narrower than the day view's single
+ * column (7 days vs. 1 sharing the same width), so a block's time line
+ * ("09:00–10:00") is far more likely to get clipped or crowd out the
+ * title there — dropped for week, kept for day. `.ec-week-view`/
+ * `.ec-day-view` land on the `.ec` root itself (Event Calendar's own
+ * `theme` option per view, confirmed against the vendored source,
+ * `@event-calendar/core/dist/index.js`'s `themeView("ec-time-grid
+ * ec-week-view")` / `"ec-time-grid ec-day-view")`; also asserted by
+ * `e2e/specs/views.e2e.ts`'s "switches the Event Calendar view class..."
+ * test), so scoping to `.ec-week-view` alone (no extra `.ec-time-grid`
+ * needed) is enough to leave `.ec-day-view` on the rule above unaffected.
+ */
+.obtask-calendar .ec-week-view .ec-body .ec-event-time {
+	display: none;
+}
+
+/*
  * The header toolbar (title, today/prev/next, three view buttons) is a
  * single non-wrapping flex row in the library. Let its segments and button
  * groups wrap so it stays usable at phone widths and in narrow panes.

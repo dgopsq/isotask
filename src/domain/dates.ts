@@ -143,6 +143,18 @@ export function isDateTime(date: TaskDate): date is IsoDateTime {
 	return date.includes("T");
 }
 
+/**
+ * Zero-padded 24h `HH:mm` time-of-day. Only meaningful for an
+ * `IsoDateTime` — a date-only `TaskDate` has no time component (this still
+ * returns `00:00` for one rather than throwing; callers that care should
+ * check `isDateTime` first, as `event-calendar-mapping.ts` does before
+ * prefixing an all-day chip's title with it).
+ */
+export function formatTime(date: TaskDate): string {
+	const c = componentsOf(date);
+	return `${pad(c.hour)}:${pad(c.minute)}`;
+}
+
 export function toDateOnly(date: TaskDate): IsoDate {
 	return isDateTime(date) ? formatDateOnly(componentsOf(date)) : date;
 }

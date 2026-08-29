@@ -4,6 +4,7 @@ import {
 	addMinutes,
 	compareTaskDate,
 	endOfWeek,
+	formatTime,
 	fromFloatingDate,
 	fromJsDate,
 	fromJsDateTime,
@@ -72,6 +73,18 @@ describe("isDateTime / toDateOnly", () => {
 	it("strips the time component", () => {
 		expect(toDateOnly(mustParse("2026-09-02T09:30"))).toBe("2026-09-02");
 		expect(toDateOnly(mustParse("2026-09-02"))).toBe("2026-09-02");
+	});
+});
+
+describe("formatTime", () => {
+	it("formats a datetime's time-of-day as zero-padded 24h HH:mm", () => {
+		expect(formatTime(mustParse("2026-09-02T09:05"))).toBe("09:05");
+		expect(formatTime(mustParse("2026-09-02T17:30"))).toBe("17:30");
+		expect(formatTime(mustParse("2026-09-02T00:00"))).toBe("00:00");
+	});
+
+	it("returns 00:00 for a date-only value", () => {
+		expect(formatTime(mustParse("2026-09-02"))).toBe("00:00");
 	});
 });
 

@@ -57,6 +57,12 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// see `docs/ARCHITECTURE.md`'s calendar section.
 			slotDuration: "01:00:00",
 			slotHeight: 32,
+			// Zero-duration due/scheduled markers no longer live in the time
+			// grid (ADR 0011) — it now holds only real scheduled+duration
+			// blocks, which can still legitimately overlap each other (two
+			// meetings at once). `false` lays overlapping blocks side by side
+			// instead of stacking them, which read as one collided rectangle.
+			slotEventOverlap: false,
 			headerToolbar: {
 				start: "title",
 				center: "",
