@@ -11,7 +11,7 @@ import { describeRRule, parseRRule, RECURRENCE_PRESETS } from "@/domain/recurren
 import type { Result } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import type { Minutes, Priority, RRuleString, StatusId, TaskPath } from "@/domain/task";
-import { PRIORITIES } from "@/domain/task";
+import { PRIORITIES, priorityLabel } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
 import { FolderSuggest } from "@/ui/suggest/folder-suggest";
 import { NoteSuggest } from "@/ui/suggest/note-suggest";
@@ -25,13 +25,6 @@ export interface CreateTaskModalDeps {
 	/** Prefill (M4's calendar "click empty slot" flow passes a clicked date this way). */
 	readonly initial?: Partial<TaskDraft>;
 }
-
-const PRIORITY_LABELS: Readonly<Record<Priority, string>> = {
-	low: "Low",
-	normal: "Normal",
-	high: "High",
-	urgent: "Urgent",
-};
 
 const NO_REPEAT_ID = "none";
 const CUSTOM_REPEAT_ID = "custom";
@@ -294,7 +287,7 @@ export class CreateTaskModal extends Modal {
 	private renderPriorityField(container: HTMLElement): void {
 		const options: Record<string, string> = {};
 		for (const priority of PRIORITIES) {
-			options[priority] = PRIORITY_LABELS[priority];
+			options[priority] = priorityLabel(priority);
 		}
 		new Setting(container)
 			.setName("Priority")
