@@ -1,5 +1,5 @@
 import type { App, QueryController } from "obsidian";
-import { BasesView, Menu, setIcon } from "obsidian";
+import { BasesView, Component, Menu, setIcon } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { DateField } from "@/app/set-date";
@@ -62,6 +62,14 @@ export class FeedBasesView extends BasesView {
 
 	private readonly viewContainerEl: HTMLElement;
 	private readonly deps: FeedBasesViewDeps;
+	/**
+	 * Owns the DOM listeners of the current render. Rows are rebuilt on every
+	 * `onDataUpdated`, so registering their listeners on the view itself would
+	 * accumulate cleanup closures (and the detached rows they close over) for
+	 * the view's whole lifetime. Swapping a child component per render frees
+	 * the previous render's listeners instead.
+	 */
+	private rows: Component = new Component();
 
 	constructor(controller: QueryController, containerEl: HTMLElement, deps: FeedBasesViewDeps) {
 		super(controller);
@@ -71,6 +79,8 @@ export class FeedBasesView extends BasesView {
 	}
 
 	override onDataUpdated(): void {
+		this.removeChild(this.rows);
+		this.rows = this.addChild(new Component());
 		this.viewContainerEl.empty();
 
 		const keys = this.deps.getPropertyKeys();
@@ -131,7 +141,7 @@ export class FeedBasesView extends BasesView {
 			cls: ["internal-link", cssClass("feed__title")],
 			href: task.path,
 		});
-		this.registerDomEvent(link, "click", (evt) => {
+		this.rows.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
@@ -175,8 +185,8 @@ export class FeedBasesView extends BasesView {
 			}).open();
 		};
 
-		this.registerDomEvent(chip, "click", openModal);
-		this.registerDomEvent(chip, "keydown", (evt) => {
+		this.rows.registerDomEvent(chip, "click", openModal);
+		this.rows.registerDomEvent(chip, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
 				openModal();
@@ -211,7 +221,7 @@ export class FeedBasesView extends BasesView {
 			cls: ["internal-link", cssClass("feed__project")],
 			href: project,
 		});
-		this.registerDomEvent(link, "click", (evt) => {
+		this.rows.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();
 			void this.deps.app.workspace.openLinkText(project, task.path, false);
 		});
@@ -254,8 +264,8 @@ export class FeedBasesView extends BasesView {
 			}
 		};
 
-		this.registerDomEvent(control, "click", openMenu);
-		this.registerDomEvent(control, "keydown", (evt) => {
+		this.rows.registerDomEvent(control, "click", openMenu);
+		this.rows.registerDomEvent(control, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
 				openMenu(evt);
