@@ -2,6 +2,8 @@ import type { IsoDate, TaskDate, Weekday } from "@/domain/dates";
 import { compareTaskDate, endOfWeek, shiftBy, toDateOnly } from "@/domain/dates";
 import type { Option } from "@/domain/result";
 import { fromNullable, none, some } from "@/domain/result";
+import type { StatusConfig } from "@/domain/status";
+import { findStatus, isTerminal } from "@/domain/status";
 import type { Task } from "@/domain/task";
 import { priorityRank } from "@/domain/task";
 
@@ -61,6 +63,10 @@ export interface BucketOptions {
 	readonly today: IsoDate;
 	readonly firstDay: Weekday;
 	readonly source: DateSource;
+	/** Configured statuses, used to detect terminal-kind tasks for `completedAtBottom`. */
+	readonly statuses?: readonly StatusConfig[];
+	/** When true, terminal-kind tasks (see `domain/status.ts#isTerminal`) sort after all others within each bucket. Defaults to false. */
+	readonly completedAtBottom?: boolean;
 }
 
 function compareOptionalDate(a: Option<TaskDate>, b: Option<TaskDate>): number {
@@ -76,8 +82,19 @@ function compareOptionalDate(a: Option<TaskDate>, b: Option<TaskDate>): number {
 	return 0;
 }
 
-function compareWithinBucket(a: Task, b: Task, source: DateSource): number {
-	const dateCompare = compareOptionalDate(taskAnchorDate(a, source), taskAnchorDate(b, source));
+function isTaskTerminal(task: Task, statuses: readonly StatusConfig[]): boolean {
+	const status = findStatus(statuses, task.status);
+	return status.some && isTerminal(status.value.kind);
+}
+
+function compareWithinBucket(a: Task, b: Task, options: BucketOptions): number {
+	if (options.completedAtBottom === true && options.statuses !== undefined) {
+		const terminalCompare = Number(isTaskTerminal(a, options.statuses)) - Number(isTaskTerminal(b, options.statuses));
+		if (terminalCompare !== 0) {
+			return terminalCompare;
+		}
+	}
+	const dateCompare = compareOptionalDate(taskAnchorDate(a, options.source), taskAnchorDate(b, options.source));
 	if (dateCompare !== 0) {
 		return dateCompare;
 	}
@@ -90,7 +107,8 @@ function compareWithinBucket(a: Task, b: Task, source: DateSource): number {
 
 /**
  * Groups tasks into buckets by the configured date source, sorted within
- * each bucket: date ascending -> priority descending -> title ascending.
+ * each bucket: (when `completedAtBottom` is set) terminal-kind tasks last,
+ * then date ascending -> priority descending -> title ascending on each side.
  * Terminal-kind tasks are not excluded here — visibility is Bases' filter's
  * job (see `docs/ARCHITECTURE.md#why-views-never-filter`).
  */
@@ -108,7 +126,7 @@ export function groupIntoBuckets(tasks: readonly Task[], options: BucketOptions)
 		const list = buckets.get(bucket) ?? [];
 		result.set(
 			bucket,
-			[...list].sort((a, b) => compareWithinBucket(a, b, options.source)),
+			[...list].sort((a, b) => compareWithinBucket(a, b, options)),
 		);
 	}
 	return result;
