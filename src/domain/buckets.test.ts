@@ -1,0 +1,103 @@
+import { describe, expect, it } from "vitest";
+
+import { BUCKET_ORDER, bucketFor, groupIntoBuckets, taskAnchorDate, type Bucket } from "@/domain/buckets";
+import type { IsoDate, TaskDate } from "@/domain/dates";
+import { parseTaskDate } from "@/domain/dates";
+import type { Task, TaskPath } from "@/domain/task";
+
+function date(value: string): TaskDate {
+	const result = parseTaskDate(value);
+	if (!result.ok) {
+		throw new Error(`bad fixture date ${value}`);
+	}
+	return result.value;
+}
+
+const TODAY = date("2026-09-02") as IsoDate; // Wed
+
+function task(overrides: Partial<Task> & { readonly title: string }): Task {
+	return {
+		path: `${overrides.title}.md` as TaskPath,
+		status: "todo" as Task["status"],
+		priority: "normal",
+		tags: [],
+		...overrides,
+	};
+}
+
+describe("bucketFor — worked example from docs/DOMAIN-MODEL.md (today = Wed 2026-09-02, Monday start)", () => {
+	const table: readonly { readonly value: string; readonly expected: Bucket }[] = [
+		{ value: "2026-08-28", expected: "overdue" }, // Fri, last week
+		{ value: "2026-09-01", expected: "overdue" }, // Tue, this week, before today
+		{ value: "2026-09-02", expected: "today" }, // Wed, today
+		{ value: "2026-09-04", expected: "this-week" }, // Fri, this week
+		{ value: "2026-09-06", expected: "this-week" }, // Sun, this week
+		{ value: "2026-09-07", expected: "next-week" }, // Mon, next week
+		{ value: "2026-09-13", expected: "next-week" }, // Sun, next week
+		{ value: "2026-09-14", expected: "later" }, // Mon, week after next
+		{ value: "2026-12-25", expected: "later" },
+	];
+
+	it.each(table)("$value -> $expected", ({ value, expected }) => {
+		expect(bucketFor(date(value), TODAY, 0)).toBe(expected);
+	});
+});
+
+describe("bucketFor — week-start boundaries", () => {
+	it("Monday-first: Sunday belongs to this week, Monday to next week", () => {
+		expect(bucketFor(date("2026-09-06"), TODAY, 0)).toBe("this-week");
+		expect(bucketFor(date("2026-09-07"), TODAY, 0)).toBe("next-week");
+	});
+
+	it("Sunday-first: Saturday belongs to this week, Sunday to next week", () => {
+		// today = Wed 2026-09-02, week (Sunday-first) = Sun 2026-08-30 .. Sat 2026-09-05
+		expect(bucketFor(date("2026-09-05"), TODAY, 6)).toBe("this-week");
+		expect(bucketFor(date("2026-09-06"), TODAY, 6)).toBe("next-week");
+	});
+});
+
+describe("taskAnchorDate", () => {
+	it("due", () => {
+		const t = task({ title: "a", due: date("2026-09-05") });
+		expect(taskAnchorDate(t, "due")).toEqual({ some: true, value: date("2026-09-05") });
+	});
+
+	it("scheduled", () => {
+		const t = task({ title: "a", scheduled: date("2026-09-05") });
+		expect(taskAnchorDate(t, "scheduled")).toEqual({ some: true, value: date("2026-09-05") });
+	});
+
+	it("earliest picks the smaller of due/scheduled", () => {
+		const t = task({ title: "a", due: date("2026-09-10"), scheduled: date("2026-09-05") });
+		expect(taskAnchorDate(t, "earliest")).toEqual({ some: true, value: date("2026-09-05") });
+	});
+
+	it("earliest falls back to whichever is present", () => {
+		expect(taskAnchorDate(task({ title: "a", due: date("2026-09-10") }), "earliest")).toEqual({
+			some: true,
+			value: date("2026-09-10"),
+		});
+		expect(taskAnchorDate(task({ title: "a" }), "earliest")).toEqual({ some: false });
+	});
+});
+
+describe("groupIntoBuckets", () => {
+	it("buckets no-date tasks separately and always returns every bucket key", () => {
+		const tasks = [task({ title: "No date" })];
+		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		expect([...grouped.keys()]).toEqual(BUCKET_ORDER);
+		expect(grouped.get("no-date")).toHaveLength(1);
+	});
+
+	it("sorts within a bucket by date asc, then priority desc, then title asc", () => {
+		const tasks = [
+			task({ title: "B late high", due: date("2026-09-04"), priority: "high" }),
+			task({ title: "A early", due: date("2026-09-03"), priority: "low" }),
+			task({ title: "C late low", due: date("2026-09-04"), priority: "low" }),
+			task({ title: "D late high alpha-first", due: date("2026-09-04"), priority: "high" }),
+		];
+		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		const thisWeek = grouped.get("this-week") ?? [];
+		expect(thisWeek.map((t) => t.title)).toEqual(["A early", "B late high", "D late high alpha-first", "C late low"]);
+	});
+});
