@@ -12,10 +12,12 @@ const crossLayerPatterns = [
 	"@/views/**",
 	"@/ui/**",
 	"@/settings/**",
+	"@/commands/**",
 	"**/adapters/**",
 	"**/views/**",
 	"**/ui/**",
 	"**/settings/**",
+	"**/commands/**",
 ];
 
 const htmlInjectionSyntaxRules = [
@@ -136,12 +138,12 @@ export default defineConfig([
 						{
 							name: "obsidian",
 							message:
-								"Only src/views, src/ui, src/settings, src/adapters/obsidian and src/main.ts may import obsidian.",
+								"Only src/views, src/ui, src/settings, src/commands, src/adapters/obsidian and src/main.ts may import obsidian.",
 						},
 						{
 							name: "electron",
 							message:
-								"Only src/views, src/ui, src/settings, src/adapters/obsidian and src/main.ts may import electron.",
+								"Only src/views, src/ui, src/settings, src/commands, src/adapters/obsidian and src/main.ts may import electron.",
 						},
 					],
 					patterns: [
@@ -188,7 +190,7 @@ export default defineConfig([
 						{
 							group: crossLayerPatterns,
 							message:
-								"src/domain, src/ports and src/app must not import from adapters/views/ui/settings.",
+								"src/domain, src/ports and src/app must not import from adapters/views/ui/settings/commands.",
 						},
 					],
 				},
@@ -207,12 +209,12 @@ export default defineConfig([
 						{
 							name: "obsidian",
 							message:
-								"Only src/views, src/ui, src/settings, src/adapters/obsidian and src/main.ts may import obsidian.",
+								"Only src/views, src/ui, src/settings, src/commands, src/adapters/obsidian and src/main.ts may import obsidian.",
 						},
 						{
 							name: "electron",
 							message:
-								"Only src/views, src/ui, src/settings, src/adapters/obsidian and src/main.ts may import electron.",
+								"Only src/views, src/ui, src/settings, src/commands, src/adapters/obsidian and src/main.ts may import electron.",
 						},
 					],
 				},
@@ -226,6 +228,7 @@ export default defineConfig([
 			"src/views/**/*.ts",
 			"src/ui/**/*.ts",
 			"src/settings/**/*.ts",
+			"src/commands/**/*.ts",
 			"src/adapters/obsidian/**/*.ts",
 			"src/main.ts",
 		],

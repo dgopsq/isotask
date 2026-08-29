@@ -1,7 +1,9 @@
 import type { App, QueryController } from "obsidian";
-import { BasesView } from "obsidian";
+import { BasesView, Menu, setIcon } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
+import type { makeSetStatus } from "@/app/set-status";
+import { describeAppError } from "@/app/errors";
 import { BUCKET_ORDER, groupIntoBuckets } from "@/domain/buckets";
 import type { Bucket } from "@/domain/buckets";
 import { fromJsDate } from "@/domain/dates";
@@ -9,8 +11,10 @@ import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
-import type { Task } from "@/domain/task";
+import type { StatusId, Task, TaskPath } from "@/domain/task";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
+import type { Notifier } from "@/ports/notifier";
+import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
 
 const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	overdue: "Overdue",
@@ -26,12 +30,14 @@ export interface FeedBasesViewDeps {
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
+	readonly setStatus: ReturnType<typeof makeSetStatus>;
+	readonly notifier: Notifier;
 }
 
 /**
- * Minimal M0 feed view: proves the Bases view API end to end. Renders
- * bucket headers and plain rows (title link, status text, date) from parsed
- * tasks. No row actions/menus yet — that's M2.
+ * M0/M1 feed view: renders bucket headers and rows (title link, a clickable
+ * status control, date) from parsed tasks. Full row layout (priority/project/
+ * tags chips, feed view options) is M2.
  */
 export class FeedBasesView extends BasesView {
 	override type = VIEW_TYPE_FEED;
@@ -96,15 +102,54 @@ export class FeedBasesView extends BasesView {
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
 
-		const statusOption = findStatus(statuses, task.status);
-		row.createSpan({
-			text: statusOption.some ? statusOption.value.label : task.status,
-			cls: cssClass("feed__status"),
-		});
+		this.renderStatusControl(row, task, statuses);
 
 		const dateText = task.due ?? task.scheduled ?? "";
 		if (dateText.length > 0) {
 			row.createSpan({ text: dateText, cls: cssClass("feed__date") });
+		}
+	}
+
+	/** Button-like span (icon + label) that opens the status `Menu` on click/Enter/Space and dispatches to `setStatus`. */
+	private renderStatusControl(row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
+		const statusOption = findStatus(statuses, task.status);
+		const control = row.createSpan({
+			cls: [cssClass("feed__status"), "clickable-icon"],
+			attr: { role: "button", tabindex: "0" },
+		});
+
+		setIcon(control.createSpan({ cls: cssClass("feed__status-icon") }), statusOption.some ? statusIcon(statusOption.value) : "circle");
+		control.createSpan({
+			text: statusOption.some ? statusOption.value.label : task.status,
+			cls: cssClass("feed__status-label"),
+		});
+
+		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
+			const menu = new Menu();
+			buildStatusMenu(menu, statuses, task.status, (status) => {
+				void this.setStatus(task.path, status.id);
+			});
+			if (evt instanceof MouseEvent) {
+				menu.showAtMouseEvent(evt);
+			} else {
+				const rect = control.getBoundingClientRect();
+				menu.showAtPosition({ x: rect.left, y: rect.bottom });
+			}
+		};
+
+		this.registerDomEvent(control, "click", openMenu);
+		this.registerDomEvent(control, "keydown", (evt) => {
+			if (evt.key === "Enter" || evt.key === " ") {
+				evt.preventDefault();
+				openMenu(evt);
+			}
+		});
+	}
+
+	private async setStatus(path: TaskPath, statusId: StatusId): Promise<void> {
+		const result = await this.deps.setStatus(path, statusId);
+		if (!result.ok) {
+			this.deps.notifier.error(describeAppError(result.error));
 		}
 	}
 }

@@ -32,20 +32,26 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 
 ## M1 — Core actions
 
-- [ ] `app` layer: use-cases as factory functions over ports (`createTask`, `setStatus`,
-      `rescheduleTask`, `generateBaseFile`), each tested against in-memory fakes
-      (`app/test/fakes.ts`).
-- [ ] Recurrence (`domain/recurrence.ts`, `domain/transitions.ts`) implemented and tested; add
-      `rrule` back to `package.json`.
-- [ ] `TaskStore` adapter (`adapters/obsidian/task-store.ts`) over Vault/MetadataCache/
+- [x] `app` layer: use-cases as factory functions over ports (`createTask`, `setStatus`,
+      `cycleStatus`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the pure
+      `generateBase#renderTasksBase`), each tested against in-memory fakes (`app/test/fakes.ts`).
+      `rescheduleTask` is deferred to M4, where the calendar drag/resize interaction that needs it
+      lands.
+- [x] Recurrence (`domain/recurrence.ts`, `domain/transitions.ts`) implemented and tested; `rrule`
+      is in `package.json`.
+- [x] `TaskStore` adapter (`adapters/obsidian/task-store.ts`) over Vault/MetadataCache/
       `processFrontMatter`.
-- [ ] `ui/` modals and menus (create-task modal, status menu).
-- [ ] Create task / convert note to task commands.
-- [ ] Set status / complete task / cycle status commands.
-- [ ] Set due date / set scheduled date / set recurrence commands.
-- [ ] Completion-triggers-spawn wired end to end (`app/setStatus.ts` -> recurrence -> `TaskStore.create`).
-- [ ] Status list becomes user-configurable in `SettingsTab` (M0 ships it read-only, backed by
-      `DEFAULT_STATUSES`).
+- [x] `ui/` modals and menus: `CreateTaskModal`, `DateModal`, `RecurrenceModal`,
+      `StatusSuggestModal`, `status-menu.ts#buildStatusMenu`.
+- [x] Create task / convert note to task commands.
+- [x] Set status / complete task / cycle status commands.
+- [x] Set due date / set scheduled date / set recurrence commands.
+- [x] Completion-triggers-spawn wired end to end (`app/set-status.ts` -> `domain/transitions.ts`
+      -> `TaskStore.create`).
+- [x] Status list is user-configurable in `SettingsTab` (`StatusesModal`: add/edit/reorder/delete).
+- [x] File-menu "Set status" entries and the feed row's clickable status control (`Menu` +
+      `buildStatusMenu`) for task notes.
+- [x] "Create tasks base" / "Open tasks base" commands (`app/generate-base.ts#renderTasksBase`).
 
 ## M2 — Feed view
 

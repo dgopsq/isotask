@@ -42,8 +42,17 @@
 }
 
 .obtask-feed__status {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.obtask-feed__status-icon {
+	display: inline-flex;
+	align-items: center;
 }
 
 .obtask-feed__date {
@@ -57,5 +66,18 @@
 
 .obtask-calendar {
 	padding: var(--size-4-4);
+	color: var(--text-muted);
+}
+
+.obtask-recurrence-modal-description,
+.obtask-create-task-modal-repeat-description {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.obtask-statuses-modal-icon-preview {
+	display: inline-flex;
+	align-items: center;
+	margin-left: var(--size-4-2);
 	color: var(--text-muted);
 }

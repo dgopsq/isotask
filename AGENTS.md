@@ -13,10 +13,11 @@ no query language.
   imports.
 - Functional core / imperative shell: `src/domain` and `src/app` are pure functions over
   immutable, `readonly` data. Side effects (filesystem, Obsidian API, DOM, timers) live only in
-  `src/adapters`, `src/views`, `src/ui`, `src/settings`, `src/main.ts`.
+  `src/adapters`, `src/views`, `src/ui`, `src/settings`, `src/commands`, `src/main.ts`.
 - Layer import boundaries (ESLint-enforced):
   - `src/domain`, `src/ports`, `src/app` must never import `obsidian`, `electron`,
-    `@event-calendar/*`, or anything under `src/adapters`, `src/views`, `src/ui`, `src/settings`.
+    `@event-calendar/*`, or anything under `src/adapters`, `src/views`, `src/ui`, `src/settings`,
+    `src/commands`.
   - Only `src/adapters/calendar/**` may import `@event-calendar/*`. No other file imports it.
 - No `innerHTML` anywhere. Use `createEl`/`createDiv`/`createSpan` and Obsidian's `Setting`/`Menu`
   helpers.
@@ -53,6 +54,7 @@ src/
   views/bases/feed/      obtask-feed BasesView (thin: entries -> domain -> render -> dispatch)
   views/bases/calendar/  obtask-calendar BasesView
   ui/          DOM renderers + modals (TaskCreateModal, DateModal, RecurrencePicker, StatusMenu)
+  commands/    registerCommands: wires every plugin command to an app/ use-case
   settings/    SettingsTab, settings type + defaults + migration
   styles/      obtask.css, calendar.css (theme-variable mappings only)
   main.ts      composition root: builds adapters, registers views/commands/menus/settings

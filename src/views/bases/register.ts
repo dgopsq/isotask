@@ -1,10 +1,12 @@
 import type { App, Plugin } from "obsidian";
 import { Notice } from "obsidian";
 
+import type { makeSetStatus } from "@/app/set-status";
 import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
+import type { Notifier } from "@/ports/notifier";
 import { CalendarBasesView } from "@/views/bases/calendar/calendar-view";
 import { FeedBasesView } from "@/views/bases/feed/feed-view";
 
@@ -13,6 +15,8 @@ export interface RegisterViewsDeps {
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
+	readonly setStatus: ReturnType<typeof makeSetStatus>;
+	readonly notifier: Notifier;
 }
 
 /** Registers the feed and calendar Bases views (`VIEW_TYPE_FEED`/`VIEW_TYPE_CALENDAR`). Returns whether Bases is enabled in this vault. */
@@ -26,6 +30,8 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				getPropertyKeys: deps.getPropertyKeys,
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,
+				setStatus: deps.setStatus,
+				notifier: deps.notifier,
 			}),
 	});
 

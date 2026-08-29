@@ -9,25 +9,40 @@ plain TypeScript functions over immutable data.
 ```
 src/
   domain/      pure. Types, frontmatter parse/serialise, statuses, buckets, recurrence,
-               transitions. No `obsidian` import. 100% unit-tested with vitest.
+               transitions, settings (type + defaults + `parseSettings`). No `obsidian` import.
+               100% unit-tested with vitest.
   ports/       interfaces the core needs: Clock, TaskStore, Notifier, CalendarRenderer,
                PathResolver.
-  app/         use-cases: createTask, setStatus (incl. complete -> spawn), rescheduleTask,
-               convertNoteToTask, generateBaseFile. Pure orchestration over ports; unit-tested
-               with in-memory fakes.
+  app/         use-cases, each a `make*(deps: AppDeps) => (...) => Promise<Result<...>>` factory
+               over `deps.ts`'s ports: `createTask`, `setStatus` (incl. complete -> spawn),
+               `cycleStatus`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the
+               pure `generateBase#renderTasksBase`. `errors.ts` holds the shared `AppError` union
+               and `describeAppError`/`describeRecurrenceError`. Pure orchestration over ports;
+               unit-tested with in-memory fakes (`app/test/fakes.ts`).
   adapters/
     obsidian/  TaskStore over Vault + MetadataCache + fileManager.processFrontMatter; Clock;
-               Notifier (Notice); settings persistence (loadData/saveData + valibot schema).
+               Notifier (Notice); settings persistence (loadData/saveData; re-exports
+               `domain/settings.ts`'s type/defaults/`parseSettings`, which do the actual
+               valibot validation — see the note below).
     calendar/event-calendar/  CalendarRenderer implementation. Only file tree allowed to import
                `@event-calendar/*`.
   views/bases/feed/, views/bases/calendar/   BasesView subclasses: thin, map entries -> domain,
                call renderers, dispatch actions to app use-cases.
-  ui/          small DOM renderers + modals (TaskCreateModal, DateModal, RecurrencePicker,
-               StatusMenu). createEl only; no innerHTML.
+  ui/          small DOM renderers + modals: `CreateTaskModal`, `DateModal`, `RecurrenceModal`,
+               `StatusSuggestModal` (`FuzzySuggestModal`), `status-menu.ts#buildStatusMenu`.
+               createEl only; no innerHTML.
+  commands/    `register-commands.ts#registerCommands`: wires every command to an `app` use-case;
+               note-scoped commands use `checkCallback` + the active file's frontmatter to hide
+               themselves off a non-task note.
   settings/    SettingsTab (Setting API), settings type + defaults + migration.
   styles/      obtask.css, calendar.css (theme-variable mappings only).
   main.ts      composition root.
 ```
+
+**`ObtaskSettings` lives in `src/domain/settings.ts`**, not `src/adapters/obsidian/settings.ts`: it's
+pure valibot validation with no Obsidian dependency, so the domain layer owns it (`app` may not
+import `adapters`, and `AppDeps.settings()` needs the type). `src/adapters/obsidian/settings.ts`
+re-exports it unchanged so existing `@/adapters/obsidian/settings` imports keep working.
 
 Dependency direction is strictly inward: `views`/`ui`/`settings`/`adapters` depend on `app`,
 which depends on `ports` and `domain`. `domain` and `ports` depend on nothing in this repo.
