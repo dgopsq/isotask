@@ -172,11 +172,18 @@ is Mon 2026-08-31 .. Sun 2026-09-06 and the next week is Mon 2026-09-07 .. Sun 2
 Each task can contribute up to two calendar events, controlled by the `events` view option
 (`both` default, or restrict to `scheduled` / `due` only):
 
-- **`scheduled` event**: a timed block starting at `scheduled` with length `duration` minutes if
-  `duration` is set and `scheduled` has a time component; otherwise an all-day event on the
-  `scheduled` date.
-- **`due` event**: all-day on the `due` date, unless `due` itself has a time component, in which
-  case a timed (typically zero-duration/marker) event at that time.
+- **`scheduled` event**: a real time-grid block, starting at `scheduled` with length `duration`
+  minutes, only when `duration` is set *and* `scheduled` has a time component. Every other case —
+  date-only `scheduled`, or a timed `scheduled` with no `duration` — is an all-day chip instead:
+  the calendar's time grid holds only genuine scheduled+duration blocks (ADR 0011), never a
+  zero-duration marker.
+- **`due` event**: always an all-day chip, on the `due` date — `due` carries no duration field, so
+  it can never become a time-grid block.
+- A chip whose underlying date carries a time component (a timed `due`, or a timed `scheduled`
+  with no `duration`) renders in the all-day row with its time prefixed onto the title, e.g.
+  `09:00 Budget report` (`event-calendar-mapping.ts#toEventCalendarEvent`, via
+  `domain/dates.ts#formatTime`) — the time-grid position is not shown, only the day and the
+  prefixed text. A genuinely date-only chip gets no prefix.
 
 A task with both `due` and `scheduled` set and `events: both` produces two separate calendar
 events for the same task. Event color follows `priority` by reusing the feed's existing
