@@ -1,36 +1,31 @@
+import type { CalendarEvent } from "@/domain/calendar-events";
+import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { IsoDate, TaskDate, Weekday } from "@/domain/dates";
-import type { Priority, TaskPath } from "@/domain/task";
 
 /**
  * Abstracts the calendar widget library (ADR 0006). Only
  * `src/adapters/calendar/**` may implement this port; the concrete adapter
- * is selected once, in `main.ts`. Not implemented yet — see
- * `src/adapters/calendar/README.md` (M3).
+ * is selected once, in `main.ts`. Implemented in M3 Wave 2 — see
+ * `src/adapters/calendar/README.md`.
  */
-export type CalendarViewKind = "day" | "week" | "month" | "list";
+export type { CalendarEvent, CalendarViewKind };
 
-export interface CalendarEvent {
-	readonly id: string;
-	readonly taskPath: TaskPath;
-	readonly title: string;
-	readonly start: TaskDate;
-	readonly end?: TaskDate;
-	readonly allDay: boolean;
-	readonly source: "due" | "scheduled";
-	readonly priority: Priority;
-	readonly editable: boolean;
-}
-
+/**
+ * All optional: M3 mounts with `callbacks: {}` (nothing wired). This is the
+ * M4 extension point — click-to-open, drag/resize reschedule and
+ * click-empty-slot create fill these in with no port shape change.
+ */
 export interface CalendarCallbacks {
-	readonly onEventClick: (event: CalendarEvent) => void;
-	readonly onEventMoved: (event: CalendarEvent, start: TaskDate, end: TaskDate | undefined) => Promise<void>;
-	readonly onSlotClick: (date: TaskDate) => void;
+	readonly onEventClick?: (event: CalendarEvent) => void;
+	readonly onEventMoved?: (event: CalendarEvent, start: TaskDate, end: TaskDate | undefined) => Promise<void>;
+	readonly onSlotClick?: (date: TaskDate) => void;
 }
 
 export interface CalendarOptions {
 	readonly initialView: CalendarViewKind;
 	readonly firstDay: Weekday;
-	readonly editable: boolean;
+	/** Whether events can be dragged/resized. Defaults to `false`; unused until M4 wires the Interaction plugin. */
+	readonly editable?: boolean;
 	readonly callbacks: CalendarCallbacks;
 }
 
