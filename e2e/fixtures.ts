@@ -184,6 +184,22 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			body: "Generated e2e fixture: 30-minute timed scheduled block.",
 			bucket: "no-date",
 		},
+		{
+			filename: "Deadline call.md",
+			title: "Deadline call",
+			// A timed `due` with no `scheduled` — `due` never carries a
+			// `duration` field, so per ADR 0011 this is a zero-duration point
+			// event: it renders as an all-day chip prefixed with its time
+			// ("14:30 Deadline call"), never as a marker inside the time-grid
+			// body. `views.e2e.ts`'s week-view test asserts both halves of
+			// that: present (prefixed) in `.ec-all-day`, absent from
+			// `.ec-time-grid .ec-body`. Bucket is "today" like the other
+			// due-today fixtures — `bucketFor` strips the time component
+			// before comparing.
+			frontmatter: { type: "task", status: "todo", due: `${today}T14:30`, priority: "normal" },
+			body: "Generated e2e fixture: timed due, no scheduled.",
+			bucket: dueToday.bucket,
+		},
 	];
 
 	const invalid: FixtureInvalidTask = {

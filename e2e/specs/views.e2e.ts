@@ -780,15 +780,69 @@ describe("Views", function () {
 				// the very block this test exists to check.
 				const timedEventEl = browser.$(`.${cssClass("calendar")} .ec-time-grid .ec-body .ec-event`);
 				await timedEventEl.waitForExist({ timeout: SELECT_TIMEOUT });
-				await browser.execute(
-					(el) => {
-						el.scrollIntoView({ block: "center" });
-					},
-					await timedEventEl.getElement(),
-				);
+				// Scroll only the time grid's own scroll container
+				// (`.ec-main`, `overflow: auto` in the vendored stylesheet) to
+				// its very top, not `scrollIntoView` on the target block —
+				// Event Calendar auto-scrolls that container to the current
+				// wall-clock time on mount, and centering the target in the
+				// viewport (a prior version of this screenshot did) scrolls the
+				// all-day row (ADR 0011's new home for point events, in normal
+				// document flow just above the hour grid, not pinned) almost
+				// entirely out of frame. Scrolling to the top instead keeps the
+				// all-day row AND the whole morning (including "Team
+				// sync"/09:00 and "Standup"/11:00) in view within one capture.
+				await browser.execute((calendarCls) => {
+					const main = document.querySelector(`.${calendarCls} .ec-main`);
+					if (main !== null) {
+						main.scrollTop = 0;
+					}
+				}, cssClass("calendar"));
 
 				await saveScreenshot("calendar-week");
 			}
+		});
+
+		/**
+		 * "Deadline call" (`due: <today>T14:30`, no `scheduled` — see
+		 * `e2e/fixtures.ts`) is the only fixture with a timed `due`. Per ADR
+		 * 0011, a zero-duration point event (a timed `due`, or a timed
+		 * `scheduled` with no `duration`) renders as an all-day chip
+		 * prefixed with its time rather than a colliding marker in the
+		 * time-grid body — this asserts both halves of that: present
+		 * (prefixed) in `.ec-all-day`, absent from `.ec-time-grid .ec-body`.
+		 * Restores `events: both` itself (rather than depending on the
+		 * previous, screenshot-only restore) since the "re-renders with only
+		 * the scheduled event..." test earlier in this file may have left
+		 * `events: scheduled`, which would hide "Deadline call"'s due event
+		 * (and this whole assertion) entirely.
+		 */
+		it("renders a timed due as a time-prefixed all-day chip, not a time-grid marker", async function () {
+			await browser.executeObsidian(({ app }) => {
+				const leaves = app.workspace.getLeavesOfType("bases");
+				const leaf = leaves[0];
+				if (leaf === undefined) {
+					throw new Error("no bases leaf found");
+				}
+				const outerView = leaf.view as unknown as {
+					controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+				};
+				outerView.controller.view.config.set("events", "both");
+			});
+
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "14:30 Deadline call"),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Deadline call's all-day chip never appeared" },
+			);
+
+			const allDayTitles = await browser.execute(() =>
+				Array.from(document.querySelectorAll(".ec-all-day .ec-event-title")).map((el) => el.textContent),
+			);
+			expect(allDayTitles).toContain("14:30 Deadline call");
+
+			const timeGridTitles = await browser.execute(() =>
+				Array.from(document.querySelectorAll(".ec-time-grid .ec-body .ec-event-title")).map((el) => el.textContent),
+			);
+			expect(timeGridTitles.some((title) => title.includes("Deadline call"))).toBe(false);
 		});
 	});
 
