@@ -5,6 +5,7 @@ import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import type { Minutes } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
+import { renderSaveClearCancel, resolveThenClose } from "@/ui/single-field-modal";
 
 export interface DurationModalDeps {
 	readonly initial: Option<Minutes>;
@@ -46,43 +47,29 @@ export class DurationModal extends Modal {
 				});
 			});
 
-		new Setting(contentEl)
-			.addButton((button) =>
-				button
-					.setButtonText("Save")
-					.setCta()
-					.onClick(() => {
-						this.save();
-					}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Clear").onClick(() => {
-					void Promise.resolve(this.deps.onSave(none())).then(() => {
-						this.close();
-					});
-				}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => {
-					this.close();
-				}),
-			);
+		renderSaveClearCancel(contentEl, {
+			onSave: () => {
+				this.save();
+			},
+			onClear: () => {
+				resolveThenClose(() => this.deps.onSave(none()), this.close.bind(this));
+			},
+			onCancel: () => {
+				this.close();
+			},
+		});
 	}
 
 	private save(): void {
 		const trimmed = this.value.trim();
 		if (trimmed.length === 0) {
-			void Promise.resolve(this.deps.onSave(none())).then(() => {
-				this.close();
-			});
+			resolveThenClose(() => this.deps.onSave(none()), this.close.bind(this));
 			return;
 		}
 		const parsed = Number(trimmed);
 		if (!Number.isFinite(parsed) || parsed < 0) {
 			return;
 		}
-		void Promise.resolve(this.deps.onSave(some(parsed as Minutes))).then(() => {
-			this.close();
-		});
+		resolveThenClose(() => this.deps.onSave(some(parsed as Minutes)), this.close.bind(this));
 	}
 }

@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import { Modal, Setting } from "obsidian";
 
 import { cssClass } from "@/plugin-id";
+import { renderSaveClearCancel, resolveThenClose } from "@/ui/single-field-modal";
 import { TagSuggest } from "@/ui/suggest/tag-suggest";
 
 export interface TagsModalDeps {
@@ -47,27 +48,17 @@ export class TagsModal extends Modal {
 				new TagSuggest(this.app, text.inputEl);
 			});
 
-		new Setting(contentEl)
-			.addButton((button) =>
-				button
-					.setButtonText("Save")
-					.setCta()
-					.onClick(() => {
-						this.save();
-					}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Clear").onClick(() => {
-					void Promise.resolve(this.deps.onSave([])).then(() => {
-						this.close();
-					});
-				}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => {
-					this.close();
-				}),
-			);
+		renderSaveClearCancel(contentEl, {
+			onSave: () => {
+				this.save();
+			},
+			onClear: () => {
+				resolveThenClose(() => this.deps.onSave([]), this.close.bind(this));
+			},
+			onCancel: () => {
+				this.close();
+			},
+		});
 	}
 
 	private save(): void {
@@ -75,8 +66,6 @@ export class TagsModal extends Modal {
 			.split(",")
 			.map((tag) => tag.trim())
 			.filter((tag) => tag.length > 0);
-		void Promise.resolve(this.deps.onSave(tags)).then(() => {
-			this.close();
-		});
+		resolveThenClose(() => this.deps.onSave(tags), this.close.bind(this));
 	}
 }

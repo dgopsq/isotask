@@ -3,6 +3,7 @@ import { Modal, Setting } from "obsidian";
 
 import { projectFromWikilink } from "@/domain/frontmatter";
 import { cssClass } from "@/plugin-id";
+import { renderSaveClearCancel, resolveThenClose } from "@/ui/single-field-modal";
 import { NoteSuggest } from "@/ui/suggest/note-suggest";
 
 export interface ProjectModalDeps {
@@ -53,39 +54,25 @@ export class ProjectModal extends Modal {
 				new NoteSuggest(this.app, text.inputEl);
 			});
 
-		new Setting(contentEl)
-			.addButton((button) =>
-				button
-					.setButtonText("Save")
-					.setCta()
-					.onClick(() => {
-						this.save();
-					}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Clear").onClick(() => {
-					void Promise.resolve(this.deps.onSave(null)).then(() => {
-						this.close();
-					});
-				}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => {
-					this.close();
-				}),
-			);
+		renderSaveClearCancel(contentEl, {
+			onSave: () => {
+				this.save();
+			},
+			onClear: () => {
+				resolveThenClose(() => this.deps.onSave(null), this.close.bind(this));
+			},
+			onCancel: () => {
+				this.close();
+			},
+		});
 	}
 
 	private save(): void {
 		const trimmed = this.value.trim();
 		if (trimmed.length === 0) {
-			void Promise.resolve(this.deps.onSave(null)).then(() => {
-				this.close();
-			});
+			resolveThenClose(() => this.deps.onSave(null), this.close.bind(this));
 			return;
 		}
-		void Promise.resolve(this.deps.onSave(projectFromWikilink(trimmed))).then(() => {
-			this.close();
-		});
+		resolveThenClose(() => this.deps.onSave(projectFromWikilink(trimmed)), this.close.bind(this));
 	}
 }

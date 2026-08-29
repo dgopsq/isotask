@@ -6,6 +6,7 @@ import { isDateTime, parseTaskDate } from "@/domain/dates";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import { cssClass } from "@/plugin-id";
+import { renderSaveClearCancel, resolveThenClose } from "@/ui/single-field-modal";
 
 export interface DateModalDeps {
 	readonly title: string;
@@ -73,35 +74,23 @@ export class DateModal extends Modal {
 				}),
 			);
 
-		new Setting(contentEl)
-			.addButton((button) =>
-				button
-					.setButtonText("Save")
-					.setCta()
-					.onClick(() => {
-						this.save();
-					}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Clear").onClick(() => {
-					void Promise.resolve(this.deps.onSave(none())).then(() => {
-						this.close();
-					});
-				}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => {
-					this.close();
-				}),
-			);
+		renderSaveClearCancel(contentEl, {
+			onSave: () => {
+				this.save();
+			},
+			onClear: () => {
+				resolveThenClose(() => this.deps.onSave(none()), this.close.bind(this));
+			},
+			onCancel: () => {
+				this.close();
+			},
+		});
 	}
 
 	private save(): void {
 		const trimmed = this.value.trim();
 		if (trimmed.length === 0) {
-			void Promise.resolve(this.deps.onSave(none())).then(() => {
-				this.close();
-			});
+			resolveThenClose(() => this.deps.onSave(none()), this.close.bind(this));
 			return;
 		}
 
@@ -109,8 +98,6 @@ export class DateModal extends Modal {
 		if (!parsed.ok) {
 			return;
 		}
-		void Promise.resolve(this.deps.onSave(some(parsed.value))).then(() => {
-			this.close();
-		});
+		resolveThenClose(() => this.deps.onSave(some(parsed.value)), this.close.bind(this));
 	}
 }
