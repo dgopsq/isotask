@@ -86,6 +86,14 @@ export default defineConfig([
 		},
 	},
 
+	{
+		// The declarative settings API (getSettingDefinitions) needs Obsidian
+		// 1.13+, while Bases views only need 1.10 (our minAppVersion). Decision
+		// pending: raise minAppVersion to 1.13 and adopt it (tracked in ROADMAP M1).
+		files: ["src/settings/**/*.ts"],
+		rules: { "obsidianmd/settings-tab/prefer-setting-definitions": "off" },
+	},
+
 	// --- Layer boundaries -----------------------------------------------
 	//
 	// Baseline: nothing under src/ may reach into Obsidian, Electron or the
