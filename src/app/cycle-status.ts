@@ -8,7 +8,7 @@ import { err } from "@/domain/result";
 import { nextStatusInCycle } from "@/domain/status";
 import type { TaskPath } from "@/domain/task";
 
-/** Advances a task to the next status in the configured order (id order, wrapping), via `setStatus`. */
+/** Advances a task to the next status in the configured order (array order, wrapping), via `setStatus`. */
 export function makeCycleStatus(deps: AppDeps) {
 	const setStatus = makeSetStatus(deps);
 

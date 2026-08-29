@@ -48,14 +48,13 @@ export function firstOpenStatus(configs: readonly StatusConfig[]): Option<Status
 	return found === undefined ? none() : some(found);
 }
 
-/** Walks the configured status list in id order, wrapping around. Falls back to the first status if `currentId` isn't found. */
+/** Walks the configured status list in configured (array) order, wrapping around. Falls back to the first status if `currentId` isn't found. */
 export function nextStatusInCycle(configs: readonly StatusConfig[], currentId: StatusId): Option<StatusConfig> {
 	if (configs.length === 0) {
 		return none();
 	}
-	const sorted = [...configs].sort((a, b) => a.id.localeCompare(b.id));
-	const currentIndex = sorted.findIndex((config) => config.id === currentId);
-	const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % sorted.length;
-	const next = sorted[nextIndex];
+	const currentIndex = configs.findIndex((config) => config.id === currentId);
+	const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % configs.length;
+	const next = configs[nextIndex];
 	return next === undefined ? none() : some(next);
 }

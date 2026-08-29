@@ -27,15 +27,15 @@ describe("makeCycleStatus", () => {
 		expect(result.ok).toBe(false);
 	});
 
-	// DEFAULT_STATUSES in id order: cancelled, done, in-progress, todo.
-	it("advances to the next status in id order, wrapping around", async () => {
+	// DEFAULT_STATUSES in configured order: todo, in-progress, done, cancelled.
+	it("advances to the next status in configured order, wrapping around", async () => {
 		const { deps, store } = makeDeps();
 		store.seed(path("Tasks/Buy milk.md"), { type: "task", status: "todo" });
 		const cycleStatus = makeCycleStatus(deps);
 
 		const first = await cycleStatus(path("Tasks/Buy milk.md"));
 		expect(first.ok).toBe(true);
-		expect(store.notes.get(path("Tasks/Buy milk.md"))?.frontmatter["status"]).toBe("cancelled");
+		expect(store.notes.get(path("Tasks/Buy milk.md"))?.frontmatter["status"]).toBe("in-progress");
 
 		const second = await cycleStatus(path("Tasks/Buy milk.md"));
 		expect(second.ok).toBe(true);

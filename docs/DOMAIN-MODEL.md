@@ -54,7 +54,7 @@ the exact closed set beyond these four). `id`/`label`/`icon` are user-facing and
   (reopen) clears `completed`.
 - Only entering a `done`-kind status triggers recurrence spawning. Entering `cancelled` ends the
   series — no spawn.
-- The "Cycle status" command walks the configured status list in id order.
+- The "Cycle status" command walks the configured status list in order.
 - Bases filters operate on the raw `status` value, not `kind`. The generated `Tasks.base` filters
   `status != "done" && status != "cancelled"` and is regenerated from settings when the status
   list changes.
