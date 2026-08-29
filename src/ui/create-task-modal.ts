@@ -38,6 +38,13 @@ interface DateFieldState {
 	readonly hasTime: boolean;
 }
 
+/**
+ * "More options" open/closed is remembered for the session (not persisted to
+ * disk) so re-opening the modal keeps the user's last choice, per a
+ * module-level `let` rather than an instance field.
+ */
+let sessionMoreOptionsOpen = false;
+
 function dateFieldFrom(initial: TaskDate | undefined): DateFieldState {
 	return initial === undefined ? { value: "", hasTime: false } : { value: initial, hasTime: isDateTime(initial) };
 }
@@ -60,11 +67,38 @@ function parseDateField(field: DateFieldState): TaskDate | undefined | "invalid"
 	return parsed.ok ? parsed.value : "invalid";
 }
 
+/** Toggles a date field between `date` and `datetime-local`, preserving the date part across the switch. */
+function toggleDateFieldTime(field: DateFieldState): DateFieldState {
+	const datePart = field.value.slice(0, 10);
+	if (field.hasTime) {
+		return { value: datePart, hasTime: false };
+	}
+	return { value: datePart.length === 0 ? "" : `${datePart}T00:00`, hasTime: true };
+}
+
+/** Whether `initial` prefills any field that lives under "More options", so the modal should open it automatically. */
+function hasMoreOptionsPrefill(initial: Partial<TaskDraft>): boolean {
+	return (
+		initial.folder !== undefined ||
+		initial.status !== undefined ||
+		initial.scheduled !== undefined ||
+		initial.duration !== undefined ||
+		initial.project !== undefined ||
+		initial.tags !== undefined
+	);
+}
+
 /**
  * Create-task modal. State lives on instance fields; the modal only does a
  * full re-render on a structural change (a dropdown that reveals/hides a
- * field, or a date/time toggle) — plain text fields update state in
- * `onChange` without re-rendering, so typing never loses focus.
+ * field, the "More options" toggle, or a date/time toggle) — plain text
+ * fields update state in `onChange` without re-rendering, so typing never
+ * loses focus.
+ *
+ * Kept short (default: Title, Due, Priority, Repeat, More options toggle,
+ * buttons) so Obsidian doesn't render its full-height scrollbar on a `Modal`
+ * taller than the viewport; the rarer fields (Folder, Status, Scheduled,
+ * Duration, Project, Tags) live behind "More options".
  */
 export class CreateTaskModal extends Modal {
 	private readonly deps: CreateTaskModalDeps;
@@ -80,6 +114,7 @@ export class CreateTaskModal extends Modal {
 	private repeatCustom: string;
 	private project: string;
 	private tagsText: string;
+	private moreOptionsOpen: boolean;
 	private submitting = false;
 
 	constructor(app: App, deps: CreateTaskModalDeps) {
@@ -99,6 +134,7 @@ export class CreateTaskModal extends Modal {
 		this.repeatCustom = repeat.custom;
 		this.project = initial.project ?? "";
 		this.tagsText = initial.tags !== undefined ? initial.tags.join(", ") : "";
+		this.moreOptionsOpen = sessionMoreOptionsOpen || hasMoreOptionsPrefill(initial);
 	}
 
 	override onOpen(): void {
@@ -117,48 +153,24 @@ export class CreateTaskModal extends Modal {
 
 		this.renderTitleField(contentEl);
 
-		new Setting(contentEl).setName("Folder").addText((text) =>
-			text.setValue(this.folder).onChange((value) => {
-				this.folder = value;
-			}),
-		);
-
-		this.renderStatusField(contentEl);
-		this.renderPriorityField(contentEl);
-
 		this.renderDateField(contentEl, "Due", this.due, (next) => {
 			this.due = next;
 		});
-		this.renderDateField(contentEl, "Scheduled", this.scheduled, (next) => {
-			this.scheduled = next;
-		});
 
-		new Setting(contentEl).setName("Duration (minutes)").addText((text) => {
-			text.inputEl.type = "number";
-			text.setValue(this.durationText).onChange((value) => {
-				this.durationText = value;
-			});
-		});
-
+		this.renderPriorityField(contentEl);
 		this.renderRepeatField(contentEl);
 
-		new Setting(contentEl).setName("Project").addText((text) =>
-			text
-				.setPlaceholder("Project name or [[link]]")
-				.setValue(this.project)
-				.onChange((value) => {
-					this.project = value;
-				}),
+		new Setting(contentEl).setName("More options").addToggle((toggle) =>
+			toggle.setValue(this.moreOptionsOpen).onChange((checked) => {
+				this.moreOptionsOpen = checked;
+				sessionMoreOptionsOpen = checked;
+				this.render();
+			}),
 		);
 
-		new Setting(contentEl).setName("Tags").addText((text) =>
-			text
-				.setPlaceholder("Comma-separated tags")
-				.setValue(this.tagsText)
-				.onChange((value) => {
-					this.tagsText = value;
-				}),
-		);
+		if (this.moreOptionsOpen) {
+			this.renderMoreOptions(contentEl);
+		}
 
 		new Setting(contentEl)
 			.addButton((button) =>
@@ -174,6 +186,45 @@ export class CreateTaskModal extends Modal {
 					this.close();
 				}),
 			);
+	}
+
+	private renderMoreOptions(container: HTMLElement): void {
+		new Setting(container).setName("Folder").addText((text) =>
+			text.setValue(this.folder).onChange((value) => {
+				this.folder = value;
+			}),
+		);
+
+		this.renderStatusField(container);
+
+		this.renderDateField(container, "Scheduled", this.scheduled, (next) => {
+			this.scheduled = next;
+		});
+
+		new Setting(container).setName("Duration (minutes)").addText((text) => {
+			text.inputEl.type = "number";
+			text.setValue(this.durationText).onChange((value) => {
+				this.durationText = value;
+			});
+		});
+
+		new Setting(container).setName("Project").addText((text) =>
+			text
+				.setPlaceholder("Project name or [[link]]")
+				.setValue(this.project)
+				.onChange((value) => {
+					this.project = value;
+				}),
+		);
+
+		new Setting(container).setName("Tags").addText((text) =>
+			text
+				.setPlaceholder("Comma-separated tags")
+				.setValue(this.tagsText)
+				.onChange((value) => {
+					this.tagsText = value;
+				}),
+		);
 	}
 
 	private renderTitleField(container: HTMLElement): void {
@@ -228,20 +279,32 @@ export class CreateTaskModal extends Modal {
 		);
 	}
 
+	/**
+	 * Renders a date row with its "include time" toggle folded into an
+	 * extra (icon) button on the row itself, rather than a separate
+	 * `Setting`: clicking it switches the text input between `date` and
+	 * `datetime-local` (preserving the date part) and re-renders so the
+	 * input's `type` picks up the change.
+	 */
 	private renderDateField(container: HTMLElement, label: string, field: DateFieldState, onChange: (next: DateFieldState) => void): void {
-		new Setting(container).setName(field.hasTime ? `${label} & time` : label).addText((text) => {
-			text.inputEl.type = field.hasTime ? "datetime-local" : "date";
-			text.setValue(field.value).onChange((value) => {
-				onChange({ value, hasTime: field.hasTime });
+		new Setting(container)
+			.setName(label)
+			.addText((text) => {
+				text.inputEl.type = field.hasTime ? "datetime-local" : "date";
+				text.setValue(field.value).onChange((value) => {
+					onChange({ value, hasTime: field.hasTime });
+				});
+			})
+			.addExtraButton((button) => {
+				button
+					.setIcon("clock")
+					.setTooltip("Include time")
+					.onClick(() => {
+						onChange(toggleDateFieldTime(field));
+						this.render();
+					});
+				button.extraSettingsEl.toggleClass("is-active", field.hasTime);
 			});
-		});
-
-		new Setting(container).setName(`${label}: include time`).addToggle((toggle) =>
-			toggle.setValue(field.hasTime).onChange((checked) => {
-				onChange({ value: checked ? field.value : field.value.slice(0, 10), hasTime: checked });
-				this.render();
-			}),
-		);
 	}
 
 	private renderRepeatField(container: HTMLElement): void {

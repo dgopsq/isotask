@@ -55,10 +55,6 @@ async function activeFilePath(): Promise<string | null> {
 	return browser.executeObsidian(({ app }) => app.workspace.getActiveFile()?.path ?? null);
 }
 
-async function fileExists(path: string): Promise<boolean> {
-	return browser.executeObsidian(({ app }, p: string) => app.vault.getFileByPath(p) !== null, path);
-}
-
 async function frontmatterOf(path: string): Promise<Record<string, unknown> | undefined> {
 	return browser.executeObsidian(({ app }, p: string) => {
 		const file = app.vault.getFileByPath(p);
@@ -349,19 +345,17 @@ describe("Actions", function () {
 		});
 
 		/**
-		 * `nextStatusInCycle` (domain/status.ts) walks statuses in *id* order
-		 * (`cancelled`, `done`, `in-progress`, `todo`, alphabetically), not
-		 * workflow order — confirmed both by the source doc comment and its
-		 * table-driven unit test (`domain/status.test.ts`). So from `todo` the
-		 * cycle is todo -> cancelled -> done -> in-progress -> todo, not the
-		 * more intuitive todo -> in-progress -> done -> cancelled -> todo.
+		 * `nextStatusInCycle` (domain/status.ts) walks statuses in *configured*
+		 * (array) order — confirmed both by the source doc comment and its
+		 * table-driven unit test (`domain/status.test.ts`). With the default
+		 * statuses, the cycle is todo -> in-progress -> done -> cancelled -> todo.
 		 */
-		it("cycles through every status in id order, setting/clearing completed at terminal transitions", async function () {
+		it("cycles through every status in configured order, setting/clearing completed at terminal transitions", async function () {
 			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "cancelled", "expected status=cancelled after 1st cycle");
+			await waitForFrontmatter(path, "status", (v) => v === "in-progress", "expected status=in-progress after 1st cycle");
 			let fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("cancelled");
-			expect(typeof fm?.["completed"]).toEqual("string");
+			expect(fm?.["status"]).toEqual("in-progress");
+			expect(fm?.["completed"]).toBeUndefined();
 
 			await browser.executeObsidianCommand("obtask:cycle-status");
 			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done after 2nd cycle");
@@ -370,10 +364,10 @@ describe("Actions", function () {
 			expect(typeof fm?.["completed"]).toEqual("string");
 
 			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "in-progress", "expected status=in-progress after 3rd cycle");
+			await waitForFrontmatter(path, "status", (v) => v === "cancelled", "expected status=cancelled after 3rd cycle");
 			fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("in-progress");
-			expect(fm?.["completed"]).toBeUndefined();
+			expect(fm?.["status"]).toEqual("cancelled");
+			expect(typeof fm?.["completed"]).toEqual("string");
 
 			await browser.executeObsidianCommand("obtask:cycle-status");
 			await waitForFrontmatter(path, "status", (v) => v === "todo", "expected status=todo after 4th cycle");
