@@ -77,6 +77,17 @@ frontmatter into a `Task`; it is independent of Bases' own value objects. A note
 parse renders as an "invalid task" row with the reason and is excluded from buckets, but the view
 never hides it outright — Bases decides visibility via its filters.
 
+**Why `metadataCache.getFileCache`, not `BasesEntry` values.** `BasesEntry`'s only public accessor
+(`getValue(propertyId): Value | null`, `obsidian.d.ts`) returns a `Value` wrapper whose only public
+methods are `toString()`/`isTruthy()` — there is no typed accessor that round-trips a property back
+to the plain string/number/boolean/array shapes `parseTask` expects, so `bases-entries.ts` reads the
+file's own indexed frontmatter instead. That source can (rarely) be stale on the very first render
+right after a vault loads — a file Bases already produced an entry for hasn't finished being
+indexed into `metadataCache` yet. Both `FeedBasesView` and `CalendarBasesView` register
+`app.metadataCache.on("resolved", ...)` in their constructor (`registerEvent`, torn down with the
+view) to re-run `onDataUpdated()` once indexing settles, self-healing that race regardless of
+whatever re-query Bases performs on its own.
+
 ### Bases view options and re-rendering
 
 A `BasesViewRegistration` (passed to `plugin.registerBasesView`, see `views/bases/register.ts`)

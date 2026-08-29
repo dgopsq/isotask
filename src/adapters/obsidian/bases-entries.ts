@@ -22,6 +22,14 @@ export interface BasesEntriesResult {
  * Entries whose note isn't a task at all (marker mismatch) are silently
  * skipped; entries that look like a task but fail to parse are reported as
  * `invalid` per `docs/DOMAIN-MODEL.md`'s parse-error policy.
+ *
+ * `BasesEntry.getValue()` was considered as an alternative source (it can't
+ * be stale the way `metadataCache` momentarily can be, right after a vault
+ * loads) but its `Value` wrapper only exposes `toString()`/`isTruthy()` —
+ * no accessor round-trips a property back to the string/number/boolean/array
+ * shapes `parseTask` needs — so `metadataCache` stays the source of truth;
+ * the views self-heal the rare staleness window instead (see
+ * `docs/ARCHITECTURE.md`).
  */
 export function tasksFromBasesEntries(
 	app: App,

@@ -76,6 +76,20 @@ export class FeedBasesView extends BasesView {
 		this.viewContainerEl = containerEl;
 		this.deps = deps;
 		this.viewContainerEl.addClass(cssClass("feed"));
+
+		// On the very first render after a vault loads, Bases can hand us
+		// entries whose `metadataCache.getFileCache(file)?.frontmatter` is
+		// still empty/stale — the file hasn't finished being indexed yet.
+		// `metadataCache`'s `resolved` event fires once the initial indexing
+		// pass (and every later modification batch) settles, so re-running
+		// `onDataUpdated()` there self-heals that race by construction,
+		// independent of whatever re-query Bases itself performs. See
+		// `docs/ARCHITECTURE.md`'s feed data-flow note.
+		this.registerEvent(
+			this.deps.app.metadataCache.on("resolved", () => {
+				this.onDataUpdated();
+			}),
+		);
 	}
 
 	override onDataUpdated(): void {

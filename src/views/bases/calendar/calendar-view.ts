@@ -55,6 +55,19 @@ export class CalendarBasesView extends BasesView {
 		super(controller);
 		this.viewContainerEl = containerEl;
 		this.deps = deps;
+
+		// Same first-render race as the feed view (see its constructor and
+		// `docs/ARCHITECTURE.md`): re-run `onDataUpdated()` once the
+		// `metadataCache` settles, so a task indexed just after Bases handed
+		// us its entry isn't missing from the calendar until some unrelated
+		// edit happens to trigger a re-query. Safe to call repeatedly —
+		// `onDataUpdated()` pushes onto the already-mounted handle rather than
+		// remounting it.
+		this.registerEvent(
+			this.deps.app.metadataCache.on("resolved", () => {
+				this.onDataUpdated();
+			}),
+		);
 	}
 
 	override onDataUpdated(): void {
