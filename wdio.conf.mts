@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 
+import QuietReporter from "./e2e/quiet-reporter.ts";
+
 /**
  * WebdriverIO + wdio-obsidian-service config: launches a real (non-headless
  * — Obsidian doesn't support headless) Obsidian window against the fixture
@@ -9,7 +11,14 @@ import { resolve } from "node:path";
  * notes (`e2e/generate-fixtures.mts`), then runs this config. The service
  * copies `e2e/vault/` into a temporary sandbox per run, so nothing here ever
  * mutates the checked-in vault.
+ *
+ * Output is quiet by default (`e2e/quiet-reporter.ts`, `logLevel: "silent"`)
+ * since this is most often read by an AI agent that pays per token. Set
+ * `E2E_VERBOSE=1` (or run `pnpm test:e2e:verbose`) for the full spec
+ * reporter and wdio/service/Obsidian logging when debugging locally.
  */
+const verbose = process.env["E2E_VERBOSE"] === "1";
+
 export const config: WebdriverIO.Config = {
 	runner: "local",
 	framework: "mocha",
@@ -33,7 +42,7 @@ export const config: WebdriverIO.Config = {
 	],
 
 	services: ["obsidian"],
-	reporters: ["obsidian"],
+	reporters: verbose ? ["obsidian"] : [[QuietReporter, {}]],
 
 	mochaOpts: {
 		ui: "bdd",
@@ -42,9 +51,9 @@ export const config: WebdriverIO.Config = {
 
 	waitforInterval: 250,
 	waitforTimeout: 10 * 1000,
-	// Keep logs quiet — only warnings/errors from wdio itself, not every
-	// browser/driver command.
-	logLevel: "warn",
+	// "silent" by default (see the module doc above); "info" under
+	// E2E_VERBOSE=1 shows wdio/service/Obsidian launch and command logs.
+	logLevel: verbose ? "info" : "silent",
 
 	cacheDir: resolve(".obsidian-cache"),
 };
