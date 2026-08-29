@@ -9,6 +9,7 @@ import { parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
+import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
@@ -56,18 +57,7 @@ export class CalendarBasesView extends BasesView {
 		this.viewContainerEl = containerEl;
 		this.deps = deps;
 
-		// Same first-render race as the feed view (see its constructor and
-		// `docs/ARCHITECTURE.md`): re-run `onDataUpdated()` once the
-		// `metadataCache` settles, so a task indexed just after Bases handed
-		// us its entry isn't missing from the calendar until some unrelated
-		// edit happens to trigger a re-query. Safe to call repeatedly —
-		// `onDataUpdated()` pushes onto the already-mounted handle rather than
-		// remounting it.
-		this.registerEvent(
-			this.deps.app.metadataCache.on("resolved", () => {
-				this.onDataUpdated();
-			}),
-		);
+		refreshAfterMetadataResolved(this, this.deps.app);
 	}
 
 	override onDataUpdated(): void {
