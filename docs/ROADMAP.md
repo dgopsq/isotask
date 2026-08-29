@@ -20,6 +20,10 @@ one being functionally complete.
       row actions/menus yet.
 - [x] `adapters/obsidian/bases-entries.ts`: maps `BasesEntry[]` to parsed `Task[]` via
       `metadataCache.getFileCache(file)?.frontmatter`.
+- [x] e2e with `wdio-obsidian-service` (`e2e/`): launches a real Obsidian window against a fixture
+      vault, opens `Tasks.base`, and exercises the Feed and Calendar Bases views. Fixture task
+      notes are date-relative (generated per run, see `docs/CONVENTIONS.md`). Not part of
+      `pnpm check` — run explicitly via `pnpm test:e2e`.
 
 Deliberately deferred out of M0 (see below): `domain/recurrence.ts`, `domain/transitions.ts`,
 `domain/calendar-events.ts`, the whole `app` layer and its use-cases, the `TaskStore` adapter, the
@@ -75,7 +79,6 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 ## M5 — Release
 
 - [ ] Mobile QA across the full feature set.
-- [ ] e2e suite (`wdio-obsidian-service`) against a fixture vault.
 - [ ] GitHub Actions release workflow triggered on tag.
 - [ ] Community plugin submission.
 

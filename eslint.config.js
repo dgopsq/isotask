@@ -63,7 +63,16 @@ export default defineConfig([
 	...obsidianmd.configs.recommended,
 
 	{
-		files: ["**/*.ts"],
+		files: ["**/*.ts", "**/*.mts", "**/*.cts"],
+		// e2e/** and wdio.conf.mts get their own `project`-mode block below,
+		// pointed explicitly at e2e/tsconfig.json — the project-service's
+		// nearest-tsconfig walk resolves e2e/tsconfig.json fine for files
+		// under e2e/, but (likely a project-service resolution quirk with
+		// this tsconfig's `types` array / package.json `exports` subpaths)
+		// produces different — wrong — type info than a plain `tsc -p
+		// e2e/tsconfig.json` for a couple of WebdriverIO-typed expressions.
+		// Classic `project` mode (same mechanism `tsc -p` uses) matches tsc.
+		ignores: ["e2e/**", "wdio.conf.mts"],
 		languageOptions: {
 			parserOptions: {
 				projectService: {
@@ -73,6 +82,30 @@ export default defineConfig([
 				},
 				tsconfigRootDir: import.meta.dirname,
 			},
+		},
+	},
+	{
+		// See the `ignores` note above.
+		files: ["e2e/**/*.ts", "e2e/**/*.mts", "wdio.conf.mts"],
+		languageOptions: {
+			parserOptions: {
+				project: ["./e2e/tsconfig.json"],
+				tsconfigRootDir: import.meta.dirname,
+			},
+		},
+	},
+	// e2e/ (wdio-obsidian-service specs + fixtures) and wdio.conf.mts run
+	// under Node/tsx, not the Obsidian sandbox esbuild bundles for src/ — Node
+	// built-ins are expected, and this is glue/test code rather than plugin
+	// UI, so the plugin-guideline console restriction doesn't apply.
+	{
+		files: ["e2e/**/*.ts", "e2e/**/*.mts", "wdio.conf.mts"],
+		rules: {
+			"no-console": "off",
+			// Ambient namespaces such as `WebdriverIO` are type-only; tsc checks them.
+			"no-undef": "off",
+			"obsidianmd/no-nodejs-modules": "off",
+			"obsidianmd/rule-custom-message": "off",
 		},
 	},
 	{

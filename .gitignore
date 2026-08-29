@@ -7,3 +7,8 @@ coverage/
 .DS_Store
 data.json
 .env
+
+# e2e (wdio-obsidian-service)
+.obsidian-cache/
+e2e/vault/Tasks/
+e2e/screenshots/

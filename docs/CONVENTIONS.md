@@ -84,9 +84,49 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   one table of `{ input, now, expected }` rows per behavior, including DST transitions,
   leap-year dates (Feb 29), and week-boundary edge cases (Sunday vs. Monday week start, midnight
   boundaries).
-- e2e (`wdio-obsidian-service` against a fixture vault) is milestone M5, not part of the regular
-  unit-test loop. `test-vault/` is a manual, gitignored vault with the plugin symlinked in via
-  `pnpm dev:link <vault>` symlinks `main.js`, `styles.css` and `manifest.json` into `<vault>/.obsidian/plugins/obtask`; then `pnpm dev` and reload the plugin in Obsidian after each build.
+- `pnpm dev:link <vault>` symlinks `main.js`, `styles.css` and `manifest.json` into
+  `<vault>/.obsidian/plugins/obtask` for manual, exploratory testing; then `pnpm dev` and reload
+  the plugin in Obsidian after each build.
+- e2e (`wdio-obsidian-service`, launching a real Obsidian window) lives under `e2e/` and is not
+  part of `pnpm check` — it's slow (downloads and boots real Obsidian) and needs a display, so it
+  doesn't belong in the fast inner loop or in CI's default gate. Run it locally before a release or
+  after touching a Bases view.
+
+  **Running it**: `pnpm test:e2e`. This builds the plugin (`pnpm build`), regenerates the
+  date-relative fixture notes (`tsx e2e/generate-fixtures.mts`), then runs `wdio run
+  wdio.conf.mts`. `wdio-obsidian-service` downloads the latest stable Obsidian app + installer
+  into `.obsidian-cache/` on first run (gitignored; the download is cached across runs) and opens
+  a real, visible Obsidian window against a sandboxed copy of `e2e/vault/` — Obsidian doesn't
+  support headless automation, so this can't run without a display (e.g. a bare CI runner without
+  Xvfb).
+
+  **Fixture generation**: `e2e/vault/` is checked in (a minimal vault with `.obsidian/`
+  core-plugins config enabling `bases`/`properties`, and `Tasks.base` with the Feed view listed
+  first so it's the default view). `e2e/vault/Tasks/` — the actual task notes — is gitignored:
+  `e2e/generate-fixtures.mts` regenerates it on every `test:e2e` run via `e2e/fixtures.ts`'s
+  `buildFixtures(now)`, which computes each note's due date relative to `now` (`date-fns`, Monday
+  week start) and its expected feed bucket by calling the real `bucketFor` from
+  `src/domain/buckets.ts` — so the notes and the assertions about them never hard-code a date or a
+  bucket boundary, and the suite passes on any day it runs. `e2e/fixtures.ts` is imported by both
+  the generator and the specs (single source of truth for fixture data); everything under `e2e/`
+  runs via `tsx` (not plain `node`) so the `@/domain/**` path alias resolves the same way it does
+  for `src/`.
+
+  **Adding a spec**: drop a new `e2e/specs/<name>.e2e.ts` — `wdio.conf.mts`'s `specs` glob
+  (`./e2e/specs/**/*.e2e.ts`) picks it up automatically. Import `describe`/`it`/`before` from
+  `"mocha"` and `browser`/`expect` from `"@wdio/globals"` explicitly (don't rely on injected
+  globals). Use `browser.executeObsidian(({ app }) => ...)` to drive the Obsidian API (e.g. open a
+  base with `app.workspace.openLinkText(...)`), and prefer the plugin's existing `obtask-*` CSS
+  classes as selectors over adding new ones. Switch a Bases view via its toolbar menu:
+  `browser.$(".bases-toolbar-views-menu .text-icon-button").click()` opens it, then
+  `browser.$(".bases-toolbar-menu-item-name=<View name>").click()` picks a view by name — that
+  markup isn't public Bases API, so re-verify it (`pnpm test:e2e`) after an Obsidian version bump.
+  When returning a plain object from `browser.execute(...)`, avoid a top-level `error` key — some
+  layer in wdio-obsidian-service's execute round trip treats it as a command-level failure rather
+  than data. `mocha` is pinned to the exact version `@wdio/mocha-framework` depends on
+  (`^10.3.0`) rather than the newest release — mocha keeps module-level state used for the
+  `import { describe } from "mocha"` pattern, and two different copies of the package (ours vs.
+  the framework's own nested one) silently break it.
 
 ## Commit message style
 

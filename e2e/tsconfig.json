@@ -1,0 +1,13 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "..",
+		"paths": {
+			"@/*": ["src/*"]
+		},
+		"types": ["node", "webdriverio", "@wdio/globals/types", "@wdio/mocha-framework", "wdio-obsidian-service"],
+		"noEmit": true,
+		"allowImportingTsExtensions": true
+	},
+	"include": ["**/*.ts", "**/*.mts", "../wdio.conf.mts"]
+}

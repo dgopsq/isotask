@@ -1,0 +1,18 @@
+filters:
+  and:
+    - type == "task"
+    - status != "done"
+    - status != "cancelled"
+views:
+  - type: obtask-feed
+    name: Feed
+  - type: obtask-calendar
+    name: Calendar
+  - type: table
+    name: All tasks
+    order:
+      - file.name
+      - status
+      - priority
+      - due
+      - scheduled
