@@ -1,0 +1,10 @@
+{
+	"id": "obtask",
+	"name": "Obtask",
+	"version": "0.1.0",
+	"minAppVersion": "1.10.0",
+	"description": "Notes as tasks: statuses, due dates, recurrence, feed and calendar views built on Obsidian Bases.",
+	"author": "Diego Pasquali",
+	"authorUrl": "https://github.com/dgopsq",
+	"isDesktopOnly": false
+}

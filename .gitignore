@@ -1,0 +1,9 @@
+node_modules/
+main.js
+styles.css
+*.js.map
+*.css.map
+coverage/
+.DS_Store
+data.json
+.env
