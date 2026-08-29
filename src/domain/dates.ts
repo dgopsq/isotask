@@ -204,7 +204,14 @@ export function fromFloatingDate(date: Date, hasTime: boolean): TaskDate {
 	return hasTime ? formatDateTime(components) : formatDateOnly(components);
 }
 
-function toDateFnsWeekStartsOn(firstDay: Weekday): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+/**
+ * Monday-first `Weekday` (0..6) -> Sunday-first 0..6, i.e. JS `Date#getDay()`
+ * order. `date-fns`'s `weekStartsOn` uses this convention; so does
+ * `@event-calendar/core`'s `firstDay` option (see
+ * `src/adapters/calendar/event-calendar/event-calendar-mapping.ts`), which
+ * is why this is exported under a generic name rather than kept private.
+ */
+export function toSundayFirstWeekday(firstDay: Weekday): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
 	if (firstDay === 6) {
 		return 0;
 	}
@@ -212,9 +219,9 @@ function toDateFnsWeekStartsOn(firstDay: Weekday): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
 }
 
 export function startOfWeek(date: TaskDate, firstDay: Weekday): IsoDate {
-	return fromJsDate(dateFnsStartOfWeek(toJsDate(date), { weekStartsOn: toDateFnsWeekStartsOn(firstDay) }));
+	return fromJsDate(dateFnsStartOfWeek(toJsDate(date), { weekStartsOn: toSundayFirstWeekday(firstDay) }));
 }
 
 export function endOfWeek(date: TaskDate, firstDay: Weekday): IsoDate {
-	return fromJsDate(dateFnsEndOfWeek(toJsDate(date), { weekStartsOn: toDateFnsWeekStartsOn(firstDay) }));
+	return fromJsDate(dateFnsEndOfWeek(toJsDate(date), { weekStartsOn: toSundayFirstWeekday(firstDay) }));
 }

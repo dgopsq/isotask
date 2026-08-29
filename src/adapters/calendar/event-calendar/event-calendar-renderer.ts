@@ -1,0 +1,93 @@
+import { createCalendar, DayGrid, destroyCalendar, List, TimeGrid } from "@event-calendar/core";
+import type { Calendar } from "@event-calendar/core";
+
+import { toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
+import type { CalendarEvent } from "@/domain/calendar-events";
+import type { CalendarHandle, CalendarOptions, CalendarRenderer } from "@/ports/calendar-renderer";
+
+/**
+ * The sole `@event-calendar/*` import site in the codebase (ESLint-enforced,
+ * `eslint.config.js`). Wraps `@event-calendar/core` behind the
+ * `CalendarRenderer` port (ADR 0006) so the rest of the plugin never sees
+ * the library's own option/event shapes.
+ *
+ * `mount()` needs a real DOM `Element` (`createCalendar`'s target), so this
+ * class is exercised by the Bases view at runtime rather than by vitest
+ * (whose `environment: "node"` has no DOM) — the pure option/event mapping
+ * it delegates to lives in `event-calendar-mapping.ts` and is unit-tested
+ * there instead.
+ */
+export class EventCalendarRenderer implements CalendarRenderer {
+	mount(container: HTMLElement, options: CalendarOptions): CalendarHandle {
+		// Keyed by event id so `eventClick` (an Event Calendar event, not a
+		// domain one) can hand the port's callback the original domain
+		// `CalendarEvent` it was given via `setEvents`. Unused in M3 —
+		// `callbacks` is always `{}` — but wired correctly for M4.
+		let eventsById = new Map<string, CalendarEvent>();
+
+		const onEventClick = options.callbacks.onEventClick;
+
+		// `exactOptionalPropertyTypes` forbids setting `eventClick:
+		// undefined` (the option's type has no `| undefined`) — the key must
+		// be entirely absent when no callback is wired, hence the spread.
+		const eventClickOption: Pick<Calendar.Options, "eventClick"> =
+			onEventClick === undefined
+				? {}
+				: {
+						eventClick: (info: Calendar.EventClickInfo) => {
+							const event = eventsById.get(String(info.event.id));
+							if (event !== undefined) {
+								onEventClick(event);
+							}
+						},
+					};
+
+		const calendar = createCalendar(container, [DayGrid, TimeGrid, List], {
+			view: toEventCalendarView(options.initialView),
+			firstDay: toEventCalendarFirstDay(options.firstDay),
+			editable: options.editable ?? false,
+			height: "auto",
+			headerToolbar: {
+				start: "title",
+				center: "",
+				end: "today prev,next dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+			},
+			buttonText: {
+				// Event Calendar's List plugin defaults `listWeek`'s label to
+				// "week" too, which would collide with the time-grid week
+				// button in the switcher — "list" disambiguates them.
+				listWeek: "list",
+			},
+			events: [],
+			...eventClickOption,
+		});
+
+		return {
+			setEvents: (events) => {
+				eventsById = new Map(events.map((event) => [event.id, event]));
+				calendar.setOption("events", events.map(toEventCalendarEvent));
+			},
+			setView: (view) => {
+				calendar.setOption("view", toEventCalendarView(view));
+			},
+			goTo: (date) => {
+				calendar.setOption("date", date);
+			},
+			next: () => {
+				calendar.next();
+			},
+			prev: () => {
+				calendar.prev();
+			},
+			today: () => {
+				calendar.gotoDate(new Date());
+			},
+			destroy: () => {
+				// `destroyCalendar` is async (Svelte 5 unmount); the port's
+				// `destroy(): void` stays sync — fire-and-forget is fine, the
+				// container itself is about to be torn down by the caller.
+				void destroyCalendar(calendar);
+			},
+		};
+	}
+}

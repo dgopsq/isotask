@@ -14,6 +14,7 @@ import {
 	toDateOnly,
 	toFloatingDate,
 	toJsDate,
+	toSundayFirstWeekday,
 	type TaskDate,
 } from "@/domain/dates";
 import { isErr, isOk } from "@/domain/result";
@@ -182,5 +183,22 @@ describe("startOfWeek / endOfWeek", () => {
 		const monday = mustParse("2026-09-07");
 		expect(startOfWeek(monday, 0)).toBe("2026-09-07");
 		expect(endOfWeek(monday, 0)).toBe("2026-09-13");
+	});
+});
+
+describe("toSundayFirstWeekday", () => {
+	// Monday-first Weekday (0=Mon..6=Sun) -> Sunday-first (0=Sun..6=Sat), the
+	// convention date-fns' weekStartsOn and @event-calendar/core's firstDay
+	// both use.
+	it.each([
+		[0, 1], // Monday -> 1
+		[1, 2], // Tuesday -> 2
+		[2, 3], // Wednesday -> 3
+		[3, 4], // Thursday -> 4
+		[4, 5], // Friday -> 5
+		[5, 6], // Saturday -> 6
+		[6, 0], // Sunday -> 0
+	] as const)("maps Weekday %i to %i", (input, expected) => {
+		expect(toSundayFirstWeekday(input)).toBe(expected);
 	});
 });
