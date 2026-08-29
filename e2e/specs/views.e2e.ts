@@ -545,6 +545,32 @@ describe("Views", function () {
 			// (the only other views registered are `dayGridMonth`/`timeGridDay`).
 			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
 			await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
+
+			// Visual check for the week view's time-grid rendering (event
+			// padding/inset in the all-day row against a narrower, timed-slot
+			// layout) — see calendar.css's Obsidian-style pass. The previous
+			// test left `events: scheduled`, whose only event falls outside
+			// this week (`todayTaskScheduled` is `today + 3`), so restore
+			// `events: both` first to get "Today task"'s due event (today,
+			// always inside this week) back into frame.
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await browser.executeObsidian(({ app }) => {
+					const leaves = app.workspace.getLeavesOfType("bases");
+					const leaf = leaves[0];
+					if (leaf === undefined) {
+						throw new Error("no bases leaf found");
+					}
+					const outerView = leaf.view as unknown as {
+						controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+					};
+					outerView.controller.view.config.set("events", "both");
+				});
+				await browser.waitUntil(
+					async () => (await readCalendarEvents()).some((e) => e.title === "Today task"),
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task event never reappeared for the week screenshot" },
+				);
+				await saveScreenshot("calendar-week");
+			}
 		});
 	});
 

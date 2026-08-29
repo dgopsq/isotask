@@ -6,6 +6,13 @@
  * .ec so this never bleeds into another plugin's own calendar instance.
  * Higher specificity than the library's own `.ec { --ec-*: ...; }` base
  * rule (two classes vs. one) wins regardless of import order.
+ *
+ * The --ec-* mapping below is the base layer; the concrete-selector rules
+ * further down (toolbar buttons, day header/numbers, events) override it
+ * where a CSS variable alone can't get Obsidian's own look (e.g. EC couples
+ * :hover and .ec-active onto the same --ec-button-active-* variables, so
+ * the two states need separate rules to read differently — see "Toolbar
+ * buttons" below).
  */
 @import "@event-calendar/core/index.css";
 
@@ -35,23 +42,25 @@
 	--ec-text-color: var(--text-normal);
 	--ec-border-color: var(--background-modifier-border);
 
-	/* Buttons (prev/next/today/view switcher) */
+	/* Buttons (prev/next/today/view switcher) — base fallback; the
+	 * "Toolbar buttons" rules below are what actually renders these. */
 	--ec-button-bg-color: var(--interactive-normal);
-	--ec-button-border-color: var(--background-modifier-border);
+	--ec-button-border-color: transparent;
 	--ec-button-text-color: var(--text-normal);
-	--ec-button-active-bg-color: var(--interactive-accent);
-	--ec-button-active-border-color: var(--interactive-accent);
-	--ec-button-active-text-color: var(--text-on-accent);
+	--ec-button-active-bg-color: var(--background-modifier-hover);
+	--ec-button-active-border-color: transparent;
+	--ec-button-active-text-color: var(--text-normal);
 
 	/* Days */
 	--ec-day-bg-color: var(--background-primary);
-	--ec-today-bg-color: var(--background-modifier-hover);
+	--ec-today-bg-color: var(--background-secondary);
 	--ec-highlight-color: var(--background-modifier-hover);
 
-	/* Events — per-priority overrides below (.obtask-priority-*) take
-	 * precedence over this baseline. */
-	--ec-event-bg-color: var(--interactive-accent);
-	--ec-event-text-color: var(--text-on-accent);
+	/* Events — .obtask-event/.obtask-priority-* below (higher specificity,
+	 * two classes vs. one) are what actually renders these; kept as a
+	 * sensible fallback for anything not covered there. */
+	--ec-event-bg-color: var(--background-modifier-hover);
+	--ec-event-text-color: var(--text-normal);
 	--ec-bg-event-color: var(--background-modifier-hover);
 
 	/* Now indicator */
@@ -62,16 +71,126 @@
 }
 
 /*
+ * Toolbar buttons (today/prev/next/view switcher) — styled to match
+ * Obsidian's own standard buttons rather than the library's bordered-box
+ * default. EC applies the exact same --ec-button-active-* variables to
+ * `:hover` and `.ec-active` (see `.ec-button:not(:disabled):hover,
+ * &.ec-active` in the vendored stylesheet), so getting a *different* look
+ * for "hovering" vs. "this is the selected view" needs concrete rules that
+ * out-specificity that coupled one, not just variables.
+ */
+.obtask-calendar .ec-button {
+	background-color: var(--interactive-normal);
+	color: var(--text-normal);
+	border: none;
+	border-radius: var(--button-radius);
+	box-shadow: var(--input-shadow);
+	font-size: var(--font-ui-small);
+	padding: var(--size-4-1) var(--size-4-3);
+}
+
+.obtask-calendar .ec-button:not(:disabled):hover {
+	background-color: var(--interactive-hover);
+	color: var(--text-normal);
+}
+
+/*
+ * Active (currently selected) view button: a quiet background-tint +
+ * bold-weight indicator (var(--background-modifier-hover) +
+ * var(--font-semibold)) rather than a solid var(--interactive-accent) fill
+ * — a filled accent button reads as a primary CTA in Obsidian's own UI
+ * (e.g. "Save"), which the view switcher isn't; the tint reads as "current
+ * selection" without competing with real actions elsewhere in the pane.
+ */
+.obtask-calendar .ec-button.ec-active {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+/* Keeps the active button's own look while it's hovered, instead of
+ * falling back to the plain hover rule above (same specificity — this one
+ * wins on source order). */
+.obtask-calendar .ec-button.ec-active:not(:disabled):hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/*
+ * prev/next are icon-only (an <i> glyph, no text — see
+ * e2e/specs/views.e2e.ts's `readToolbarButtons` comment), labelled via
+ * `aria-label` rather than visible text. A boxed background like the
+ * text/view buttons reads heavier than Obsidian's own icon-only controls
+ * (e.g. the pane-header nav arrows), which stay transparent until hovered —
+ * so these two get that quieter treatment instead of the base `.ec-button`
+ * fill.
+ */
+.obtask-calendar .ec-button[aria-label="Previous"],
+.obtask-calendar .ec-button[aria-label="Next"] {
+	background-color: transparent;
+	padding: var(--size-4-1) var(--size-4-2);
+}
+
+.obtask-calendar .ec-button[aria-label="Previous"]:not(:disabled):hover,
+.obtask-calendar .ec-button[aria-label="Next"]:not(:disabled):hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* Title (e.g. "August 2026") — smaller and calmer than the library's <h2> default. */
+.obtask-calendar .ec-title {
+	font-size: var(--font-ui-large);
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+}
+
+/* Day-of-week header row (month/week view). */
+.obtask-calendar .ec-col-head {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-medium);
+}
+
+/* Day numbers — muted by default, today's called out, other-month days faint. */
+.obtask-calendar .ec-day-head time {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.obtask-calendar .ec-day.ec-today .ec-day-head time {
+	color: var(--text-accent);
+	font-weight: var(--font-semibold);
+}
+
+/* Overrides the library's own `opacity: .3` other-month dimming (same
+ * property, higher specificity via the extra .obtask-calendar ancestor)
+ * with an explicit muted color instead of a translucent one. */
+.obtask-calendar .ec-day.ec-other-month .ec-day-head time {
+	color: var(--text-faint);
+	opacity: 1;
+}
+
+/*
  * Per-event classes set by event-calendar-mapping.ts#toEventCalendarEvent
  * (classNames: obtask-event, obtask-event--<source>,
  * obtask-priority-<priority>). obtask-priority-* is domain/task.ts's
  * existing priorityChipClass mapping, already used unscoped by the feed
  * chip (styles/obtask.css) — scoped here under .obtask-calendar so the
- * calendar's stronger override (background + text, not just text color)
- * doesn't affect the feed.
+ * calendar's stronger override doesn't affect the feed.
+ *
+ * Every event shares one neutral surface; priority is shown only via the
+ * border-inline-start color (plus, for urgent, a very light tint) — solid
+ * per-priority fills read as loud/alarm-like against Obsidian's own muted
+ * palette, which this plugin otherwise sticks to everywhere else.
  */
 .obtask-calendar .obtask-event {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
 	border-inline-start: 3px solid transparent;
+	border-radius: var(--radius-s);
+	padding: var(--size-4-1) var(--size-4-2);
+	font-size: var(--font-ui-smaller);
+	box-shadow: none;
 }
 
 /* due: a deadline marker -> dashed accent. scheduled: a planned block -> solid accent. */
@@ -84,19 +203,16 @@
 }
 
 .obtask-calendar .obtask-priority-urgent.obtask-event {
-	background-color: var(--color-red);
+	background-color: rgba(var(--color-red-rgb), 0.12);
 	border-inline-start-color: var(--color-red);
-	color: var(--text-on-accent);
 }
 
 .obtask-calendar .obtask-priority-high.obtask-event {
-	background-color: var(--color-orange);
 	border-inline-start-color: var(--color-orange);
-	color: var(--text-on-accent);
 }
 
 .obtask-calendar .obtask-priority-normal.obtask-event {
-	border-inline-start-color: var(--text-muted);
+	border-inline-start-color: var(--interactive-accent);
 }
 
 .obtask-calendar .obtask-priority-low.obtask-event {
@@ -104,13 +220,30 @@
 }
 
 /*
- * The header toolbar (title, today/prev/next, four view buttons) is a single
- * non-wrapping flex row in the library. Let its segments and button groups
- * wrap so it stays usable at phone widths and in narrow panes.
+ * Small horizontal inset from the day-grid cell's edges (month/week
+ * all-day row) — events otherwise touch the cell border. Scoped to
+ * `.ec-day-grid` (not time-grid's timed events, which size themselves to
+ * overlapping time columns): the library already narrows `.ec-event`'s
+ * inline-size by `--ec-event-col-gap` to leave a gap on one edge (see the
+ * vendored stylesheet's base `.ec-event { inline-size: calc(100% -
+ * var(--ec-event-col-gap)); }`), so the margin added here is subtracted
+ * back out of that same calc instead of just layered on top of it, which
+ * would push the event past its grid cell on narrow days.
+ */
+.obtask-calendar .ec-day-grid .ec-event {
+	margin-inline: var(--size-4-1);
+	inline-size: calc(100% - var(--ec-event-col-gap) - (var(--size-4-1) * 2));
+}
+
+/*
+ * The header toolbar (title, today/prev/next, three view buttons) is a
+ * single non-wrapping flex row in the library. Let its segments and button
+ * groups wrap so it stays usable at phone widths and in narrow panes.
  */
 .obtask-calendar .ec-toolbar {
 	flex-wrap: wrap;
 	row-gap: var(--size-4-2);
+	margin-block-end: var(--size-4-3);
 }
 
 .obtask-calendar .ec-toolbar > * {
