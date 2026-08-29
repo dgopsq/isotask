@@ -1,0 +1,91 @@
+/*
+ * Event Calendar (@event-calendar/core) theming. Theme variables only — no
+ * hardcoded colors (docs/CONVENTIONS.md). Every --ec-* custom property the
+ * library exposes (see node_modules/@event-calendar/core/dist/index.css) is
+ * remapped to an Obsidian theme variable here, scoped under .obtask-calendar
+ * .ec so this never bleeds into another plugin's own calendar instance.
+ * Higher specificity than the library's own `.ec { --ec-*: ...; }` base
+ * rule (two classes vs. one) wins regardless of import order.
+ */
+@import "@event-calendar/core/index.css";
+
+.obtask-calendar .ec {
+	/* Main colors -> the Obsidian scale closest to each role. */
+	--ec-color-50: var(--background-secondary);
+	--ec-color-100: var(--background-secondary);
+	--ec-color-200: var(--background-modifier-hover);
+	--ec-color-300: var(--background-modifier-border);
+	--ec-color-400: var(--background-modifier-border-hover);
+
+	/* General */
+	--ec-bg-color: var(--background-primary);
+	--ec-text-color: var(--text-normal);
+	--ec-border-color: var(--background-modifier-border);
+
+	/* Buttons (prev/next/today/view switcher) */
+	--ec-button-bg-color: var(--interactive-normal);
+	--ec-button-border-color: var(--background-modifier-border);
+	--ec-button-text-color: var(--text-normal);
+	--ec-button-active-bg-color: var(--interactive-accent);
+	--ec-button-active-border-color: var(--interactive-accent);
+	--ec-button-active-text-color: var(--text-on-accent);
+
+	/* Days */
+	--ec-day-bg-color: var(--background-primary);
+	--ec-today-bg-color: var(--background-modifier-hover);
+	--ec-highlight-color: var(--background-modifier-hover);
+
+	/* Events — per-priority overrides below (.obtask-priority-*) take
+	 * precedence over this baseline. */
+	--ec-event-bg-color: var(--interactive-accent);
+	--ec-event-text-color: var(--text-on-accent);
+	--ec-bg-event-color: var(--background-modifier-hover);
+
+	/* Now indicator */
+	--ec-now-indicator-color: var(--color-accent);
+
+	/* Popup (e.g. "+N more" day overflow) */
+	--ec-popup-bg-color: var(--background-primary);
+}
+
+/*
+ * Per-event classes set by event-calendar-mapping.ts#toEventCalendarEvent
+ * (classNames: obtask-event, obtask-event--<source>,
+ * obtask-priority-<priority>). obtask-priority-* is domain/task.ts's
+ * existing priorityChipClass mapping, already used unscoped by the feed
+ * chip (styles/obtask.css) — scoped here under .obtask-calendar so the
+ * calendar's stronger override (background + text, not just text color)
+ * doesn't affect the feed.
+ */
+.obtask-calendar .obtask-event {
+	border-inline-start: 3px solid transparent;
+}
+
+/* due: a deadline marker -> dashed accent. scheduled: a planned block -> solid accent. */
+.obtask-calendar .obtask-event--due {
+	border-inline-start-style: dashed;
+}
+
+.obtask-calendar .obtask-event--scheduled {
+	border-inline-start-style: solid;
+}
+
+.obtask-calendar .obtask-priority-urgent.obtask-event {
+	background-color: var(--color-red);
+	border-inline-start-color: var(--color-red);
+	color: var(--text-on-accent);
+}
+
+.obtask-calendar .obtask-priority-high.obtask-event {
+	background-color: var(--color-orange);
+	border-inline-start-color: var(--color-orange);
+	color: var(--text-on-accent);
+}
+
+.obtask-calendar .obtask-priority-normal.obtask-event {
+	border-inline-start-color: var(--text-muted);
+}
+
+.obtask-calendar .obtask-priority-low.obtask-event {
+	border-inline-start-color: var(--text-faint);
+}

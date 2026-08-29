@@ -1,6 +1,7 @@
 import type { Menu, TAbstractFile } from "obsidian";
 import { Plugin, TFile } from "obsidian";
 
+import "@/styles/calendar.css";
 import "@/styles/obtask.css";
 
 import { createObsidianClock } from "@/adapters/obsidian/clock";
