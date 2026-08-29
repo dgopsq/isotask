@@ -64,6 +64,7 @@ export default class ObtaskPlugin extends Plugin {
 			getStatuses: () => this.pluginSettings.statuses,
 			getWeekStart: () => this.pluginSettings.weekStart,
 			setStatus,
+			setDate,
 			notifier,
 		});
 

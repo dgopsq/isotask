@@ -2,22 +2,28 @@ import type { App, QueryController } from "obsidian";
 import { BasesView, Menu, setIcon } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
+import type { DateField } from "@/app/set-date";
+import type { makeSetDate } from "@/app/set-date";
 import type { makeSetStatus } from "@/app/set-status";
 import { describeAppError } from "@/app/errors";
 import type { Bucket, DateSource } from "@/domain/buckets";
 import { BUCKET_ORDER, groupIntoBuckets } from "@/domain/buckets";
+import type { TaskDate } from "@/domain/dates";
 import { fromJsDate } from "@/domain/dates";
 import type { Weekday } from "@/domain/dates";
 import type { FeedRowAnchor } from "@/domain/feed-row";
-import { feedRowAnchor } from "@/domain/feed-row";
+import { feedRowAnchor, feedRowDefaultDateField } from "@/domain/feed-row";
 import { parseFeedViewOptions } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { Option } from "@/domain/result";
+import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
 import type { StatusId, Task, TaskPath } from "@/domain/task";
 import { priorityChipClass } from "@/domain/task";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
+import { DateModal } from "@/ui/date-modal";
 import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
 
 const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
@@ -40,6 +46,7 @@ export interface FeedBasesViewDeps {
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
+	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly notifier: Notifier;
 }
 
@@ -135,14 +142,46 @@ export class FeedBasesView extends BasesView {
 		this.renderTags(row, task);
 	}
 
-	/** Date chip: the field the configured date source resolved to (`due`/`scheduled`), plus its value — see `domain/feed-row.ts#feedRowAnchor`. */
+	/**
+	 * Date chip: the field the configured date source resolved to
+	 * (`due`/`scheduled`), plus its value — see `domain/feed-row.ts#feedRowAnchor`.
+	 * A button-like span (same click/Enter/Space pattern as the status
+	 * control) that opens `DateModal` pre-filled with the row's anchor
+	 * field/value, dispatching `setDate` on save. When the task has no
+	 * anchor date yet, renders a muted "Set date" chip that still opens the
+	 * modal, targeting `feedRowDefaultDateField(dateSource)`.
+	 */
 	private renderDateChip(row: HTMLElement, task: Task, dateSource: DateSource): void {
 		const anchor = feedRowAnchor(task, dateSource);
+		const field = anchor.some ? anchor.value.field : feedRowDefaultDateField(dateSource);
+		const initial: Option<TaskDate> = anchor.some ? some(anchor.value.value) : none();
+
+		const chip = row.createSpan({
+			cls: [cssClass("feed__date"), "clickable-icon"],
+			attr: { role: "button", tabindex: "0" },
+		});
+		chip.setText(anchor.some ? `${DATE_FIELD_LABELS[anchor.value.field]}: ${anchor.value.value}` : "Set date");
 		if (!anchor.some) {
-			return;
+			chip.addClass(cssClass("feed__date--empty"));
 		}
-		const label = DATE_FIELD_LABELS[anchor.value.field];
-		row.createSpan({ text: `${label}: ${anchor.value.value}`, cls: cssClass("feed__date") });
+
+		const openModal = (): void => {
+			new DateModal(this.deps.app, {
+				title: field === "due" ? "Set due date" : "Set scheduled date",
+				initial,
+				onSave: (value) => {
+					void this.setDate(task.path, field, value);
+				},
+			}).open();
+		};
+
+		this.registerDomEvent(chip, "click", openModal);
+		this.registerDomEvent(chip, "keydown", (evt) => {
+			if (evt.key === "Enter" || evt.key === " ") {
+				evt.preventDefault();
+				openModal();
+			}
+		});
 	}
 
 	/** Priority chip: base layout class plus one `obtask-priority-<value>` class per `domain/task.ts#priorityChipClass`, mapped to a theme colour in `styles/obtask.css`. */
@@ -226,6 +265,13 @@ export class FeedBasesView extends BasesView {
 
 	private async setStatus(path: TaskPath, statusId: StatusId): Promise<void> {
 		const result = await this.deps.setStatus(path, statusId);
+		if (!result.ok) {
+			this.deps.notifier.error(describeAppError(result.error));
+		}
+	}
+
+	private async setDate(path: TaskPath, field: DateField, value: Option<TaskDate>): Promise<void> {
+		const result = await this.deps.setDate(path, field, value);
 		if (!result.ok) {
 			this.deps.notifier.error(describeAppError(result.error));
 		}

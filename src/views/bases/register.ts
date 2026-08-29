@@ -1,6 +1,7 @@
 import type { App, BasesAllOptions, Plugin } from "obsidian";
 import { Notice } from "obsidian";
 
+import type { makeSetDate } from "@/app/set-date";
 import type { makeSetStatus } from "@/app/set-status";
 import type { Weekday } from "@/domain/dates";
 import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
@@ -45,6 +46,7 @@ export interface RegisterViewsDeps {
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
+	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly notifier: Notifier;
 }
 
@@ -60,6 +62,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,
 				setStatus: deps.setStatus,
+				setDate: deps.setDate,
 				notifier: deps.notifier,
 			}),
 		options: () => feedViewOptions,

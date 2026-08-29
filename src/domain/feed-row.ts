@@ -12,6 +12,15 @@ export interface FeedRowAnchor {
 }
 
 /**
+ * Which field a date-chip click should edit when the row has no anchor date
+ * yet (`feedRowAnchor` returned `none`) — `due` for the `due` and `earliest`
+ * sources, `scheduled` for the `scheduled` source.
+ */
+export function feedRowDefaultDateField(source: DateSource): FeedRowAnchor["field"] {
+	return source === "scheduled" ? "scheduled" : "due";
+}
+
+/**
  * Resolves the feed row's anchor date for the configured date source, same
  * due/scheduled/earliest precedence as `buckets.ts#taskAnchorDate` (earliest
  * tie -> due) — but also reports which property won, so a row's date-chip

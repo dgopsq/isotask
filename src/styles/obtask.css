@@ -58,6 +58,11 @@
 .obtask-feed__date {
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.obtask-feed__date--empty {
+	font-style: italic;
 }
 
 .obtask-feed__error {

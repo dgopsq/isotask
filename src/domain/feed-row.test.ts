@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { DateSource } from "@/domain/buckets";
 import type { TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
-import { feedRowAnchor } from "@/domain/feed-row";
+import { feedRowAnchor, feedRowDefaultDateField } from "@/domain/feed-row";
 import type { Task, TaskPath } from "@/domain/task";
 
 function date(value: string): TaskDate {
@@ -76,5 +76,15 @@ describe("feedRowAnchor", () => {
 		for (const source of sources) {
 			expect(feedRowAnchor(t, source)).toEqual({ some: false });
 		}
+	});
+});
+
+describe("feedRowDefaultDateField", () => {
+	it.each<[DateSource, "due" | "scheduled"]>([
+		["due", "due"],
+		["scheduled", "scheduled"],
+		["earliest", "due"],
+	])("%s source -> field %s", (source, expected) => {
+		expect(feedRowDefaultDateField(source)).toBe(expected);
 	});
 });
