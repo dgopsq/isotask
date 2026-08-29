@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "date-fns": "4.4.0",
+    "rrule": "2.8.1",
     "valibot": "1.4.2"
   }
 }

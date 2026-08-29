@@ -82,7 +82,9 @@ events via Obsidian's `--color-*` palette variables.
 3. On a status transition into a `done`-kind status:
    a. Compute `next = rrule.after(anchor, inclusive=false)` using the task's `repeat` body
       anchored at `anchor`.
-   b. If `next` is undefined (series exhausted or unparseable), do not spawn.
+   b. If `next` is undefined (series exhausted or unparseable), do not spawn. Likewise, if no
+      configured status has kind `open` (e.g. a user has edited the status list down to none),
+      there's no valid spawn target — do not spawn.
    c. Otherwise build the spawned note:
       - Body: identical to the completed note's body (the completed note is the template for the
         series).
