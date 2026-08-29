@@ -86,7 +86,7 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   boundaries).
 - e2e (`wdio-obsidian-service` against a fixture vault) is milestone M5, not part of the regular
   unit-test loop. `test-vault/` is a manual, gitignored vault with the plugin symlinked in via
-  `pnpm dev:link <vault>` symlinks `main.js`, `styles.css` and `manifest.json` into `<vault>/.obsidian/plugins/obtask`; then `pnpm dev` and reload the plugin in Obsidian after each build.
+  `pnpm dev:link <vault>` copies `main.js`, `styles.css` and `manifest.json` into `<vault>/.obsidian/plugins/obtask` (real copies — Obsidian does not reliably see symlinks); `OBSIDIAN_VAULT=<vault> pnpm dev` re-copies after every rebuild. Reload the plugin in Obsidian to pick up changes.
 
 ## Commit message style
 
