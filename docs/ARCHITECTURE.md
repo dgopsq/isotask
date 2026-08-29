@@ -77,6 +77,26 @@ frontmatter into a `Task`; it is independent of Bases' own value objects. A note
 parse renders as an "invalid task" row with the reason and is excluded from buckets, but the view
 never hides it outright — Bases decides visibility via its filters.
 
+### Bases view options and re-rendering
+
+A `BasesViewRegistration` (passed to `plugin.registerBasesView`, see `views/bases/register.ts`)
+can declare `options: (config) => BasesAllOptions[]` — dropdown/toggle entries Bases renders in
+its own native view-options panel (not a plugin `SettingsTab`; the feed's three options —
+`dateSource`, `showEmptyBuckets`, `completedAtBottom` — are per-`.base`-view config, read back out
+via `BasesViewConfig.get(key)` inside `onDataUpdated()`, parsed by
+`domain/feed-view-options.ts#parseFeedViewOptions`).
+
+**Finding (verified empirically in `e2e/specs/views.e2e.ts`'s "Feed view options" probe, per the
+"live DOM probe recipe" in `docs/CONVENTIONS.md`): editing a view option re-renders the view with
+no extra plumbing on obtask's side.** `BasesViewConfig.set(key, value)` alone — with no manual
+`onDataUpdated()` call — is enough; Bases owns config reactivity and calls back into the view
+itself once the config changes. `FeedBasesView` needed no `onConfigChanged`-style hook (there
+isn't one in the public `BasesView` API — the abstract class exposes only `onDataUpdated()`); it
+already only reads options at the top of `onDataUpdated()`, so the existing single entry point
+covers option changes too. The probe found this by inspecting the runtime "bases" leaf's
+prototype chain (`leaf.view.controller.view` is the actual registered `BasesView` instance) and
+calling `config.set()` on it directly, rather than driving Bases' own options-panel DOM.
+
 ## Data flow: complete-task path
 
 ```

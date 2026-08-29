@@ -119,9 +119,37 @@ week) · **Next week** (the following full week) · **Later** (after next week) 
 Terminal-kind tasks are not excluded from bucketing by the buckets function itself — whether they
 are visible at all is decided by the Bases filter on the underlying `.base` view.
 
-Within a bucket, rows sort: date (date source) ascending -> priority descending -> title
-ascending. This ordering is fixed by the view and ignores whatever order Bases applied upstream;
-this is documented view behavior, not a bug.
+Within a bucket, rows sort: (when `completedAtBottom` is on) terminal-kind tasks (`domain/status.ts#isTerminal`)
+last, then — on each side of that split — date (date source) ascending -> priority descending ->
+title ascending. `completedAtBottom` reorders which tasks come first; it never replaces the
+date/priority/title ordering, only splits it into a non-terminal group and a terminal group, each
+independently sorted the same way. This ordering is fixed by the view and ignores whatever order
+Bases applied upstream; this is documented view behavior, not a bug.
+
+### Feed view options
+
+Three Bases-native view options (`views/bases/register.ts`'s `options`, parsed by
+`domain/feed-view-options.ts#parseFeedViewOptions`; not plugin settings — set per-view, in Bases'
+own view options panel):
+
+| option              | type     | default | effect |
+|----------------------|----------|---------|--------|
+| `dateSource`         | dropdown | `due`   | which date anchors bucketing *and* the row's date chip (`due`/`scheduled`/`earliest`) |
+| `showEmptyBuckets`   | toggle   | `false` | render every bucket header, even with zero tasks (empty ones get a muted "No tasks" placeholder), instead of skipping them |
+| `completedAtBottom`  | toggle   | `true`  | sort terminal-kind tasks after non-terminal ones within each bucket (see above) |
+
+A malformed or hand-edited `.base` file falls back to each option's default independently
+(`v.fallback` per field) rather than breaking the view.
+
+### Date-chip anchor field
+
+The feed row's date chip edits whichever frontmatter property the configured `dateSource`
+actually resolved to for that task (`domain/feed-row.ts#feedRowAnchor`): with `dateSource: due` or
+`scheduled`, the chip always edits that field; with `earliest`, it edits whichever of `due`/
+`scheduled` produced the earlier date (a tie resolves to `due`, same precedence as
+`taskAnchorDate`). When a task has neither date set yet, the chip shows a muted "Set date" and
+opens the modal targeting a fixed default field (`feedRowDefaultDateField`): `due` for the `due`
+and `earliest` sources, `scheduled` for the `scheduled` source.
 
 **Worked example** — given `now` = Wednesday 2026-09-02 and week start = Monday, the current week
 is Mon 2026-08-31 .. Sun 2026-09-06 and the next week is Mon 2026-09-07 .. Sun 2026-09-13:

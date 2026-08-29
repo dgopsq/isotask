@@ -55,10 +55,10 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 
 ## M2 — Feed view
 
-- [ ] Full feed rendering: outer Bases groups, inner time buckets, row layout (status control,
+- [x] Full feed rendering: outer Bases groups, inner time buckets, row layout (status control,
       title link, date/priority chips, project link, tags) — upgrading the M0 plain-row rendering.
-- [ ] Feed view options (date source, show empty buckets, show completed at bottom).
-- [ ] Row actions: status menu, date modal.
+- [x] Feed view options (date source, show empty buckets, show completed at bottom).
+- [x] Row actions: status menu, date modal.
 - [x] "Create tasks base" command generates `Tasks.base` (landed in M1).
 
 ## M3 — Calendar (read-only)
