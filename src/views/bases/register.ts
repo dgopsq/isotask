@@ -1,14 +1,43 @@
-import type { App, Plugin } from "obsidian";
+import type { App, BasesAllOptions, Plugin } from "obsidian";
 import { Notice } from "obsidian";
 
 import type { makeSetStatus } from "@/app/set-status";
 import type { Weekday } from "@/domain/dates";
+import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import { CalendarBasesView } from "@/views/bases/calendar/calendar-view";
 import { FeedBasesView } from "@/views/bases/feed/feed-view";
+
+/**
+ * Bases-native view options for the feed, shown in Bases' own view-options
+ * panel — not plugin settings. Keys/defaults mirror
+ * `domain/feed-view-options.ts#DEFAULT_FEED_VIEW_OPTIONS`; `parseFeedViewOptions`
+ * is what actually reads these back out of `BasesViewConfig` in `feed-view.ts`.
+ */
+const feedViewOptions: BasesAllOptions[] = [
+	{
+		key: "dateSource",
+		type: "dropdown",
+		displayName: "Date source",
+		default: DEFAULT_FEED_VIEW_OPTIONS.dateSource,
+		options: { due: "Due", scheduled: "Scheduled", earliest: "Earliest" },
+	},
+	{
+		key: "showEmptyBuckets",
+		type: "toggle",
+		displayName: "Show empty buckets",
+		default: DEFAULT_FEED_VIEW_OPTIONS.showEmptyBuckets,
+	},
+	{
+		key: "completedAtBottom",
+		type: "toggle",
+		displayName: "Completed tasks at bottom",
+		default: DEFAULT_FEED_VIEW_OPTIONS.completedAtBottom,
+	},
+];
 
 export interface RegisterViewsDeps {
 	readonly app: App;
@@ -33,6 +62,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				setStatus: deps.setStatus,
 				notifier: deps.notifier,
 			}),
+		options: () => feedViewOptions,
 	});
 
 	const calendarRegistered = plugin.registerBasesView(VIEW_TYPE_CALENDAR, {

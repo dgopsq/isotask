@@ -4,14 +4,18 @@ import { BasesView, Menu, setIcon } from "obsidian";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { makeSetStatus } from "@/app/set-status";
 import { describeAppError } from "@/app/errors";
+import type { Bucket, DateSource } from "@/domain/buckets";
 import { BUCKET_ORDER, groupIntoBuckets } from "@/domain/buckets";
-import type { Bucket } from "@/domain/buckets";
 import { fromJsDate } from "@/domain/dates";
 import type { Weekday } from "@/domain/dates";
+import type { FeedRowAnchor } from "@/domain/feed-row";
+import { feedRowAnchor } from "@/domain/feed-row";
+import { parseFeedViewOptions } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
 import type { StatusId, Task, TaskPath } from "@/domain/task";
+import { priorityChipClass } from "@/domain/task";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
@@ -25,6 +29,11 @@ const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	"no-date": "No date",
 };
 
+const DATE_FIELD_LABELS: Readonly<Record<FeedRowAnchor["field"], string>> = {
+	due: "Due",
+	scheduled: "Scheduled",
+};
+
 export interface FeedBasesViewDeps {
 	readonly app: App;
 	readonly getPropertyKeys: () => PropertyKeys;
@@ -35,9 +44,11 @@ export interface FeedBasesViewDeps {
 }
 
 /**
- * M0/M1 feed view: renders bucket headers and rows (title link, a clickable
- * status control, date) from parsed tasks. Full row layout (priority/project/
- * tags chips, feed view options) is M2.
+ * Feed view: renders bucket headers and rows (status control, title link,
+ * date chip, priority chip, project link, tags) from parsed tasks, honouring
+ * the three Bases-native view options (`domain/feed-view-options.ts`)
+ * registered in `views/bases/register.ts`. Row layout stays thin — pure
+ * domain code decides buckets/anchors, this file only renders and dispatches.
  */
 export class FeedBasesView extends BasesView {
 	override type = VIEW_TYPE_FEED;
@@ -59,6 +70,7 @@ export class FeedBasesView extends BasesView {
 		const statuses = this.deps.getStatuses();
 		const today = fromJsDate(new Date());
 		const firstDay = this.deps.getWeekStart();
+		const options = parseFeedViewOptions(this.config);
 
 		for (const group of this.data.groupedData) {
 			if (group.hasKey() && group.key !== undefined) {
@@ -66,16 +78,29 @@ export class FeedBasesView extends BasesView {
 			}
 
 			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
-			const buckets = groupIntoBuckets(tasks, { today, firstDay, source: "due" });
+			const buckets = groupIntoBuckets(tasks, {
+				today,
+				firstDay,
+				source: options.dateSource,
+				statuses,
+				completedAtBottom: options.completedAtBottom,
+			});
 
 			for (const bucket of BUCKET_ORDER) {
 				const bucketTasks = buckets.get(bucket) ?? [];
-				if (bucketTasks.length === 0) {
+				if (bucketTasks.length === 0 && !options.showEmptyBuckets) {
 					continue;
 				}
+
 				this.viewContainerEl.createEl("h4", { text: BUCKET_LABELS[bucket], cls: cssClass("feed__bucket") });
+
+				if (bucketTasks.length === 0) {
+					this.viewContainerEl.createDiv({ text: "No tasks", cls: cssClass("feed__bucket-empty") });
+					continue;
+				}
+
 				for (const task of bucketTasks) {
-					this.renderRow(task, statuses);
+					this.renderRow(task, statuses, options.dateSource);
 				}
 			}
 
@@ -89,8 +114,10 @@ export class FeedBasesView extends BasesView {
 		}
 	}
 
-	private renderRow(task: Task, statuses: readonly StatusConfig[]): void {
+	private renderRow(task: Task, statuses: readonly StatusConfig[], dateSource: DateSource): void {
 		const row = this.viewContainerEl.createDiv({ cls: cssClass("feed__row") });
+
+		this.renderStatusControl(row, task, statuses);
 
 		const link = row.createEl("a", {
 			text: task.title,
@@ -102,11 +129,62 @@ export class FeedBasesView extends BasesView {
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
 
-		this.renderStatusControl(row, task, statuses);
+		this.renderDateChip(row, task, dateSource);
+		this.renderPriorityChip(row, task);
+		this.renderProjectLink(row, task);
+		this.renderTags(row, task);
+	}
 
-		const dateText = task.due ?? task.scheduled ?? "";
-		if (dateText.length > 0) {
-			row.createSpan({ text: dateText, cls: cssClass("feed__date") });
+	/** Date chip: the field the configured date source resolved to (`due`/`scheduled`), plus its value — see `domain/feed-row.ts#feedRowAnchor`. */
+	private renderDateChip(row: HTMLElement, task: Task, dateSource: DateSource): void {
+		const anchor = feedRowAnchor(task, dateSource);
+		if (!anchor.some) {
+			return;
+		}
+		const label = DATE_FIELD_LABELS[anchor.value.field];
+		row.createSpan({ text: `${label}: ${anchor.value.value}`, cls: cssClass("feed__date") });
+	}
+
+	/** Priority chip: base layout class plus one `obtask-priority-<value>` class per `domain/task.ts#priorityChipClass`, mapped to a theme colour in `styles/obtask.css`. */
+	private renderPriorityChip(row: HTMLElement, task: Task): void {
+		const label = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
+		row.createSpan({
+			text: label,
+			cls: [cssClass("feed__priority"), cssClass(priorityChipClass(task.priority))],
+		});
+	}
+
+	/** Internal link to the project note, if `task.project` resolves to an existing file — same open pattern as the title link. Unresolved projects render as plain text (no dead-link click). */
+	private renderProjectLink(row: HTMLElement, task: Task): void {
+		const project = task.project;
+		if (project === undefined) {
+			return;
+		}
+
+		const dest = this.deps.app.metadataCache.getFirstLinkpathDest(project, task.path);
+		if (dest === null) {
+			row.createSpan({ text: project, cls: cssClass("feed__project") });
+			return;
+		}
+
+		const link = row.createEl("a", {
+			text: project,
+			cls: ["internal-link", cssClass("feed__project")],
+			href: project,
+		});
+		this.registerDomEvent(link, "click", (evt) => {
+			evt.preventDefault();
+			void this.deps.app.workspace.openLinkText(project, task.path, false);
+		});
+	}
+
+	private renderTags(row: HTMLElement, task: Task): void {
+		if (task.tags.length === 0) {
+			return;
+		}
+		const container = row.createSpan({ cls: cssClass("feed__tags") });
+		for (const tag of task.tags) {
+			container.createSpan({ text: `#${tag}`, cls: cssClass("feed__tag") });
 		}
 	}
 

@@ -29,6 +29,17 @@ export function priorityRank(priority: Priority): number {
 	}
 }
 
+/**
+ * CSS class suffix for a priority chip, e.g. `"priority-urgent"` — callers
+ * prefix it (`cssClass(priorityChipClass(priority))` -> `"obtask-priority-urgent"`).
+ * One class per `Priority` value so a stylesheet can map each to a theme
+ * colour variable; kept here (not scattered in DOM code) so the feed row and
+ * the M3 calendar can share the same mapping.
+ */
+export function priorityChipClass(priority: Priority): string {
+	return `priority-${priority}`;
+}
+
 export type Minutes = Brand<number, "Minutes">;
 
 /** An RFC 5545 RRULE body only, no `DTSTART` (e.g. `FREQ=WEEKLY;BYDAY=MO`). */
