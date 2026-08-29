@@ -66,7 +66,7 @@ export class RecurrenceModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("Repeat")
-			.setDesc("Completing the task creates the next occurrence.")
+			.setDesc("Next occurrence is created on completion.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions(options)

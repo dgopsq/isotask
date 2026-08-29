@@ -153,7 +153,7 @@ export class CreateTaskModal extends Modal {
 
 		this.renderTitleField(contentEl);
 
-		this.renderDateField(contentEl, "Due", "When the task must be done. Click the clock to include a time.", this.due, (next) => {
+		this.renderDateField(contentEl, "Due", "Deadline. Clock adds a time.", this.due, (next) => {
 			this.due = next;
 		});
 
@@ -162,7 +162,7 @@ export class CreateTaskModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("More options")
-			.setDesc("Folder, status, scheduled date, duration, project and tags.")
+			.setDesc("Folder, status, schedule, project, tags.")
 			.addToggle((toggle) =>
 				toggle.setValue(this.moreOptionsOpen).onChange((checked) => {
 					this.moreOptionsOpen = checked;
@@ -203,7 +203,7 @@ export class CreateTaskModal extends Modal {
 
 		this.renderStatusField(container);
 
-		this.renderDateField(container, "Scheduled", "When you plan to work on it. Shown on the calendar.", this.scheduled, (next) => {
+		this.renderDateField(container, "Scheduled", "When you plan to do it.", this.scheduled, (next) => {
 			this.scheduled = next;
 		});
 
@@ -219,7 +219,7 @@ export class CreateTaskModal extends Modal {
 
 		new Setting(container)
 			.setName("Project")
-			.setDesc("Wikilink to a project note, e.g. `[[Launch]]`.")
+			.setDesc("Project note, e.g. `[[Launch]]`.")
 			.addText((text) =>
 				text
 					.setPlaceholder("Project name or [[link]]")
@@ -347,7 +347,7 @@ export class CreateTaskModal extends Modal {
 
 		new Setting(container)
 			.setName("Repeat")
-			.setDesc("Completing the task creates the next occurrence.")
+			.setDesc("Next occurrence is created on completion.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions(options)

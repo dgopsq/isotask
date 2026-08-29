@@ -47,7 +47,7 @@ export class DateModal extends Modal {
 		contentEl.addClass(cssClass("date-modal"));
 
 		const desc = this.deps.title.toLowerCase().includes("scheduled")
-			? "When you plan to work on it. Shown on the calendar."
+			? "When you plan to do it."
 			: "When the task must be done.";
 
 		new Setting(contentEl)
