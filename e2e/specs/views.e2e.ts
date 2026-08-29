@@ -482,6 +482,13 @@ describe("Views", function () {
 			const dueEvent = events.find((e) => e.title === "Today task" && e.className.includes(cssClass("event--due")));
 			expect(dueEvent).toBeDefined();
 			expect(dueEvent?.className).toContain(cssClass(priorityChipClass("normal")));
+
+			// The `after` screenshot captures whatever state the last test
+			// leaves (scheduled-only events in the list view, usually empty);
+			// this one shows the month view with events for visual checks.
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("calendar-month");
+			}
 		});
 
 		/**
