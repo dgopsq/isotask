@@ -1,0 +1,125 @@
+import * as v from "valibot";
+
+import type { Weekday } from "@/domain/dates";
+import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
+import type { PropertyKeys } from "@/domain/property-keys";
+import { DEFAULT_STATUSES } from "@/domain/status";
+import type { StatusConfig } from "@/domain/status";
+import type { StatusId } from "@/domain/task";
+
+export interface ObtaskSettings {
+	readonly version: 1;
+	readonly taskFolder: string;
+	readonly tasksBasePath: string;
+	readonly propertyKeys: PropertyKeys;
+	readonly statuses: readonly StatusConfig[];
+	readonly newTaskFilenameTemplate: string;
+	readonly spawnFilenameTemplate: string;
+	readonly weekStart: Weekday;
+}
+
+export const DEFAULT_SETTINGS: ObtaskSettings = {
+	version: 1,
+	taskFolder: "Tasks",
+	tasksBasePath: "Tasks.base",
+	propertyKeys: DEFAULT_PROPERTY_KEYS,
+	statuses: DEFAULT_STATUSES,
+	newTaskFilenameTemplate: "{{title}}",
+	spawnFilenameTemplate: "{{title}} {{due}}",
+	weekStart: 0,
+};
+
+function fallbackString(defaultValue: string) {
+	return v.fallback(v.string(), defaultValue);
+}
+
+const PropertyKeysSchema = v.fallback(
+	v.object({
+		markerKey: fallbackString(DEFAULT_PROPERTY_KEYS.markerKey),
+		markerValue: fallbackString(DEFAULT_PROPERTY_KEYS.markerValue),
+		status: fallbackString(DEFAULT_PROPERTY_KEYS.status),
+		priority: fallbackString(DEFAULT_PROPERTY_KEYS.priority),
+		due: fallbackString(DEFAULT_PROPERTY_KEYS.due),
+		scheduled: fallbackString(DEFAULT_PROPERTY_KEYS.scheduled),
+		duration: fallbackString(DEFAULT_PROPERTY_KEYS.duration),
+		repeat: fallbackString(DEFAULT_PROPERTY_KEYS.repeat),
+		project: fallbackString(DEFAULT_PROPERTY_KEYS.project),
+		tags: fallbackString(DEFAULT_PROPERTY_KEYS.tags),
+		created: fallbackString(DEFAULT_PROPERTY_KEYS.created),
+		completed: fallbackString(DEFAULT_PROPERTY_KEYS.completed),
+	}),
+	DEFAULT_PROPERTY_KEYS,
+);
+
+const STATUS_KINDS = ["open", "active", "done", "cancelled"] as const;
+
+const StatusConfigSchema = v.object({
+	id: v.pipe(v.string(), v.minLength(1)),
+	label: v.pipe(v.string(), v.minLength(1)),
+	kind: v.picklist(STATUS_KINDS),
+	icon: v.optional(v.pipe(v.string(), v.minLength(1))),
+});
+
+type ParsedStatusConfig = v.InferOutput<typeof StatusConfigSchema>;
+
+function hasUniqueIds(statuses: ParsedStatusConfig[]): boolean {
+	return new Set(statuses.map((status) => status.id)).size === statuses.length;
+}
+
+function hasRequiredKinds(statuses: ParsedStatusConfig[]): boolean {
+	return statuses.some((status) => status.kind === "open") && statuses.some((status) => status.kind === "done");
+}
+
+const StatusesSchema = v.fallback(
+	v.pipe(
+		v.array(StatusConfigSchema),
+		v.check(hasUniqueIds, "Status ids must be unique."),
+		v.check(hasRequiredKinds, "At least one open and one done status is required."),
+	),
+	DEFAULT_STATUSES,
+);
+
+const WeekdaySchema = v.fallback(v.picklist([0, 1, 2, 3, 4, 5, 6]), DEFAULT_SETTINGS.weekStart);
+
+const SettingsSchema = v.object({
+	version: v.fallback(v.literal(1), 1),
+	taskFolder: fallbackString(DEFAULT_SETTINGS.taskFolder),
+	tasksBasePath: fallbackString(DEFAULT_SETTINGS.tasksBasePath),
+	propertyKeys: PropertyKeysSchema,
+	statuses: StatusesSchema,
+	newTaskFilenameTemplate: fallbackString(DEFAULT_SETTINGS.newTaskFilenameTemplate),
+	spawnFilenameTemplate: fallbackString(DEFAULT_SETTINGS.spawnFilenameTemplate),
+	weekStart: WeekdaySchema,
+});
+
+function toStatusConfig(status: ParsedStatusConfig): StatusConfig {
+	return {
+		id: status.id as StatusId,
+		label: status.label,
+		kind: status.kind,
+		...(status.icon !== undefined ? { icon: status.icon } : {}),
+	};
+}
+
+/**
+ * Parses persisted plugin data into `ObtaskSettings`, falling back to the
+ * default for any field that's missing or fails validation — so a corrupt
+ * or hand-edited `data.json` never breaks the plugin. `statuses` falls back
+ * as a whole (rather than item-by-item): it must be a non-empty list of
+ * status configs with unique ids and at least one `open` and one `done`
+ * kind, or the entire list reverts to `DEFAULT_STATUSES`.
+ */
+export function parseSettings(raw: unknown): ObtaskSettings {
+	if (typeof raw !== "object" || raw === null) {
+		return DEFAULT_SETTINGS;
+	}
+	try {
+		const parsed = v.parse(SettingsSchema, raw);
+		return {
+			...parsed,
+			statuses: parsed.statuses.map(toStatusConfig),
+		} satisfies ObtaskSettings;
+	} catch {
+		return DEFAULT_SETTINGS;
+	}
+}

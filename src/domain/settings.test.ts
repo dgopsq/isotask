@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_SETTINGS, parseSettings } from "@/adapters/obsidian/settings";
+import { DEFAULT_SETTINGS, parseSettings } from "@/domain/settings";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_STATUSES } from "@/domain/status";
 
