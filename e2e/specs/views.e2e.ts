@@ -386,6 +386,36 @@ describe("Views", function () {
 		);
 	}
 
+	/**
+	 * `.ec-toolbar`/`.ec-button`/`.ec-active` are Event Calendar's own class
+	 * names for its header toolbar (confirmed against the vendored source,
+	 * `@event-calendar/core/src/{Toolbar,Buttons}.svelte` and
+	 * `storage/options.js`'s `theme` defaults — not documented in the
+	 * package's public API surface). `prev`/`next` are icon-only buttons
+	 * (an `<i>` child, no text node) labelled via `aria-label`/`title`
+	 * instead of visible text; every other toolbar button (today, and the
+	 * one per registered view) renders its `buttonText[...]` value as plain
+	 * text. This regression-tests the `buttonText` bug fixed in `fcc7e6b`
+	 * (`event-calendar-renderer.ts`): Event Calendar *replaces* its default
+	 * `buttonText` map with the one passed in, so an incomplete map rendered
+	 * blank buttons — and nothing in the e2e suite asserted visible text
+	 * before this test existed.
+	 */
+	async function readToolbarButtons(): Promise<
+		{ readonly text: string; readonly ariaLabel: string | null; readonly title: string | null; readonly isActive: boolean }[]
+	> {
+		return browser.execute(
+			(calendarCls) =>
+				Array.from(document.querySelectorAll(`.${calendarCls} .ec-toolbar .ec-button`)).map((el) => ({
+					text: el.textContent,
+					ariaLabel: el.getAttribute("aria-label"),
+					title: el.getAttribute("title"),
+					isActive: el.classList.contains("ec-active"),
+				})),
+			cssClass("calendar"),
+		);
+	}
+
 	describe("Calendar view", function () {
 		before(async function () {
 			// Switch from the default "Feed" view to "Calendar" through the Bases
@@ -398,12 +428,48 @@ describe("Views", function () {
 			await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
 		});
 
+		after(async function () {
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("calendar");
+			}
+		});
+
 		it("renders the Event Calendar root inside .obtask-calendar, in the default month view", async function () {
 			await expect(browser.$(`.${cssClass("calendar")} .ec`)).toExist();
 			// Month view renders an `.ec-day-grid` grid and no `.ec-list` — the
 			// inverse of the "list" assertion below.
 			await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).toExist();
 			await expect(browser.$(`.${cssClass("calendar")} .ec-list`)).not.toExist();
+		});
+
+		it("renders non-blank toolbar button labels, with Month active by default", async function () {
+			const buttons = await readToolbarButtons();
+			expect(buttons.length).toBeGreaterThan(0);
+
+			// Every button carries a visible label, one way or another: plain
+			// text for todo/view buttons, aria-label (mirrored onto title) for
+			// the icon-only prev/next pair.
+			for (const button of buttons) {
+				expect(button.text.trim().length > 0 || (button.ariaLabel ?? "").trim().length > 0).toBe(true);
+			}
+
+			const prev = buttons.find((b) => b.ariaLabel === "Previous");
+			const next = buttons.find((b) => b.ariaLabel === "Next");
+			expect(prev).toBeDefined();
+			expect(prev?.title).toEqual("Previous");
+			expect(next).toBeDefined();
+			expect(next?.title).toEqual("Next");
+
+			// The text-bearing buttons, in render order: today, then the
+			// per-view buttons (see `headerToolbar` in
+			// event-calendar-renderer.ts — prev/next render between "today"
+			// and the view buttons but carry no text, so they fall out here).
+			const textLabels = buttons.map((b) => b.text.trim()).filter((t) => t.length > 0);
+			expect(textLabels).toEqual(["Today", "Month", "Week", "Day", "List"]);
+
+			const active = buttons.filter((b) => b.isActive);
+			expect(active).toHaveLength(1);
+			expect(active[0]?.text.trim()).toEqual("Month");
 		});
 
 		it("renders the due-today fixture task as a due event with its priority class", async function () {
