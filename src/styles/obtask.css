@@ -64,6 +64,54 @@
 	font-size: var(--font-ui-small);
 }
 
+.obtask-feed__bucket-empty {
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
+	font-style: italic;
+	padding: var(--size-4-1) 0;
+}
+
+.obtask-feed__priority {
+	font-size: var(--font-ui-small);
+}
+
+/*
+ * Priority -> theme colour mapping (domain/task.ts#priorityChipClass). Not
+ * scoped under .obtask-feed so the M3 calendar view can reuse the same
+ * classes for event colouring.
+ */
+.obtask-priority-urgent {
+	color: var(--color-red);
+}
+
+.obtask-priority-high {
+	color: var(--color-orange);
+}
+
+.obtask-priority-normal {
+	color: var(--text-muted);
+}
+
+.obtask-priority-low {
+	color: var(--text-faint);
+}
+
+.obtask-feed__project {
+	color: var(--text-accent);
+	font-size: var(--font-ui-small);
+}
+
+.obtask-feed__tags {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-1);
+}
+
+.obtask-feed__tag {
+	color: var(--text-accent);
+	font-size: var(--font-ui-small);
+}
+
 .obtask-calendar {
 	padding: var(--size-4-4);
 	color: var(--text-muted);
