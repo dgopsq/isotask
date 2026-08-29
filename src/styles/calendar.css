@@ -102,3 +102,18 @@
 .obtask-calendar .obtask-priority-low.obtask-event {
 	border-inline-start-color: var(--text-faint);
 }
+
+/*
+ * The header toolbar (title, today/prev/next, four view buttons) is a single
+ * non-wrapping flex row in the library. Let its segments and button groups
+ * wrap so it stays usable at phone widths and in narrow panes.
+ */
+.obtask-calendar .ec-toolbar {
+	flex-wrap: wrap;
+	row-gap: var(--size-4-2);
+}
+
+.obtask-calendar .ec-toolbar > * {
+	flex-wrap: wrap;
+	row-gap: var(--size-4-2);
+}
