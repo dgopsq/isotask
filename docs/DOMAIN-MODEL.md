@@ -180,10 +180,12 @@ Each task can contribute up to two calendar events, controlled by the `events` v
 - **`due` event**: always an all-day chip, on the `due` date — `due` carries no duration field, so
   it can never become a time-grid block.
 - A chip whose underlying date carries a time component (a timed `due`, or a timed `scheduled`
-  with no `duration`) renders in the all-day row with its time prefixed onto the title, e.g.
-  `09:00 Budget report` (`event-calendar-mapping.ts#toEventCalendarEvent`, via
-  `domain/dates.ts#formatTime`) — the time-grid position is not shown, only the day and the
-  prefixed text. A genuinely date-only chip gets no prefix.
+  with no `duration`) shows its time as a separate muted label in front of the title, e.g. "09:00"
+  next to "Budget report" (`event-calendar-mapping.ts#toEventCalendarEvent` sets
+  `extendedProps.obtaskTime` via `domain/dates.ts#formatTime`; the adapter's `event-content.ts`
+  renders it as `.obtask-event-time`, styled in `styles/calendar.css`) — the time-grid position is
+  not shown, only the day and the label. A genuinely date-only chip carries no `obtaskTime` and
+  shows no label.
 
 A task with both `due` and `scheduled` set and `events: both` produces two separate calendar
 events for the same task. Event color follows `priority` by reusing the feed's existing

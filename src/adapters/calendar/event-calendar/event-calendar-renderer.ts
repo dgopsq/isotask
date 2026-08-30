@@ -2,6 +2,7 @@ import { createCalendar, DayGrid, destroyCalendar, TimeGrid } from "@event-calen
 import type { Calendar } from "@event-calendar/core";
 
 import { toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
+import { eventContent } from "@/adapters/calendar/event-calendar/event-content";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer } from "@/ports/calendar-renderer";
 
@@ -63,6 +64,13 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// meetings at once). `false` lays overlapping blocks side by side
 			// instead of stacking them, which read as one collided rectangle.
 			slotEventOverlap: false,
+			// Overrides rendering only for a timed all-day chip (one carrying
+			// `extendedProps.obtaskTime`, see `event-calendar-mapping.ts`); for
+			// every other event `eventContent` returns `undefined`, which Event
+			// Calendar treats as "use the default rendering" — see
+			// `event-content.ts`'s doc comment for how that fallback was
+			// confirmed against the vendored source.
+			eventContent,
 			headerToolbar: {
 				start: "title",
 				center: "",

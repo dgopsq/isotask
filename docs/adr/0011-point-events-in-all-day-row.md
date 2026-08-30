@@ -16,15 +16,16 @@ day cells) to absorb the overflow.
 ## Decision
 
 A zero-duration event — a timed `due` (never has a duration), or a timed `scheduled` with no
-`duration` — is rendered as an **all-day chip** instead of a time-grid rectangle, prefixed with its
-time (`09:00 Budget report`, `domain/dates.ts#formatTime`). The time grid holds only real blocks:
-`scheduled` with both a time and a `duration`. `domain/calendar-events.ts#scheduledEvent`/
-`#dueEvent` set `allDay: true` for every case except a timed-with-duration `scheduled`, but keep
-`start`'s time component either way — the mapping layer
-(`event-calendar-mapping.ts#toEventCalendarEvent`) is what turns that surviving time into the
-title prefix, only when `allDay && isDateTime(start)`. The renderer also sets
-`slotEventOverlap: false`, so two real blocks that do overlap in time lay out side by side instead
-of stacking on top of each other.
+`duration` — is rendered as an **all-day chip** instead of a time-grid rectangle, with its time
+shown as a separate muted label in front of the title ("09:00" next to "Budget report",
+`domain/dates.ts#formatTime`). The time grid holds only real blocks: `scheduled` with both a time
+and a `duration`. `domain/calendar-events.ts#scheduledEvent`/`#dueEvent` set `allDay: true` for
+every case except a timed-with-duration `scheduled`, but keep `start`'s time component either way
+— the mapping layer (`event-calendar-mapping.ts#toEventCalendarEvent`) is what turns that
+surviving time into `extendedProps.obtaskTime`, only when `allDay && isDateTime(start)`; the
+renderer's `eventContent` (`event-content.ts`) reads it back to build the label. The renderer also
+sets `slotEventOverlap: false`, so two real blocks that do overlap in time lay out side by side
+instead of stacking on top of each other.
 
 ## Consequences
 
@@ -36,9 +37,9 @@ Positive:
 - No time grid overflow-clustering code is needed to work around Event Calendar's lack of one.
 
 Negative:
-- A due-time's position on the timeline is no longer visible at a glance — only its day and the
-  `HH:mm` prefix in its title communicate the time; reading it requires reading text, not scanning
-  a position on the grid.
+- A due-time's position on the timeline is no longer visible at a glance — only its day and its
+  `HH:mm` label communicate the time; reading it requires reading text, not scanning a position on
+  the grid.
 - A day with many zero-duration events grows the all-day row tall, pushing the time grid down
   further before it's visible.
 

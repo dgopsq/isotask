@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
+import {
+	isObtaskEventExtendedProps,
+	toEventCalendarEvent,
+	toEventCalendarFirstDay,
+	toEventCalendarView,
+} from "@/adapters/calendar/event-calendar/event-calendar-mapping";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
@@ -85,21 +90,44 @@ describe("toEventCalendarEvent", () => {
 		expect(mapped.classNames).toContain("obtask-event--due");
 	});
 
-	it("prefixes the title with HH:mm for a timed all-day point event", () => {
+	it("keeps the title unprefixed and sets obtaskTime for a timed all-day point event", () => {
 		const input = event({ start: date("2026-09-10T09:00"), allDay: true, title: "Budget report" });
 		const mapped = toEventCalendarEvent(input);
-		expect(mapped.title).toBe("09:00 Budget report");
+		expect(mapped.title).toBe("Budget report");
+		expect(mapped.extendedProps).toEqual({ obtaskTime: "09:00" });
 	});
 
-	it("does not prefix the title for a date-only all-day event", () => {
+	it("does not set obtaskTime for a date-only all-day event", () => {
 		const input = event({ start: date("2026-09-10"), allDay: true, title: "Budget report" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Budget report");
+		expect(mapped.extendedProps).toEqual({});
 	});
 
-	it("does not prefix the title for a timed block (not all-day)", () => {
+	it("does not set obtaskTime for a timed block (not all-day)", () => {
 		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false, title: "Team sync" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Team sync");
+		expect(mapped.extendedProps).toEqual({});
+	});
+});
+
+describe("isObtaskEventExtendedProps", () => {
+	it("accepts an object with no obtaskTime key", () => {
+		expect(isObtaskEventExtendedProps({})).toBe(true);
+	});
+
+	it("accepts an object with a string obtaskTime", () => {
+		expect(isObtaskEventExtendedProps({ obtaskTime: "09:00" })).toBe(true);
+	});
+
+	it("rejects an object with a non-string obtaskTime", () => {
+		expect(isObtaskEventExtendedProps({ obtaskTime: 900 })).toBe(false);
+	});
+
+	it("rejects non-object values", () => {
+		expect(isObtaskEventExtendedProps(null)).toBe(false);
+		expect(isObtaskEventExtendedProps("09:00")).toBe(false);
+		expect(isObtaskEventExtendedProps(undefined)).toBe(false);
 	});
 });

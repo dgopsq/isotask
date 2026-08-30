@@ -550,6 +550,27 @@ describe("Views", function () {
 	}
 
 	/**
+	 * The week/day all-day row's chips, in DOM order (which is also their
+	 * on-screen top-to-bottom order — see `sortCalendarEvents`,
+	 * `domain/calendar-events.ts`). `time` reads `event-content.ts`'s custom
+	 * `.obtask-event-time` label (empty string for a date-only chip, which
+	 * carries no such element), separately from `.ec-event-title`'s own
+	 * text — the title is no longer prefixed with the time, see ADR 0011's
+	 * update and the "renders a timed due..." test below.
+	 */
+	async function readAllDayChips(): Promise<{ readonly time: string; readonly title: string }[]> {
+		return browser.execute(
+			(eventCls, timeCls) =>
+				Array.from(document.querySelectorAll(`.ec-all-day .${eventCls}`)).map((el) => ({
+					time: el.querySelector(`.${timeCls}`)?.textContent ?? "",
+					title: el.querySelector(".ec-event-title")?.textContent ?? "",
+				})),
+			cssClass("event"),
+			cssClass("event-time"),
+		);
+	}
+
+	/**
 	 * `.ec-toolbar`/`.ec-button`/`.ec-active` are Event Calendar's own class
 	 * names for its header toolbar (confirmed against the vendored source,
 	 * `@event-calendar/core/src/{Toolbar,Buttons}.svelte` and
@@ -881,19 +902,22 @@ describe("Views", function () {
 
 		/**
 		 * "Deadline call" (`due: <today>T14:30`, no `scheduled` — see
-		 * `e2e/fixtures.ts`) is the only fixture with a timed `due`. Per ADR
-		 * 0011, a zero-duration point event (a timed `due`, or a timed
-		 * `scheduled` with no `duration`) renders as an all-day chip
-		 * prefixed with its time rather than a colliding marker in the
-		 * time-grid body — this asserts both halves of that: present
-		 * (prefixed) in `.ec-all-day`, absent from `.ec-time-grid .ec-body`.
+		 * `e2e/fixtures.ts`) is a timed `due` fixture. Per ADR 0011, a
+		 * zero-duration point event (a timed `due`, or a timed `scheduled`
+		 * with no `duration`) renders as an all-day chip rather than a
+		 * colliding marker in the time-grid body; per the follow-up fix, its
+		 * time is shown as a separate `.obtask-event-time` label
+		 * (`event-content.ts`) rather than prefixed onto the title — this
+		 * asserts both the chip placement (present in `.ec-all-day`, absent
+		 * from `.ec-time-grid .ec-body`) and that split rendering (the time
+		 * label reads "14:30", the title reads exactly "Deadline call").
 		 * Restores `events: both` itself (rather than depending on the
 		 * previous, screenshot-only restore) since the "re-renders with only
 		 * the scheduled event..." test earlier in this file may have left
 		 * `events: scheduled`, which would hide "Deadline call"'s due event
 		 * (and this whole assertion) entirely.
 		 */
-		it("renders a timed due as a time-prefixed all-day chip, not a time-grid marker", async function () {
+		it("renders a timed due as an all-day chip with a separate muted time label, not a time-grid marker", async function () {
 			await browser.executeObsidian(({ app }) => {
 				const leaves = app.workspace.getLeavesOfType("bases");
 				const leaf = leaves[0];
@@ -907,14 +931,14 @@ describe("Views", function () {
 			});
 
 			await browser.waitUntil(
-				async () => (await readCalendarEvents()).some((e) => e.title === "14:30 Deadline call"),
+				async () => (await readCalendarEvents()).some((e) => e.title === "Deadline call"),
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Deadline call's all-day chip never appeared" },
 			);
 
-			const allDayTitles = await browser.execute(() =>
-				Array.from(document.querySelectorAll(".ec-all-day .ec-event-title")).map((el) => el.textContent),
-			);
-			expect(allDayTitles).toContain("14:30 Deadline call");
+			const chips = await readAllDayChips();
+			const deadlineChip = chips.find((c) => c.title === "Deadline call");
+			expect(deadlineChip).toBeDefined();
+			expect(deadlineChip?.time).toBe("14:30");
 
 			const timeGridTitles = await browser.execute(() =>
 				Array.from(document.querySelectorAll(".ec-time-grid .ec-body .ec-event-title")).map((el) => el.textContent),

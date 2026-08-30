@@ -241,11 +241,19 @@
 /*
  * Time text ("14:00 Title") makes month-view rows noisy for what's really
  * just a due/scheduled marker, not a scheduled call — dropped in favour of
- * the dot alone. Scoped to `.ec-day-grid` only: the all-day row never
- * carries a time (all-day by definition), and time-grid's timed blocks
- * keep their time label (below).
+ * the dot alone. Scoped to `.ec-day-grid` (month view) only: `.ec-event-time`
+ * is Event Calendar's own default time element (unused now — every all-day
+ * event's custom content comes from `event-content.ts`'s `eventContent`
+ * instead, see below — but hidden here defensively in case a future event
+ * ever falls back to the library's default rendering while `allDay`), and
+ * `.obtask-event-time` is this plugin's own label for a timed all-day chip
+ * (`event-content.ts`), hidden the same way in month view for the same
+ * "just a marker, not a scheduled call" reason — it still shows in the
+ * week/day all-day row (`.ec-all-day`, below) and time-grid's timed blocks
+ * keep their own time label (further down this file).
  */
-.obtask-calendar .ec-day-grid .ec-event-time {
+.obtask-calendar .ec-day-grid .ec-event-time,
+.obtask-calendar .ec-day-grid .obtask-event-time {
 	display: none;
 }
 
@@ -295,6 +303,28 @@
 
 .obtask-calendar .ec-event-title {
 	line-height: var(--line-height-tight);
+}
+
+/*
+ * The week/day all-day row's timed-chip time label (`event-content.ts`'s
+ * `eventContent`, e.g. "12:00" in front of "Deadline at noon") — a genuine
+ * flex item of `.ec-event-body`, sitting between the dot (`::before`,
+ * above) and `.ec-event-title` in DOM order. Muted and unaccented (this is
+ * a secondary label, not the headline — the title still carries the
+ * priority-coloured dot), `font-variant-numeric: tabular-nums` so
+ * single/double-digit hours don't jiggle the title's start position as
+ * chips re-render, `flex-shrink: 0` so a narrow chip compresses the
+ * title's own ellipsis instead of clipping the time, and `font-size:
+ * inherit` to explicitly match `.ec-event-title`'s size (both otherwise
+ * inherit the same `.ec-event` font-size already, this just documents
+ * that they're meant to). Hidden in month view (`.ec-day-grid`, above).
+ */
+.obtask-calendar .ec-all-day .obtask-event-time {
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	font-size: inherit;
+	flex-shrink: 0;
+	margin-inline-end: var(--size-4-1);
 }
 
 /*
