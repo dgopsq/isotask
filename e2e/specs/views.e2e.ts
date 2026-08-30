@@ -1536,6 +1536,396 @@ describe("Views", function () {
 
 			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(targetDate);
 		});
+
+		/**
+		 * Drags "Today task"'s due-event chip (month view) to an empty cell in
+		 * the same grid row — same gesture as the "dragging an event to a
+		 * different day reschedules the task" test above, reused (rather than
+		 * duplicated) by the undo/redo tests below, for which the drag is only
+		 * a means to have something to undo/redo. `currentDue` (rather than a
+		 * fixed `fixtures.today`) is excluded from the candidate target cells
+		 * since an earlier test in this suite has already moved "Today task"'s
+		 * due date once. Returns the target cell's date.
+		 */
+		async function dragTodayTaskDueToEmptyCellSameRow(currentDue: string): Promise<string> {
+			const dragPlan = await browser.execute(
+				(calendarCls, eventCls, dueCls, excludeDate) => {
+					const events = Array.from(document.querySelectorAll(`.${calendarCls} .${eventCls}`));
+					const sourceEl = events.find(
+						(el) => el.querySelector(".ec-event-title")?.textContent === "Today task" && el.classList.contains(dueCls),
+					);
+					if (sourceEl === undefined) {
+						return null;
+					}
+					const sourceRect = sourceEl.getBoundingClientRect();
+					const eventRects = events.map((el) => el.getBoundingClientRect());
+					const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+					const targetEl = cells.find((cell) => {
+						const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
+						if (dateAttr === null || dateAttr === undefined || dateAttr === excludeDate) {
+							return false;
+						}
+						const rect = cell.getBoundingClientRect();
+						if (Math.abs(rect.top - sourceRect.top) > rect.height / 2) {
+							return false;
+						}
+						return !eventRects.some(
+							(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+						);
+					});
+					if (targetEl === undefined) {
+						return null;
+					}
+					const targetDate = targetEl.querySelector("time[datetime]")?.getAttribute("datetime");
+					if (targetDate === null || targetDate === undefined) {
+						return null;
+					}
+					const targetRect = targetEl.getBoundingClientRect();
+					return {
+						date: targetDate,
+						source: { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
+						target: { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 },
+					};
+				},
+				cssClass("calendar"),
+				cssClass("event"),
+				cssClass("event--due"),
+				currentDue,
+			);
+			if (dragPlan === null) {
+				throw new Error('could not resolve "Today task"\'s due event and an empty same-row day cell for the drag');
+			}
+			const { date, source, target } = dragPlan;
+
+			await browser
+				.action("pointer", { parameters: { pointerType: "mouse" } })
+				.move({ x: Math.round(source.x), y: Math.round(source.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.move({ x: Math.round(source.x) + 10, y: Math.round(source.y) + 10, origin: "viewport", duration: 100 })
+				.move({ x: Math.round(target.x), y: Math.round(target.y), origin: "viewport", duration: 250 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			return date;
+		}
+
+		/**
+		 * M4 follow-up: undo/redo (docs/ROADMAP.md, `app/undo-reschedule.ts`,
+		 * `src/commands/register-commands.ts`'s "Undo/redo last calendar
+		 * reschedule" commands). Drives them through the command palette
+		 * (`executeObsidianCommand`, same technique as every other command
+		 * test in this file's "Actions" suite) rather than a keybinding —
+		 * see the Cmd+Z test below for the keyboard path, which the same
+		 * `deps.history` instance backs regardless of which one is used.
+		 */
+		it('undoes and redoes a drag through the "Undo/redo last calendar reschedule" commands', async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the undo/redo command test" },
+			);
+
+			const originalDue = await frontmatterValueOnDisk("Tasks/Today task.md", "due");
+			if (originalDue === undefined) {
+				throw new Error('Today task has no on-disk "due" to compare against');
+			}
+
+			const targetDate = await dragTodayTaskDueToEmptyCellSameRow(originalDue);
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === targetDate,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${targetDate} after the drag` },
+			);
+
+			await browser.executeObsidianCommand("obtask:undo-reschedule");
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === originalDue,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Undo last calendar reschedule" never restored the original due date' },
+			);
+			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(originalDue);
+
+			await browser.executeObsidianCommand("obtask:redo-reschedule");
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === targetDate,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Redo last calendar reschedule" never re-applied the dragged due date' },
+			);
+			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(targetDate);
+		});
+
+		/**
+		 * Same history, driven by the keybinding instead of the command
+		 * palette (`calendar-view.ts`'s `Scope.register(["Mod"], "z", ...)`).
+		 * The calendar's container is `tabIndex = -1` and the scope is only
+		 * pushed onto `app.keymap` on `focusin` (see the constructor's doc
+		 * comment) — a click somewhere *inside* the container is required
+		 * before the key chord is claimed. The click lands on a week-day
+		 * column header cell (`.ec-col-head`), which carries no click handler
+		 * of its own (unlike an event or an empty day-grid cell, which would
+		 * navigate away or open the create-task modal) but is still a
+		 * descendant of the container, so the click bubbles focus up to it.
+		 */
+		it("undoes a drag with Cmd+Z after clicking inside the calendar container", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the Cmd+Z test" },
+			);
+
+			const originalDue = await frontmatterValueOnDisk("Tasks/Today task.md", "due");
+			if (originalDue === undefined) {
+				throw new Error('Today task has no on-disk "due" to compare against');
+			}
+
+			const targetDate = await dragTodayTaskDueToEmptyCellSameRow(originalDue);
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === targetDate,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${targetDate} after the drag` },
+			);
+
+			await browser.$(`.${cssClass("calendar")} .ec-header .ec-col-head`).click();
+
+			// "Mod" resolves to Cmd on macOS, Ctrl elsewhere — mirrors what
+			// `Scope.register(["Mod"], "z", ...)` itself claims.
+			const modifier = process.platform === "darwin" ? "Meta" : "Control";
+			await browser.keys([modifier, "z"]);
+			await browser.keys([modifier]);
+
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === originalDue,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Cmd+Z (after a click inside the calendar) never restored the original due date" },
+			);
+			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(originalDue);
+		});
+
+		/**
+		 * Explicit M4 ROADMAP item with no prior coverage: resizing a timed
+		 * `scheduled` block's bottom edge (`Event Calendar`'s `.ec-resizer`
+		 * handle, only rendered on a `durationEditable` — i.e. genuinely
+		 * timed — block, see `event-calendar-mapping.ts`) writes a new
+		 * `duration`, leaving `scheduled` (the anchor) untouched. "Planning
+		 * session" (`scheduled` today 13:00, `duration` 120 — `e2e/fixtures.ts`)
+		 * is the target: tall enough (64px) that its resize handle is easy to
+		 * grab distinctly from the block above it. `scrollIntoView` is needed
+		 * first — `height: "auto"` renders the full 00:00-24:00 grid
+		 * (`event-calendar-renderer.ts`), which is taller than the Obsidian
+		 * window, so afternoon blocks like this one start out below the fold.
+		 */
+		it("resizes a scheduled block's bottom edge, changing its duration (week view)", async function () {
+			await setCalendarInitialView("week");
+			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const originalDuration = await frontmatterValueOnDisk("Tasks/Planning session.md", "duration");
+			expect(originalDuration).toEqual("120");
+
+			const plan = await browser.execute((calendarCls) => {
+				const events = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-body .ec-event`));
+				const source = events.find((el) => el.querySelector(".ec-event-title")?.textContent === "Planning session");
+				const resizer = source === undefined ? undefined : source.querySelector(".ec-resizer");
+				if (source === undefined || resizer === null || resizer === undefined) {
+					return null;
+				}
+				resizer.scrollIntoView({ block: "center" });
+				const resizerRect = resizer.getBoundingClientRect();
+				const slots = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-slot`));
+				const targetSlot = slots.find((el) => el.querySelector("time[datetime]")?.getAttribute("datetime")?.includes("T16:00:00"));
+				if (targetSlot === undefined) {
+					return null;
+				}
+				const slotRect = targetSlot.getBoundingClientRect();
+				return {
+					resizer: { x: resizerRect.left + resizerRect.width / 2, y: resizerRect.top + resizerRect.height / 2 },
+					targetY: slotRect.top + slotRect.height / 2,
+				};
+			}, cssClass("calendar"));
+			if (plan === null) {
+				throw new Error("could not resolve Planning session's resize handle or the 16:00 target slot");
+			}
+
+			await browser
+				.action("pointer", { parameters: { pointerType: "mouse" } })
+				.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.resizer.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.resizer.y) + 10, origin: "viewport", duration: 100 })
+				.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.targetY), origin: "viewport", duration: 250 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Planning session.md", "duration")) !== originalDuration,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Planning session's on-disk duration never changed after the resize" },
+			);
+
+			const newDuration = await frontmatterValueOnDisk("Tasks/Planning session.md", "duration");
+			expect(newDuration).toBeDefined();
+			expect(Number(newDuration)).toBeGreaterThan(120);
+			// A resize is a duration change only — the anchor itself never moves.
+			expect(await frontmatterValueOnDisk("Tasks/Planning session.md", "scheduled")).toEqual(`${fixtures.today}T13:00`);
+		});
+
+		/**
+		 * Complements the resize test above with the other timed-block
+		 * gesture — a move, not a resize — asserted against the rule from
+		 * `docs/DOMAIN-MODEL.md`'s "Reschedule semantics": "`duration` is
+		 * written only by a resize." "Team sync" (`scheduled` today 09:00,
+		 * `duration` 60) is dragged sideways to a different day at the same
+		 * time-of-day (same `y`, only `x` changes) — `fromEventCalendarDrop`'s
+		 * `!drop.allDay` branch reports no `end` for a plain move (`end`
+		 * equals `start` for a point-in-time drop), so `reschedule-task.ts`
+		 * never includes `duration` in the write.
+		 */
+		it("drags a timed scheduled block to a different day, leaving its duration untouched (week view)", async function () {
+			await setCalendarInitialView("week");
+			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const originalScheduled = await frontmatterValueOnDisk("Tasks/Team sync.md", "scheduled");
+			const originalDuration = await frontmatterValueOnDisk("Tasks/Team sync.md", "duration");
+			expect(originalScheduled).toEqual(`${fixtures.today}T09:00`);
+			expect(originalDuration).toEqual("60");
+
+			const plan = await browser.execute((calendarCls) => {
+				const events = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-body .ec-event`));
+				const source = events.find((el) => el.querySelector(".ec-event-title")?.textContent === "Team sync");
+				if (source === undefined) {
+					return null;
+				}
+				source.scrollIntoView({ block: "center" });
+				const sourceRect = source.getBoundingClientRect();
+				const sourceY = sourceRect.top + sourceRect.height / 2;
+				const headers = Array.from(document.querySelectorAll(`.${calendarCls} .ec-header .ec-col-head`));
+				const targetHeader = headers.find((h) => {
+					const r = h.getBoundingClientRect();
+					return !(sourceRect.left >= r.left - 1 && sourceRect.left < r.right + 1);
+				});
+				if (targetHeader === undefined) {
+					return null;
+				}
+				const targetDate = targetHeader.querySelector("time[datetime]")?.getAttribute("datetime");
+				if (targetDate === null || targetDate === undefined) {
+					return null;
+				}
+				const targetRect = targetHeader.getBoundingClientRect();
+				return {
+					source: { x: sourceRect.left + sourceRect.width / 2, y: sourceY },
+					target: { x: targetRect.left + targetRect.width / 2, y: sourceY },
+					targetDate,
+				};
+			}, cssClass("calendar"));
+			if (plan === null) {
+				throw new Error("could not resolve Team sync or a different day column to drag it to");
+			}
+
+			await browser
+				.action("pointer", { parameters: { pointerType: "mouse" } })
+				.move({ x: Math.round(plan.source.x), y: Math.round(plan.source.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.move({ x: Math.round(plan.source.x) + 10, y: Math.round(plan.source.y), origin: "viewport", duration: 100 })
+				.move({ x: Math.round(plan.target.x), y: Math.round(plan.target.y), origin: "viewport", duration: 250 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			const expectedScheduled = `${plan.targetDate}T09:00`;
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Team sync.md", "scheduled")) === expectedScheduled,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Team sync's on-disk "scheduled" never became ${expectedScheduled} after the drag` },
+			);
+
+			expect(await frontmatterValueOnDisk("Tasks/Team sync.md", "scheduled")).toEqual(expectedScheduled);
+			expect(await frontmatterValueOnDisk("Tasks/Team sync.md", "duration")).toEqual(originalDuration);
+		});
+
+		/**
+		 * Week/day view coverage for the all-day-row drag path (the only
+		 * existing drag test — "dragging an event to a different day
+		 * reschedules the task" above — runs in month view). "Early ping"
+		 * (a timed `due`, no `scheduled`, rendered as an all-day chip per
+		 * ADR 0011) is dragged sideways within the week view's all-day row to
+		 * a different day — per "Reschedule semantics" in
+		 * `docs/DOMAIN-MODEL.md`, moving an all-day chip to another day
+		 * changes only the day, so its `09:15` time-of-day must survive.
+		 * Asserts both the on-disk `due` and the re-rendered chip's own time
+		 * label (`readAllDayChips`), since the rendered label is what a user
+		 * actually sees as proof the time carried over.
+		 */
+		it("drags an all-day due chip to a different day in week view, preserving its time-of-day", async function () {
+			await setCalendarInitialView("week");
+			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(async () => (await readCalendarEvents()).some((e) => e.title === "Early ping"), {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "Early ping never appeared in week view",
+			});
+
+			const originalDue = await frontmatterValueOnDisk("Tasks/Early ping.md", "due");
+			expect(originalDue).toEqual(`${fixtures.today}T09:15`);
+
+			const plan = await browser.execute((calendarCls) => {
+				const chips = Array.from(document.querySelectorAll(`.${calendarCls} .ec-all-day .ec-event`));
+				const source = chips.find((el) => el.querySelector(".ec-event-title")?.textContent === "Early ping");
+				if (source === undefined) {
+					return null;
+				}
+				// Earlier tests in this suite scroll the calendar's own scroll
+				// container to reach afternoon time-grid blocks — bring the
+				// all-day row (and its header, above it) back into view first.
+				source.scrollIntoView({ block: "center" });
+				const sourceRect = source.getBoundingClientRect();
+				// The all-day row's own `.ec-day` cells carry no `time[datetime]`
+				// (that's only rendered by the column *header* row's `DayHeader`,
+				// see `docs/CONVENTIONS.md`'s DOM-probing note) — read the target
+				// date off a header cell instead, and reuse the source chip's own
+				// `y` (same all-day row) for the drop coordinate.
+				const headers = Array.from(document.querySelectorAll(`.${calendarCls} .ec-header .ec-col-head`));
+				const targetHeader = headers.find((h) => {
+					const r = h.getBoundingClientRect();
+					return !(sourceRect.left >= r.left - 1 && sourceRect.left < r.right + 1);
+				});
+				if (targetHeader === undefined) {
+					return null;
+				}
+				const targetDate = targetHeader.querySelector("time[datetime]")?.getAttribute("datetime");
+				if (targetDate === null || targetDate === undefined) {
+					return null;
+				}
+				const targetRect = targetHeader.getBoundingClientRect();
+				return {
+					source: { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
+					target: { x: targetRect.left + targetRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
+					targetDate,
+				};
+			}, cssClass("calendar"));
+			if (plan === null) {
+				throw new Error("could not resolve Early ping's chip or a different day column to drag it to");
+			}
+
+			await browser
+				.action("pointer", { parameters: { pointerType: "mouse" } })
+				.move({ x: Math.round(plan.source.x), y: Math.round(plan.source.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.move({ x: Math.round(plan.source.x) + 10, y: Math.round(plan.source.y), origin: "viewport", duration: 100 })
+				.move({ x: Math.round(plan.target.x), y: Math.round(plan.target.y), origin: "viewport", duration: 250 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			const expectedDue = `${plan.targetDate}T09:15`;
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Early ping.md", "due")) === expectedDue,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Early ping's on-disk "due" never became ${expectedDue} after the drag` },
+			);
+			expect(await frontmatterValueOnDisk("Tasks/Early ping.md", "due")).toEqual(expectedDue);
+
+			const chips = await readAllDayChips();
+			const moved = chips.find((c) => c.title === "Early ping");
+			expect(moved).toBeDefined();
+			expect(moved?.time).toBe("09:15");
+		});
 	});
 
 	it("has no console errors in the Obsidian window", async function () {
