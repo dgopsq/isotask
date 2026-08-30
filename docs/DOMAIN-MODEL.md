@@ -150,6 +150,36 @@ own view options panel):
 A malformed or hand-edited `.base` file falls back to each option's default independently
 (`v.fallback` per field) rather than breaking the view.
 
+### Properties (Bases toolbar)
+
+The Bases toolbar's own "Properties" menu (not a plugin option — Bases-native, same panel every
+built-in Bases view uses) controls which extra columns a feed row shows, via
+`domain/feed-row.ts#feedRowColumns`. The status control and title link are always rendered first,
+regardless of the menu; after that, each entry in the menu's order maps to a column, left to
+right:
+
+- `Due` or `Scheduled` -> one date chip, at the position of whichever of the two appears first in
+  the menu; the second (if also enabled) is ignored — a row shows one date chip, never two.
+- `Priority` -> the priority chip. `Project` -> the project link.
+- `Tags` (either the frontmatter `tags` property or Obsidian's own inline/`file.tags`) -> the tags
+  list, same first-wins dedupe as the date chip.
+- The task marker property (`type` by default) contributes nothing — it's noise in a feed row.
+- Any other property (a different frontmatter field, or a formula) renders as a muted label/value
+  chip, e.g. `Effort: 3`, using the property's Bases-configured display name.
+
+Unchecking every property in the menu (or an `order:` reduced to just `file.name`) leaves a row
+showing only its status control and title — still a valid feed, just chip-free.
+
+**Search matches what's shown.** Bases' own toolbar Search only searches properties present in
+the view's `order:`, so honouring `order:` for rendering also makes Search cover exactly the
+columns visible on screen.
+
+**The calendar view does not honour Properties** (documented no-op, not a bug): its events are
+placed by date/time, not by a row of columns, so there is no equivalent per-property rendering to
+drive. The calendar's own three view options (`events`/`initialView`/`firstDay`, above the Feed
+table) are unaffected either way. Toolbar Search still applies to whatever the calendar's
+`order:` contains, same as any other Bases view.
+
 ### Date-chip anchor field
 
 The feed row's date chip edits whichever frontmatter property the configured `dateSource`

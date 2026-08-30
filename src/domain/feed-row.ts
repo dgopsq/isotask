@@ -1,6 +1,7 @@
 import type { DateSource } from "@/domain/buckets";
 import type { TaskDate } from "@/domain/dates";
 import { compareTaskDate } from "@/domain/dates";
+import type { PropertyKeys } from "@/domain/property-keys";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import type { Task } from "@/domain/task";
@@ -51,4 +52,87 @@ export function feedRowAnchor(task: Task, source: DateSource): Option<FeedRowAnc
 			return exhaustive;
 		}
 	}
+}
+
+/**
+ * One extra column a feed row renders after status/title, derived from the
+ * Bases toolbar's "Properties" menu (`BasesViewConfig.getOrder()`). See
+ * `feedRowColumns`'s doc comment for the mapping rules.
+ */
+export type FeedColumn =
+	| { readonly kind: "date" }
+	| { readonly kind: "priority" }
+	| { readonly kind: "project" }
+	| { readonly kind: "tags" }
+	| { readonly kind: "generic"; readonly propertyId: string };
+
+/**
+ * Maps the Bases toolbar's Properties order (`BasesPropertyId[]`, e.g.
+ * `file.name`, `note.due`, `formula.effort`) to the columns a feed row
+ * renders after its always-on status control and title link, preserving
+ * `order`'s left-to-right position. This is also what makes the toolbar's
+ * Search useful for the feed — Bases only searches properties in `getOrder()`.
+ *
+ * Rules, walking `order` left to right:
+ * - `file.name` and `note.<keys.status>` contribute nothing (title and
+ *   status are always rendered first, regardless of the menu).
+ * - `note.<keys.due>` or `note.<keys.scheduled>` contribute a single `date`
+ *   column, positioned at the FIRST of the two that appears in `order`; the
+ *   second (if present) is ignored — a row shows one date chip, not two.
+ * - `note.<keys.priority>` -> `priority`; `note.<keys.project>` -> `project`;
+ *   `note.<keys.tags>` or `file.tags` -> `tags` (whichever appears first;
+ *   the second is ignored, same dedupe as the date columns above).
+ * - `note.<keys.markerKey>` contributes nothing (the task marker is noise
+ *   in a feed row).
+ * - Anything else (`note.*`, `file.*`, `formula.*`) becomes a `generic`
+ *   column carrying its raw property id, rendered as a label/value chip
+ *   (`feed-view.ts#renderGenericChip`).
+ */
+export function feedRowColumns(order: readonly string[], keys: PropertyKeys): readonly FeedColumn[] {
+	const notedId = (key: string): string => `note.${key}`;
+
+	const columns: FeedColumn[] = [];
+	let dateAdded = false;
+	let tagsAdded = false;
+
+	for (const id of order) {
+		if (id === "file.name" || id === notedId(keys.status) || id === notedId(keys.markerKey)) {
+			continue;
+		}
+		if (id === notedId(keys.due) || id === notedId(keys.scheduled)) {
+			if (!dateAdded) {
+				columns.push({ kind: "date" });
+				dateAdded = true;
+			}
+			continue;
+		}
+		if (id === notedId(keys.priority)) {
+			columns.push({ kind: "priority" });
+			continue;
+		}
+		if (id === notedId(keys.project)) {
+			columns.push({ kind: "project" });
+			continue;
+		}
+		if (id === notedId(keys.tags) || id === "file.tags") {
+			if (!tagsAdded) {
+				columns.push({ kind: "tags" });
+				tagsAdded = true;
+			}
+			continue;
+		}
+		columns.push({ kind: "generic", propertyId: id });
+	}
+
+	return columns;
+}
+
+/**
+ * Default `order:` block for a generated `.base` file's Feed view, in the
+ * bare YAML property names Bases' own `order:` syntax expects (not
+ * `BasesPropertyId`s — Bases prefixes bare `note.*` properties itself when
+ * it loads the file). Used by `app/generate-base.ts#renderTasksBase`.
+ */
+export function defaultFeedOrderYaml(keys: PropertyKeys): readonly string[] {
+	return ["file.name", keys.status, keys.due, keys.scheduled, keys.priority, keys.project, keys.tags];
 }

@@ -88,6 +88,14 @@ indexed into `metadataCache` yet. Both `FeedBasesView` and `CalendarBasesView` r
 view) to re-run `onDataUpdated()` once indexing settles, self-healing that race regardless of
 whatever re-query Bases performs on its own.
 
+`tasksFromBasesEntries` returns `{ tasks: TaskWithEntry[], invalid: InvalidTaskEntry[] }`, where
+each `TaskWithEntry` is `{ task: Task; entry: BasesEntry }` — the source `BasesEntry` travels
+alongside its parsed `Task` rather than being discarded. The calendar view only ever needs
+`.task` (events are derived from `Task` fields alone); the feed view keeps both, since a row also
+renders whichever extra Bases toolbar "Properties" this plugin doesn't model as first-class `Task`
+fields (`domain/feed-row.ts#feedRowColumns`'s `generic` column), read display-only off the entry
+via `BasesEntry.getValue()`/`Value.toString()` — never as a second parse source.
+
 ### Bases view options and re-rendering
 
 A `BasesViewRegistration` (passed to `plugin.registerBasesView`, see `views/bases/register.ts`)

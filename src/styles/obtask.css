@@ -126,6 +126,21 @@
 	font-size: var(--font-ui-small);
 }
 
+.obtask-feed__generic {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--size-4-1);
+	font-size: var(--font-ui-small);
+}
+
+.obtask-feed__generic-label {
+	color: var(--text-faint);
+}
+
+.obtask-feed__generic-value {
+	color: var(--text-muted);
+}
+
 .obtask-calendar {
 	padding: var(--size-4-4);
 	color: var(--text-muted);

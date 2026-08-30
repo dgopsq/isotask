@@ -6,6 +6,14 @@ filters:
 views:
   - type: obtask-feed
     name: Feed
+    order:
+      - file.name
+      - status
+      - due
+      - scheduled
+      - priority
+      - project
+      - tags
   - type: obtask-calendar
     name: Calendar
   - type: table

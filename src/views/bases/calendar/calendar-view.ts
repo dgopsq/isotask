@@ -75,7 +75,7 @@ export class CalendarBasesView extends BasesView {
 		for (const group of this.data.groupedData) {
 			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
 			invalidCount += invalid.length;
-			for (const task of tasks) {
+			for (const { task } of tasks) {
 				events.push(...eventsForTask(task, { source: options.events }));
 			}
 		}

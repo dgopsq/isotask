@@ -139,6 +139,58 @@ async function clickFeedPriorityControl(title: string): Promise<void> {
 	}
 }
 
+/** Reads the active Bases leaf's `FeedBasesView.config.getOrder()` — same internal `leaf.view.controller.view` path as the "Feed view options" probe (see that describe block's doc comment). */
+async function getFeedOrder(): Promise<string[]> {
+	return browser.executeObsidian(({ app }) => {
+		const leaves = app.workspace.getLeavesOfType("bases");
+		const leaf = leaves[0];
+		if (leaf === undefined) {
+			throw new Error("no bases leaf found");
+		}
+		const outerView = leaf.view as unknown as { controller: { view: { config: { getOrder: () => string[] } } } };
+		return outerView.controller.view.config.getOrder();
+	});
+}
+
+/**
+ * Sets the active Bases leaf's Properties order. Prefers `config.setOrder()`
+ * — undocumented (not in `obsidian.d.ts`, which declares only `getOrder`),
+ * but present at runtime and, unlike `config.set("order", ...)`, actually
+ * updates what `getOrder()` reads back (verified empirically: `set("order")`
+ * silently no-ops on this build). Falls back to `config.set("order", ...)`
+ * if `setOrder` isn't there, per the task's fallback instruction — reports
+ * which path ran via the returned `usedSetOrder`.
+ */
+async function setFeedOrder(order: readonly string[]): Promise<{ readonly usedSetOrder: boolean }> {
+	return browser.executeObsidian(
+		({ app }, orderArg: string[]) => {
+			const leaves = app.workspace.getLeavesOfType("bases");
+			const leaf = leaves[0];
+			if (leaf === undefined) {
+				throw new Error("no bases leaf found");
+			}
+			const outerView = leaf.view as unknown as {
+				controller: {
+					view: {
+						config: {
+							setOrder?: (order: string[]) => void;
+							set: (key: string, value: unknown) => void;
+						};
+					};
+				};
+			};
+			const config = outerView.controller.view.config;
+			if (typeof config.setOrder === "function") {
+				config.setOrder(orderArg);
+				return { usedSetOrder: true };
+			}
+			config.set("order", orderArg);
+			return { usedSetOrder: false };
+		},
+		[...order],
+	);
+}
+
 /**
  * Dispatches a synthetic `contextmenu` event on a feed row, found by its
  * title text — real right-click simulation is unreliable in this Electron
@@ -525,6 +577,58 @@ describe("Views", function () {
 
 			const after = await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, emptyBucketCls);
 			expect(after).toBeGreaterThan(0);
+		});
+
+		/**
+		 * `domain/feed-row.ts#feedRowColumns` maps the Bases toolbar's
+		 * "Properties" order (`BasesViewConfig.getOrder()`) to which extra
+		 * columns a feed row renders. `setOrder` isn't declared on
+		 * `BasesViewConfig` in `obsidian.d.ts` (only `getOrder`/`getSort`/
+		 * `get`/`set`/`getDisplayName`), but it exists at runtime and is what
+		 * `getFeedOrder`/`setFeedOrder` (above) actually use — probed here
+		 * because `config.set("order", [...])`, the documented-shape
+		 * fallback, was tried first and silently no-ops on this build
+		 * (`getOrder()` doesn't reflect it). Narrowing the order to
+		 * `file.name`/status only should drop every date chip while the
+		 * status control stays.
+		 */
+		it("date chips follow the Bases toolbar's Properties order (setOrder)", async function () {
+			const dateCls = cssClass("feed__date");
+			const statusCls = cssClass("feed__status");
+
+			await browser.$(`.${dateCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			const before = await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, dateCls);
+			expect(before).toBeGreaterThan(0);
+
+			const previousOrder = await getFeedOrder();
+
+			try {
+				const { usedSetOrder } = await setFeedOrder(["file.name", "note.status"]);
+				expect(usedSetOrder).toBe(true);
+
+				await browser.waitUntil(
+					async () => (await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, dateCls)) === 0,
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: "feed__date chips never disappeared after narrowing Properties to file.name/status" },
+				);
+
+				const [dateCount, statusCount] = await Promise.all([
+					browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, dateCls),
+					browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, statusCls),
+				]);
+				expect(dateCount).toEqual(0);
+				expect(statusCount).toBeGreaterThan(0);
+
+				if (process.env["E2E_SCREENSHOT"] === "1") {
+					await saveScreenshot("feed-properties");
+				}
+			} finally {
+				// Restores the fixture's Feed view to its original Properties
+				// order so this spec (and `e2e/vault/Tasks.base` on disk, since
+				// Bases persists `.base`-view config back to the file) is left
+				// untouched for later tests / `git status`.
+				await setFeedOrder(previousOrder);
+				await browser.$(`.${dateCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			}
 		});
 	});
 

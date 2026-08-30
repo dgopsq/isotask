@@ -10,13 +10,20 @@ export interface InvalidTaskEntry {
 	readonly errors: readonly TaskParseError[];
 }
 
+/** A parsed task paired with the Bases entry it came from — the entry is kept only as a display-only source for properties `Task` doesn't model (see `renderGenericChip` in `feed-view.ts`), never re-parsed. */
+export interface TaskWithEntry {
+	readonly task: Task;
+	readonly entry: BasesEntry;
+}
+
 export interface BasesEntriesResult {
-	readonly tasks: readonly Task[];
+	readonly tasks: readonly TaskWithEntry[];
 	readonly invalid: readonly InvalidTaskEntry[];
 }
 
 /**
- * Maps the entries a Bases view was handed into parsed tasks, using
+ * Maps the entries a Bases view was handed into parsed tasks (each paired
+ * with the `BasesEntry` it came from), using
  * `app.metadataCache.getFileCache(file)?.frontmatter` (never re-reading the
  * file body) as the source of raw frontmatter for `domain/frontmatter.ts`.
  * Entries whose note isn't a task at all (marker mismatch) are silently
@@ -29,7 +36,10 @@ export interface BasesEntriesResult {
  * no accessor round-trips a property back to the string/number/boolean/array
  * shapes `parseTask` needs — so `metadataCache` stays the source of truth;
  * the views self-heal the rare staleness window instead (see
- * `docs/ARCHITECTURE.md`).
+ * `docs/ARCHITECTURE.md`). The entry is still handed back alongside the
+ * parsed task, display-only, so the feed view can render Bases toolbar
+ * "Properties" this plugin doesn't model as first-class `Task` fields
+ * (`feed-row.ts#feedRowColumns`'s `generic` column).
  */
 export function tasksFromBasesEntries(
 	app: App,
@@ -37,7 +47,7 @@ export function tasksFromBasesEntries(
 	keys: PropertyKeys,
 	statuses: readonly StatusConfig[],
 ): BasesEntriesResult {
-	const tasks: Task[] = [];
+	const tasks: TaskWithEntry[] = [];
 	const invalid: InvalidTaskEntry[] = [];
 
 	for (const entry of entries) {
@@ -47,7 +57,7 @@ export function tasksFromBasesEntries(
 		const result = parseTask(path, file.basename, raw, keys, statuses);
 
 		if (result.ok) {
-			tasks.push(result.value);
+			tasks.push({ task: result.value, entry });
 			continue;
 		}
 

@@ -15,7 +15,8 @@ import type { StatusId } from "@/domain/task";
  */
 const EXPECTED_DEFAULT_BASE =
 	'filters:\n  and:\n    - type == "task"\n    - status != "done"\n    - status != "cancelled"\nviews:\n' +
-	"  - type: obtask-feed\n    name: Feed\n  - type: obtask-calendar\n    name: Calendar\n  - type: table\n" +
+	"  - type: obtask-feed\n    name: Feed\n    order:\n      - file.name\n      - status\n      - due\n      - scheduled\n      - priority\n      - project\n      - tags\n" +
+	"  - type: obtask-calendar\n    name: Calendar\n  - type: table\n" +
 	"    name: All tasks\n    order:\n      - file.name\n      - status\n      - priority\n      - due\n      - scheduled\n";
 
 describe("renderTasksBase", () => {
@@ -42,5 +43,13 @@ describe("renderTasksBase", () => {
 		expect(result).toContain('kind == "action-item"');
 		expect(result).toContain('state != "done"');
 		expect(result).toContain("      - state");
+	});
+
+	it("Feed view's order: block uses defaultFeedOrderYaml", () => {
+		const keys = { ...DEFAULT_PROPERTY_KEYS, due: "deadline" };
+		const result = renderTasksBase(keys, DEFAULT_STATUSES, { feed: "obtask-feed", calendar: "obtask-calendar" });
+		expect(result).toContain(
+			"  - type: obtask-feed\n    name: Feed\n    order:\n      - file.name\n      - status\n      - deadline\n      - scheduled\n      - priority\n      - project\n      - tags\n",
+		);
 	});
 });

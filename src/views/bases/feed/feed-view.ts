@@ -1,6 +1,7 @@
-import type { App, QueryController } from "obsidian";
+import type { App, BasesEntry, BasesPropertyId, QueryController } from "obsidian";
 import { BasesView, Component, Menu, setIcon } from "obsidian";
 
+import type { TaskWithEntry } from "@/adapters/obsidian/bases-entries";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { DateField } from "@/app/set-date";
 import type { makeSetDate } from "@/app/set-date";
@@ -16,8 +17,8 @@ import { BUCKET_ORDER, groupIntoBuckets } from "@/domain/buckets";
 import type { TaskDate } from "@/domain/dates";
 import { fromJsDate } from "@/domain/dates";
 import type { Weekday } from "@/domain/dates";
-import type { FeedRowAnchor } from "@/domain/feed-row";
-import { feedRowAnchor, feedRowDefaultDateField } from "@/domain/feed-row";
+import type { FeedColumn, FeedRowAnchor } from "@/domain/feed-row";
+import { feedRowAnchor, feedRowColumns, feedRowDefaultDateField } from "@/domain/feed-row";
 import { parseFeedViewOptions } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Option } from "@/domain/result";
@@ -77,10 +78,13 @@ export interface FeedBasesViewDeps {
 
 /**
  * Feed view: renders bucket headers and rows (status control, title link,
- * date chip, priority chip, project link, tags) from parsed tasks, honouring
- * the three Bases-native view options (`domain/feed-view-options.ts`)
- * registered in `views/bases/register.ts`. Row layout stays thin — pure
- * domain code decides buckets/anchors, this file only renders and dispatches.
+ * then the columns the Bases toolbar's "Properties" menu selects — date
+ * chip, priority chip, project link, tags, and a muted generic chip for
+ * anything else — see `domain/feed-row.ts#feedRowColumns`) from parsed
+ * tasks, honouring the three Bases-native view options
+ * (`domain/feed-view-options.ts`) registered in `views/bases/register.ts`.
+ * Row layout stays thin — pure domain code decides buckets/anchors/columns,
+ * this file only renders and dispatches.
  */
 export class FeedBasesView extends BasesView {
 	override type = VIEW_TYPE_FEED;
@@ -115,6 +119,7 @@ export class FeedBasesView extends BasesView {
 		const today = fromJsDate(new Date());
 		const firstDay = this.deps.getWeekStart();
 		const options = parseFeedViewOptions(this.config);
+		const columns = feedRowColumns(this.config.getOrder(), keys);
 
 		for (const group of this.data.groupedData) {
 			if (group.hasKey() && group.key !== undefined) {
@@ -122,14 +127,18 @@ export class FeedBasesView extends BasesView {
 			}
 
 			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
-			const buckets = groupIntoBuckets(tasks, {
-				today,
-				firstDay,
-				source: options.dateSource,
-				statuses,
-				completedAtBottom: options.completedAtBottom,
-				order: this.config.getSort().length === 0 ? "smart" : "preserve",
-			});
+			const entryByPath = new Map(tasks.map((row) => [row.task.path, row.entry] as const));
+			const buckets = groupIntoBuckets(
+				tasks.map((row) => row.task),
+				{
+					today,
+					firstDay,
+					source: options.dateSource,
+					statuses,
+					completedAtBottom: options.completedAtBottom,
+					order: this.config.getSort().length === 0 ? "smart" : "preserve",
+				},
+			);
 
 			for (const bucket of BUCKET_ORDER) {
 				const bucketTasks = buckets.get(bucket) ?? [];
@@ -145,7 +154,15 @@ export class FeedBasesView extends BasesView {
 				}
 
 				for (const task of bucketTasks) {
-					this.renderRow(task, statuses, options.dateSource);
+					const entry = entryByPath.get(task.path);
+					if (entry === undefined) {
+						// Invariant: `entryByPath` was built from the exact same
+						// `tasks` list `groupIntoBuckets` bucketed, keyed by each
+						// task's own path — every bucketed task's entry is in
+						// there. Guards the lookup instead of asserting past it.
+						continue;
+					}
+					this.renderRow({ task, entry }, statuses, options.dateSource, columns);
 				}
 			}
 
@@ -159,12 +176,13 @@ export class FeedBasesView extends BasesView {
 		}
 	}
 
-	private renderRow(task: Task, statuses: readonly StatusConfig[], dateSource: DateSource): void {
-		const row = this.viewContainerEl.createDiv({ cls: cssClass("feed__row") });
+	private renderRow(row: TaskWithEntry, statuses: readonly StatusConfig[], dateSource: DateSource, columns: readonly FeedColumn[]): void {
+		const { task, entry } = row;
+		const rowEl = this.viewContainerEl.createDiv({ cls: cssClass("feed__row") });
 
-		this.renderStatusControl(row, task, statuses);
+		this.renderStatusControl(rowEl, task, statuses);
 
-		const link = row.createEl("a", {
+		const link = rowEl.createEl("a", {
 			text: task.title,
 			cls: ["internal-link", cssClass("feed__title")],
 			href: task.path,
@@ -174,12 +192,31 @@ export class FeedBasesView extends BasesView {
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
 
-		this.renderDateChip(row, task, dateSource);
-		this.renderPriorityControl(row, task);
-		this.renderProjectLink(row, task);
-		this.renderTags(row, task);
+		for (const column of columns) {
+			switch (column.kind) {
+				case "date":
+					this.renderDateChip(rowEl, task, dateSource);
+					break;
+				case "priority":
+					this.renderPriorityControl(rowEl, task);
+					break;
+				case "project":
+					this.renderProjectLink(rowEl, task);
+					break;
+				case "tags":
+					this.renderTags(rowEl, task);
+					break;
+				case "generic":
+					this.renderGenericChip(rowEl, entry, column.propertyId);
+					break;
+				default: {
+					const exhaustive: never = column;
+					return exhaustive;
+				}
+			}
+		}
 
-		this.registerRowContextMenu(row, task, statuses);
+		this.registerRowContextMenu(rowEl, task, statuses);
 	}
 
 	/**
@@ -294,6 +331,27 @@ export class FeedBasesView extends BasesView {
 		for (const tag of task.tags) {
 			container.createSpan({ text: `#${tag}`, cls: cssClass("feed__tag") });
 		}
+	}
+
+	/**
+	 * Muted label/value chip for a Bases toolbar "Properties" entry that
+	 * isn't one of the feed's first-class columns (`domain/feed-row.ts`'s
+	 * `generic` column) — anything from `note.*`, `file.*`, or `formula.*`
+	 * the plugin doesn't otherwise render. Reads `entry.getValue()`
+	 * display-only (never as a parse source, per `bases-entries.ts`'s doc
+	 * comment); `Value`'s only public API is `toString()`/`isTruthy()`
+	 * (`obsidian.d.ts`), so that's all this can use. Renders nothing when
+	 * the property is absent (`getValue` returns `null`) or falsy.
+	 */
+	private renderGenericChip(row: HTMLElement, entry: BasesEntry, propertyId: string): void {
+		const value = entry.getValue(propertyId as BasesPropertyId);
+		if (value?.isTruthy() !== true) {
+			return;
+		}
+
+		const chip = row.createSpan({ cls: cssClass("feed__generic") });
+		chip.createSpan({ text: this.config.getDisplayName(propertyId as BasesPropertyId), cls: cssClass("feed__generic-label") });
+		chip.createSpan({ text: value.toString(), cls: cssClass("feed__generic-value") });
 	}
 
 	/** Button-like span (icon + label) that opens the status `Menu` on click/Enter/Space and dispatches to `setStatus`. */

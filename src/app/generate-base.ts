@@ -1,3 +1,4 @@
+import { defaultFeedOrderYaml } from "@/domain/feed-row";
 import type { PropertyKeys } from "@/domain/property-keys";
 import { isTerminal } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
@@ -24,6 +25,12 @@ function filterLines(keys: PropertyKeys, statuses: readonly StatusConfig[]): rea
  * and Feed / Calendar / "All tasks" table views. Pure string building (no
  * YAML library) — the shape is fixed and small enough to keep exact,
  * matching `e2e/vault/Tasks.base`.
+ *
+ * The Feed view's `order:` block (`defaultFeedOrderYaml`) matters beyond
+ * cosmetics: the toolbar's "Properties" menu drives which chips a feed row
+ * shows (`domain/feed-row.ts#feedRowColumns`), and its `order:` is also
+ * what the toolbar's own Search matches against — an empty `order:` would
+ * strip every chip and break Search for a freshly generated base.
  */
 export function renderTasksBase(keys: PropertyKeys, statuses: readonly StatusConfig[], viewTypes: BaseViewTypes): string {
 	const lines: string[] = [
@@ -33,6 +40,8 @@ export function renderTasksBase(keys: PropertyKeys, statuses: readonly StatusCon
 		"views:",
 		`  - type: ${viewTypes.feed}`,
 		"    name: Feed",
+		"    order:",
+		...defaultFeedOrderYaml(keys).map((id) => `      - ${id}`),
 		`  - type: ${viewTypes.calendar}`,
 		"    name: Calendar",
 		"  - type: table",
