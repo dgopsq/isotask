@@ -2,13 +2,16 @@ import type { App, QueryController } from "obsidian";
 import { BasesView } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
-import type { makeCreateTask } from "@/app/create-task";
+import type { makeCreateTask, TaskDraft } from "@/app/create-task";
+import { describeAppError } from "@/app/errors";
+import type { RescheduleTask } from "@/app/reschedule-task";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import { parseCalendarViewOptions } from "@/domain/calendar-view-options";
-import type { Weekday } from "@/domain/dates";
+import type { TaskDate, Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
+import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
@@ -30,6 +33,7 @@ export interface CalendarBasesViewDeps {
 	readonly getWeekStart: () => Weekday;
 	readonly getTaskFolder: () => string;
 	readonly createTask: ReturnType<typeof makeCreateTask>;
+	readonly rescheduleTask: RescheduleTask;
 	readonly renderer: CalendarRenderer;
 	readonly notifier: Notifier;
 }
@@ -43,9 +47,12 @@ export interface CalendarBasesViewDeps {
  * pushes new events/view/firstDay onto the existing `CalendarHandle` instead
  * of destroying and recreating the widget — a remount would reset the
  * calendar to its initial date, discarding whatever the user had navigated
- * to. `notifier` is currently unused (no failure path exists yet in a
- * read-only view) but kept in `deps` for parity with the feed view and
- * because M4's interactions (reschedule via drag) will need it.
+ * to.
+ *
+ * The three interaction callbacks are handed to `mount` once and therefore
+ * outlive any number of `onDataUpdated` passes, so anything of theirs that
+ * depends on a view option re-reads `this.config` when it fires rather than
+ * closing over the value the option happened to have at mount time.
  */
 export class CalendarBasesView extends BasesView {
 	override type = VIEW_TYPE_CALENDAR;
@@ -77,13 +84,7 @@ export class CalendarBasesView extends BasesView {
 	 * `frontmatterProcessor` is accepted but intentionally never called.
 	 */
 	override async createFileForView(baseFileName?: string, _frontmatterProcessor?: (frontmatter: Record<string, unknown>) => void): Promise<void> {
-		new CreateTaskModal(this.deps.app, {
-			app: this.deps.app,
-			createTask: this.deps.createTask,
-			getStatuses: this.deps.getStatuses,
-			getDefaultFolder: this.deps.getTaskFolder,
-			...(baseFileName !== undefined ? { initial: { title: baseFileName } } : {}),
-		}).open();
+		this.openCreateModal(baseFileName !== undefined ? { title: baseFileName } : undefined);
 	}
 
 	/** Undocumented Bases hook — see `FeedBasesView#getViewActions`'s doc comment. */
@@ -119,7 +120,34 @@ export class CalendarBasesView extends BasesView {
 			handle = this.deps.renderer.mount(root, {
 				initialView: options.initialView,
 				firstDay,
-				callbacks: {},
+				// Unconditional: every other calendar view option changes what
+				// is *shown*, whereas a read-only toggle would change what is
+				// *permitted*, and a user who doesn't want to drag simply
+				// doesn't drag.
+				editable: true,
+				callbacks: {
+					// Matches the feed's title link (`feed-view.ts`) rather than
+					// `getLeaf().openFile()`, which would need a resolved `TFile`
+					// where all we hold is a path.
+					onEventClick: (event) => {
+						void this.deps.app.workspace.openLinkText(event.taskPath, "", false);
+					},
+					onEventMoved: async (event, start, end) => {
+						// `CalendarEvent.source` is already `"due" | "scheduled"`,
+						// i.e. exactly the `DateField` the use-case wants — the
+						// event knows which of the task's dates it was derived
+						// from, so a drag can never write the wrong one.
+						const result = await this.deps.rescheduleTask(event.taskPath, event.source, start, end === undefined ? none() : some(end));
+						if (result.ok) {
+							return true;
+						}
+						this.deps.notifier.error(describeAppError(result.error));
+						return false;
+					},
+					onSlotClick: (date) => {
+						this.openCreateModal(this.prefillForSlot(date));
+					},
+				},
 			});
 			this.handle = handle;
 			this.applied = { view: options.initialView, firstDay };
@@ -147,6 +175,31 @@ export class CalendarBasesView extends BasesView {
 		this.handle = undefined;
 		this.applied = undefined;
 		super.onunload();
+	}
+
+	/**
+	 * Which date a clicked empty slot pre-fills. Follows the `events` view
+	 * option, because pre-filling `scheduled` on a calendar the user has set
+	 * to show due dates puts the new task somewhere other than the slot they
+	 * clicked. `both` picks `scheduled` — "when will I work on it" is what
+	 * clicking a slot expresses.
+	 *
+	 * Read from `this.config` on each click rather than captured at mount:
+	 * the option can be changed while the view is open.
+	 */
+	private prefillForSlot(date: TaskDate): Partial<TaskDraft> {
+		return parseCalendarViewOptions(this.config).events === "due" ? { due: date } : { scheduled: date };
+	}
+
+	/** Shared by the Bases "New" flow (`createFileForView`) and the click-an-empty-slot flow, which differ only in what they pre-fill. */
+	private openCreateModal(initial?: Partial<TaskDraft>): void {
+		new CreateTaskModal(this.deps.app, {
+			app: this.deps.app,
+			createTask: this.deps.createTask,
+			getStatuses: this.deps.getStatuses,
+			getDefaultFolder: this.deps.getTaskFolder,
+			...(initial !== undefined ? { initial } : {}),
+		}).open();
 	}
 
 	private renderInvalidLine(count: number): void {

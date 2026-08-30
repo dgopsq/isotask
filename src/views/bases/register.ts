@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 
 import type { makeCreateTask } from "@/app/create-task";
 import type { makeSetDate } from "@/app/set-date";
+import type { RescheduleTask } from "@/app/reschedule-task";
 import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
 import type { makeSetProject } from "@/app/set-project";
@@ -118,6 +119,7 @@ export interface RegisterViewsDeps {
 	readonly getWeekStart: () => Weekday;
 	readonly getTaskFolder: () => string;
 	readonly createTask: ReturnType<typeof makeCreateTask>;
+	readonly rescheduleTask: RescheduleTask;
 	readonly renderer: CalendarRenderer;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
@@ -165,6 +167,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				getWeekStart: deps.getWeekStart,
 				getTaskFolder: deps.getTaskFolder,
 				createTask: deps.createTask,
+				rescheduleTask: deps.rescheduleTask,
 				renderer: deps.renderer,
 				notifier: deps.notifier,
 			}),

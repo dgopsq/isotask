@@ -12,6 +12,7 @@ import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import { makeCycleStatus } from "@/app/cycle-status";
 import type { AppDeps } from "@/app/deps";
+import { makeRescheduleTask } from "@/app/reschedule-task";
 import { makeSetDate } from "@/app/set-date";
 import { makeSetDuration } from "@/app/set-duration";
 import { makeSetPriority } from "@/app/set-priority";
@@ -58,6 +59,7 @@ export default class ObtaskPlugin extends Plugin {
 		const convertNote = makeConvertNote(appDeps);
 		const setStatus = makeSetStatus(appDeps);
 		const cycleStatus = makeCycleStatus(appDeps);
+		const rescheduleTask = makeRescheduleTask(appDeps);
 		const setDate = makeSetDate(appDeps);
 		const setDuration = makeSetDuration(appDeps);
 		const setPriority = makeSetPriority(appDeps);
@@ -72,6 +74,7 @@ export default class ObtaskPlugin extends Plugin {
 			getWeekStart: () => this.pluginSettings.weekStart,
 			getTaskFolder: () => this.pluginSettings.taskFolder,
 			createTask,
+			rescheduleTask,
 			renderer: calendarRenderer,
 			setStatus,
 			setPriority,

@@ -21,10 +21,10 @@ import type { CalendarHandle, CalendarOptions, CalendarRenderer } from "@/ports/
  */
 export class EventCalendarRenderer implements CalendarRenderer {
 	mount(container: HTMLElement, options: CalendarOptions): CalendarHandle {
-		// Keyed by event id so `eventClick` (an Event Calendar event, not a
-		// domain one) can hand the port's callback the original domain
-		// `CalendarEvent` it was given via `setEvents`. Unused in M3 —
-		// `callbacks` is always `{}` — but wired correctly for M4.
+		// Keyed by event id so the click/drop/resize callbacks (which are
+		// handed an Event Calendar event, not a domain one) can give the
+		// port's callback back the original domain `CalendarEvent` supplied
+		// via `setEvents` — that's what carries `taskPath` and `source`.
 		let eventsById = new Map<string, CalendarEvent>();
 
 		const onEventClick = options.callbacks.onEventClick;
