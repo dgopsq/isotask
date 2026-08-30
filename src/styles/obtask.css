@@ -135,6 +135,7 @@
 
 .obtask-feed__generic-label {
 	color: var(--text-faint);
+	white-space: nowrap;
 }
 
 .obtask-feed__generic-value {

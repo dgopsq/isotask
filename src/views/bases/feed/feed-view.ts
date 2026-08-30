@@ -383,9 +383,11 @@ export class FeedBasesView extends BasesView {
 	 * `generic` column) — anything from `note.*`, `file.*`, or `formula.*`
 	 * the plugin doesn't otherwise render. Reads `entry.getValue()`
 	 * display-only (never as a parse source, per `bases-entries.ts`'s doc
-	 * comment); `Value`'s only public API is `toString()`/`isTruthy()`
-	 * (`obsidian.d.ts`), so that's all this can use. Renders nothing when
-	 * the property is absent (`getValue` returns `null`) or falsy.
+	 * comment) and shows `Value.toString()`. `Value.renderTo` was tried and
+	 * rejected (2026-08-30): it draws Bases' *table-cell editors* (a boxed,
+	 * segmented date input for `file.mtime`, for instance), which is a form
+	 * control, not a chip. Renders nothing when the property is absent
+	 * (`getValue` returns `null`) or falsy.
 	 */
 	private renderGenericChip(row: HTMLElement, entry: BasesEntry, propertyId: string): void {
 		const value = entry.getValue(propertyId as BasesPropertyId);
