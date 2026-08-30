@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	addMinutes,
 	compareTaskDate,
+	differenceInMinutes,
 	endOfWeek,
 	formatTime,
 	fromFloatingDate,
@@ -16,6 +17,8 @@ import {
 	toFloatingDate,
 	toJsDate,
 	toSundayFirstWeekday,
+	withDatePart,
+	type IsoDate,
 	type TaskDate,
 } from "@/domain/dates";
 import { isErr, isOk } from "@/domain/result";
@@ -76,6 +79,29 @@ describe("isDateTime / toDateOnly", () => {
 	});
 });
 
+describe("withDatePart", () => {
+	it("returns the day unchanged for a date-only source", () => {
+		expect(withDatePart("2026-09-10" as IsoDate, mustParse("2026-09-02"))).toBe("2026-09-10");
+	});
+
+	it("replaces the day and preserves the time-of-day for a datetime source", () => {
+		expect(withDatePart("2026-09-10" as IsoDate, mustParse("2026-09-02T14:30"))).toBe("2026-09-10T14:30");
+	});
+
+	it("handles a source with seconds without error, keeping hour/minute", () => {
+		// IsoDateTime's canonical form (formatDateTime) never carries seconds,
+		// same as every other TaskDate-producing helper in this module (compare
+		// addMinutes/shiftBy) — a source with seconds still round-trips correctly
+		// for hour/minute, it just doesn't reintroduce seconds into the output.
+		expect(withDatePart("2026-09-10" as IsoDate, mustParse("2026-09-02T14:30:45"))).toBe("2026-09-10T14:30");
+	});
+
+	it("is a no-op when day equals the source's own day", () => {
+		expect(withDatePart("2026-09-02" as IsoDate, mustParse("2026-09-02T14:30"))).toBe("2026-09-02T14:30");
+		expect(withDatePart("2026-09-02" as IsoDate, mustParse("2026-09-02"))).toBe("2026-09-02");
+	});
+});
+
 describe("formatTime", () => {
 	it("formats a datetime's time-of-day as zero-padded 24h HH:mm", () => {
 		expect(formatTime(mustParse("2026-09-02T09:05"))).toBe("09:05");
@@ -121,6 +147,37 @@ describe("addMinutes", () => {
 
 	it.each(table)("$input + $minutes min -> $expected", ({ input, minutes, expected }) => {
 		expect(addMinutes(mustParse(input), minutes)).toBe(expected);
+	});
+});
+
+describe("differenceInMinutes", () => {
+	const table: readonly { readonly from: string; readonly to: string; readonly expected: number }[] = [
+		{ from: "2026-09-02T09:00", to: "2026-09-02T10:30", expected: 90 },
+		{ from: "2026-09-02T23:45", to: "2026-09-03T00:15", expected: 30 },
+		{ from: "2026-09-02T10:30", to: "2026-09-02T09:00", expected: -90 },
+		{ from: "2026-09-02", to: "2026-09-04", expected: 60 * 24 * 2 },
+		// Europe/Rome spring-forward boundary (2026-03-29): naive wall-clock
+		// difference, NOT the 120 a real DST-aware clock would report.
+		{ from: "2026-03-28T23:30", to: "2026-03-29T02:30", expected: 180 },
+	];
+
+	it.each(table)("from $from to $to -> $expected", ({ from, to, expected }) => {
+		expect(differenceInMinutes(mustParse(from), mustParse(to))).toBe(expected);
+	});
+
+	const roundTripCases: readonly { readonly date: string; readonly minutes: number }[] = [
+		{ date: "2026-09-02T09:00", minutes: 90 },
+		{ date: "2026-09-02T23:45", minutes: 30 },
+		{ date: "2026-09-02T10:30", minutes: -90 },
+		{ date: "2026-09-02", minutes: 60 * 24 },
+		// Round-trips across the same Europe/Rome spring-forward boundary.
+		{ date: "2026-03-28T23:30", minutes: 180 },
+		{ date: "2026-03-29T01:30", minutes: 90 },
+	];
+
+	it.each(roundTripCases)("is the exact inverse of addMinutes for $date + $minutes", ({ date, minutes }) => {
+		const d = mustParse(date);
+		expect(differenceInMinutes(d, addMinutes(d, minutes))).toBe(minutes);
 	});
 });
 

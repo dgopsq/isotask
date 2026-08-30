@@ -159,6 +159,28 @@ export function toDateOnly(date: TaskDate): IsoDate {
 	return isDateTime(date) ? formatDateOnly(componentsOf(date)) : date;
 }
 
+/**
+ * Replaces the date part of `source` with `day`, keeping `source`'s
+ * time-of-day and its date-vs-datetime kind. Exists for the calendar
+ * drag path (M4): dropping an event onto a new day must move the event
+ * without disturbing the hour/minute a user set — re-parsing a
+ * concatenated string would risk exactly that kind of corruption, so this
+ * rebuilds through `componentsOf`/`formatDateTime` instead.
+ */
+export function withDatePart(day: IsoDate, source: TaskDate): TaskDate {
+	if (!isDateTime(source)) {
+		return day;
+	}
+	const dayComponents = componentsOf(day);
+	const sourceComponents = componentsOf(source);
+	return formatDateTime({
+		...sourceComponents,
+		year: dayComponents.year,
+		month: dayComponents.month,
+		day: dayComponents.day,
+	});
+}
+
 /** Builds a genuine local `Date` (real system-timezone semantics) for boundaries that need one (rrule, the calendar widget). */
 export function toJsDate(date: TaskDate): Date {
 	const c = componentsOf(date);
@@ -180,6 +202,18 @@ export function addMinutes(date: TaskDate, minutes: number): TaskDate {
 	const c = componentsOf(date);
 	const shifted = fromEpochMs(toEpochMs(c) + minutes * 60_000, c.hasTime);
 	return c.hasTime ? formatDateTime(shifted) : formatDateOnly(shifted);
+}
+
+/**
+ * Whole wall-clock minutes from `from` to `to` (naive-UTC arithmetic, immune
+ * to real DST). Exact inverse of `addMinutes` — `differenceInMinutes(d,
+ * addMinutes(d, n)) === n` for any `d`/`n` — which is what lets the calendar
+ * resize path (M4) round-trip a dragged block's new end back into a
+ * `Minutes` duration without drifting across a DST boundary. Negative when
+ * `to` precedes `from`.
+ */
+export function differenceInMinutes(from: TaskDate, to: TaskDate): number {
+	return Math.round((toEpochMs(componentsOf(to)) - toEpochMs(componentsOf(from))) / 60_000);
 }
 
 /** Shifts by an exact millisecond delta (naive-UTC arithmetic), preserving date-vs-datetime kind and wall-clock time. */
