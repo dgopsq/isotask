@@ -788,3 +788,37 @@
 	font-size: var(--font-ui-smaller);
 	padding: var(--size-2-1) var(--size-4-2);
 }
+
+/*
+ * Compact-only: stack a timed all-day chip's time above its title instead of
+ * squeezing both onto one line. At the narrow (~86px) 3-day column width a
+ * single-line "11:45 Task name" left no room for the title at all — reported
+ * at a 390x844 viewport, the chip showed only "11:45". `.ec-event-body`'s two
+ * extra children here (`.obtask-event-time`, then `.ec-event-title` —
+ * `event-content.ts`'s `eventContent` override, that DOM order confirmed
+ * there) sit after the priority dot (`.ec-event-body::before`, above) in
+ * source order; `flex-wrap: wrap` on the body plus `flex-basis: 100%` on the
+ * title is the standard flexbox "force onto its own line" trick — the
+ * title's basis exceeds whatever space is left on line 1 after the dot and
+ * time, so it wraps onto a fresh line and (per the wrap algorithm) fills
+ * that line's full width. `min-width: 0` overrides the title's own automatic
+ * minimum size (which otherwise defaults to its text's min-content width)
+ * so it can still shrink narrower than its text and truncate via the
+ * `overflow: hidden; text-overflow: ellipsis` the library already applies to
+ * `.ec-all-day .ec-event-title`.
+ *
+ * Scoped via the `.obtask-event-time ~ .ec-event-title` sibling combinator,
+ * not a bare `.ec-event-title`, so a date-only chip — no `.obtask-event-time`
+ * node at all, since `event-content.ts` only overrides rendering when
+ * `extendedProps.obtaskTime` is set — never wraps: it already fits its
+ * single line fine, and forcing a second (empty) line would only waste
+ * vertical space in the compact grid.
+ */
+.obtask-calendar.obtask-calendar--compact .ec-all-day .ec-event-body {
+	flex-wrap: wrap;
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-all-day .obtask-event-time ~ .ec-event-title {
+	flex-basis: 100%;
+	min-width: 0;
+}

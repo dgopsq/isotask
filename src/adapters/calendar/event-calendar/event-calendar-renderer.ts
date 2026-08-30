@@ -126,6 +126,18 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				view: toEventCalendarView(currentView),
 				firstDay: toEventCalendarFirstDay(currentFirstDay),
 				editable: options.editable ?? false,
+				// Always "auto", compact included: a bounded height would give Event
+				// Calendar an internal scroller, and that scroller is exactly what
+				// PINS the day-header row and all-day row in place while the rest of
+				// the grid scrolls underneath them — the opposite of what's wanted
+				// here. The whole grid (header, all-day row, hourly slots) should
+				// scroll away together with the pane's own scroll, same as wide
+				// panes. This also costs little: per ADR 0011 every zero-duration
+				// event (all timed `due`s, and any `scheduled` without a `duration`)
+				// renders as an all-day chip, so most of a day's content already sits
+				// in the all-day row at the very top, visible with no scrolling at
+				// all — only real `scheduled`+`duration` blocks live in the time grid
+				// below.
 				height: "auto",
 				// Compact hourly grid: the vendored default (48px/half-hour slot,
 				// ~1150px for a full day) reads as an oversized empty grid for a

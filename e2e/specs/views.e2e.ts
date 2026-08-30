@@ -872,6 +872,46 @@ describe("Views", function () {
 	}
 
 	/**
+	 * Geometry (not just text) of every TIMED all-day chip's time/title pair —
+	 * used by the narrow-pane compaction test to prove the compact-mode CSS
+	 * fix (`calendar.css`'s `.obtask-calendar--compact .ec-all-day
+	 * .ec-event-body { flex-wrap: wrap }` + the title's `flex-basis: 100%`)
+	 * actually stacks the two onto separate lines instead of squeezing the
+	 * title out entirely, the bug this was written against (a 390px-wide
+	 * column left no room for both on one line — the chip rendered only its
+	 * time). A date-only chip (no `.obtask-event-time` node) is skipped, not
+	 * asserted on — it never had this problem and the fix doesn't touch it.
+	 */
+	async function readTimedAllDayChipLayouts(): Promise<
+		{ readonly title: string; readonly titleWidth: number; readonly stackedBelowTime: boolean }[]
+	> {
+		return browser.execute(
+			(eventCls, timeCls) =>
+				Array.from(document.querySelectorAll(`.ec-all-day .${eventCls}`))
+					.map((el) => {
+						const timeEl = el.querySelector(`.${timeCls}`);
+						const titleEl = el.querySelector(".ec-event-title");
+						if (timeEl === null || titleEl === null) {
+							return null;
+						}
+						const timeRect = timeEl.getBoundingClientRect();
+						const titleRect = titleEl.getBoundingClientRect();
+						return {
+							title: titleEl.textContent,
+							titleWidth: titleRect.width,
+							// The title's own top sits at or below the time's bottom
+							// edge — i.e. a genuinely separate line, not merely a CSS
+							// property asserted in isolation.
+							stackedBelowTime: titleRect.top >= timeRect.bottom - 1,
+						};
+					})
+					.filter((chip): chip is NonNullable<typeof chip> => chip !== null),
+			cssClass("event"),
+			cssClass("event-time"),
+		);
+	}
+
+	/**
 	 * `.ec-toolbar`/`.ec-button`/`.ec-active` are Event Calendar's own class
 	 * names for its header toolbar (confirmed against the vendored source,
 	 * `@event-calendar/core/src/{Toolbar,Buttons}.svelte` and
@@ -1340,27 +1380,39 @@ describe("Views", function () {
 			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
 			await browser.$(`.${cssClass("feed")}`).waitForExist({ timeout: SELECT_TIMEOUT });
 
-			// Re-clicks the views-menu toggle until the "Calendar" item shows up
-			// — a single click occasionally lands before the toolbar has
-			// finished re-attaching its handlers right after `openLinkText`
-			// swaps the leaf's view back to a freshly mounted Bases file (the
-			// menu opens then immediately closes, unlike this describe's own
-			// `before` hook above, which does this exact click sequence once
-			// against an already-settled window).
+			// Retries the whole open-menu-then-pick-Calendar cycle until the
+			// calendar is ACTUALLY mounted, rather than until an intermediate
+			// signal. Waiting only for the "Calendar" item to be displayed and
+			// then clicking it looks equivalent but is racy: right after
+			// `openLinkText` swaps the leaf's view back to a freshly mounted
+			// Bases file the toolbar is still re-attaching its handlers, so the
+			// menu can open and immediately close again in the window between
+			// `isDisplayed()` returning true and the `click()` landing — the
+			// click then hits nothing and the test fails on a calendar that was
+			// never asked for. Observed as a roughly 1-in-5 flake. Looping on
+			// the outcome absorbs it: a lost click just costs one more pass.
+			const calendarEl = browser.$(`.${cssClass("calendar")} .ec`);
 			const calendarMenuItem = browser.$(".bases-toolbar-menu-item-name=Calendar");
 			await browser.waitUntil(
 				async () => {
-					if (await calendarMenuItem.isDisplayed().catch(() => false)) {
+					if (await calendarEl.isExisting().catch(() => false)) {
 						return true;
 					}
-					await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button").click();
-					return calendarMenuItem.isDisplayed().catch(() => false);
+					// Every click is best-effort: the element it targets can go
+					// away mid-gesture for exactly the reason above, and a throw
+					// here would abort the retry that is meant to recover from it.
+					if (await calendarMenuItem.isDisplayed().catch(() => false)) {
+						await calendarMenuItem.click().catch(() => undefined);
+					} else {
+						await browser
+							.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button")
+							.click()
+							.catch(() => undefined);
+					}
+					return calendarEl.isExisting().catch(() => false);
 				},
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: 'the "Calendar" view menu item never appeared' },
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "the calendar view never mounted after picking it from the views menu" },
 			);
-			await calendarMenuItem.click();
-
-			await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
 		}
 
 		/**
@@ -2293,29 +2345,10 @@ describe("Views", function () {
 				// emulateMobile(true) tears down the active leaf's view (it
 				// comes back as an empty "New tab" pane) rather than
 				// re-rendering the Bases view in place, so the base and its
-				// Calendar view have to be reopened the same way the
-				// top-level `before` hooks do.
-				await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
-				await browser.$(`.${cssClass("feed")}`).waitForExist({ timeout: SELECT_TIMEOUT });
-
-				// Same retry-click as `reopenCalendarView()` above: right after
-				// `openLinkText` swaps the leaf's view back in, the toolbar can
-				// take a moment to (re)attach its handlers, so a single click
-				// on the views-menu toggle occasionally opens then immediately
-				// closes the menu.
-				const calendarMenuItem = browser.$(".bases-toolbar-menu-item-name=Calendar");
-				await browser.waitUntil(
-					async () => {
-						if (await calendarMenuItem.isDisplayed().catch(() => false)) {
-							return true;
-						}
-						await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button").click();
-						return calendarMenuItem.isDisplayed().catch(() => false);
-					},
-					{ timeout: SELECT_TIMEOUT, timeoutMsg: 'the "Calendar" view menu item never appeared under mobile emulation' },
-				);
-				await calendarMenuItem.click();
-				await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
+				// Calendar view have to be reopened — via the same hardened
+				// helper the other tests use, which retries until the calendar
+				// is really mounted rather than until the menu item appears.
+				await reopenCalendarView();
 
 				await browser.waitUntil(async () => (await readCalendarEvents()).length > 0, {
 					timeout: SELECT_TIMEOUT,
@@ -2401,6 +2434,22 @@ describe("Views", function () {
 				expect(textLabels).toContain("Day");
 				expect(textLabels).not.toContain("Month");
 				expect(textLabels).not.toContain("Week");
+
+				// The narrow (~86px) compact column has no room for a timed
+				// all-day chip's time and title on one line — at this width the
+				// title used to be squeezed out entirely (the chip showed only its
+				// time, e.g. "11:45", nothing else). `calendar.css`'s compact-only
+				// `flex-wrap` fix stacks them onto two lines instead; asserting on
+				// rendered geometry (not just a CSS property) is what actually
+				// proves the title is both present AND visible, not merely
+				// present-but-zero-width in the DOM.
+				const timedChips = await readTimedAllDayChipLayouts();
+				expect(timedChips.length).toBeGreaterThan(0);
+				for (const chip of timedChips) {
+					expect(chip.stackedBelowTime).toBe(true);
+					expect(chip.title.trim().length).toBeGreaterThan(0);
+					expect(chip.titleWidth).toBeGreaterThan(20);
+				}
 
 				if (process.env["E2E_SCREENSHOT"] === "1") {
 					await saveScreenshot("calendar-compact-390");

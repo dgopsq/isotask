@@ -296,6 +296,20 @@ file) choosing "Month" on a narrow pane silently renders 3 days instead of a 7-c
 accepted, not a bug to fix — the alternative (hiding "Month" from the dropdown itself) would need
 the dropdown's own options to vary by live pane width, which Bases doesn't support.
 
+At the compact 3-day view's ~86px column width, a timed all-day chip's time label and title no
+longer fit on one line (the title was squeezed out entirely — a chip read as bare "11:45" with no
+task name). `styles/calendar.css` stacks the two onto separate lines under
+`.obtask-calendar--compact` (CSS-only: `.ec-event-body` gets `flex-wrap: wrap` and the title
+`flex-basis: 100%`, forcing it onto its own line via the standard flexbox "wrap" trick — no change
+to `event-content.ts`'s DOM). A date-only chip (no `.obtask-event-time` node) is unaffected, since
+the rule is scoped via a `.obtask-event-time ~ .ec-event-title` sibling combinator. Wide panes are
+untouched — the rule only applies under `.obtask-calendar--compact`. The compact grid's own height
+stays `"auto"` (unbounded, same as wide panes) — a bounded height would give Event Calendar an
+internal scroller, which would pin the day-header and all-day rows in place while the hourly slots
+scrolled beneath them; instead the whole grid scrolls away with the pane. This costs little because
+per ADR 0011 every zero-duration event (all timed `due`s, and any `scheduled` without a `duration`)
+already renders in the all-day row at the very top, visible with no scrolling at all.
+
 ### Reschedule semantics
 
 Dragging or resizing a calendar event writes back through `app/reschedule-task.ts`, which builds a
