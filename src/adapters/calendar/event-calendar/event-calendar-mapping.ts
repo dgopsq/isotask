@@ -2,8 +2,8 @@ import type { Calendar } from "@event-calendar/core";
 
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
-import type { Weekday } from "@/domain/dates";
-import { formatTime, isDateTime, toJsDate, toSundayFirstWeekday } from "@/domain/dates";
+import type { TaskDate, Weekday } from "@/domain/dates";
+import { formatTime, fromJsDate, fromJsDateTime, isDateTime, toJsDate, toSundayFirstWeekday, withDatePart } from "@/domain/dates";
 import { priorityChipClass } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
 
@@ -91,5 +91,55 @@ export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput 
 		allDay: event.allDay,
 		extendedProps,
 		classNames: [cssClass("event"), cssClass(`event--${event.source}`), cssClass(priorityChipClass(event.priority))],
+		// Resizing an all-day chip would ask the user to give the task an end
+		// *date*, and the data model has no property for one — `duration` is
+		// minutes and only meaningful against a timed `scheduled`. All-day
+		// chips stay draggable (they can move to another day), just not
+		// resizable; a timed time-grid block keeps both handles.
+		durationEditable: !event.allDay,
 	};
+}
+
+/**
+ * The shape `Calendar.Event` supplies to a drop/resize callback — structural
+ * so this stays testable without the library's DOM-bearing types.
+ */
+export interface EventCalendarDrop {
+	readonly start: Date;
+	readonly end: Date;
+	readonly allDay: boolean;
+}
+
+/**
+ * Converts an Event Calendar drag/resize result back into domain dates.
+ * Branches on `drop.allDay` — the event's NEW all-day-ness, which may differ
+ * from `event.allDay` when a timed block was dragged into (or out of) the
+ * all-day row.
+ */
+export function fromEventCalendarDrop(event: CalendarEvent, drop: EventCalendarDrop): { readonly start: TaskDate; readonly end: TaskDate | undefined } {
+	if (!drop.allDay) {
+		// Absolute conversion, not delta arithmetic: shifting the domain date
+		// by `drop.start - oldStart` breaks twice, across a DST boundary a
+		// one-day drag is 23 or 25 real hours but the wall clock must not
+		// move, and a delta can't express a change of kind (a timed block
+		// dragged up out of the all-day row). Converting the new position
+		// absolutely is DST-correct because a real local `Date` -> wall-clock
+		// digits is exactly what `fromJsDateTime` does.
+		const start = fromJsDateTime(drop.start);
+		// `toEventCalendarEvent` sets `end = start` for a point event, so a
+		// plain move of one hands back a zero-length span here; reporting
+		// that as a real `end` would make the reschedule use-case clamp it to
+		// a 1-minute duration the task never had.
+		const end = drop.end.getTime() > drop.start.getTime() ? fromJsDateTime(drop.end) : undefined;
+		return { start, end };
+	}
+	// Per ADR 0011 a `scheduled` datetime with no `duration` renders as an
+	// all-day chip that still carries its time (surfaced via
+	// `extendedProps.obtaskTime`). Event Calendar normalises an all-day
+	// event's `start` to midnight, so taking it verbatim would silently
+	// destroy the user's `14:30`. `withDatePart` takes the new day from the
+	// drop and the time-of-day from the original domain event; a genuinely
+	// date-only event has no time to keep and stays date-only.
+	const start = withDatePart(fromJsDate(drop.start), event.start);
+	return { start, end: undefined };
 }

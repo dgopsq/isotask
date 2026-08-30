@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	fromEventCalendarDrop,
 	isObtaskEventExtendedProps,
 	toEventCalendarEvent,
 	toEventCalendarFirstDay,
@@ -9,7 +10,7 @@ import {
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
-import { parseTaskDate } from "@/domain/dates";
+import { parseTaskDate, toJsDate } from "@/domain/dates";
 import type { TaskPath } from "@/domain/task";
 
 function date(value: string): TaskDate {
@@ -109,6 +110,96 @@ describe("toEventCalendarEvent", () => {
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Team sync");
 		expect(mapped.extendedProps).toEqual({});
+	});
+
+	it("marks an all-day chip's duration as not editable (no end-date property to resize into)", () => {
+		const input = event({ start: date("2026-09-10"), allDay: true });
+		const mapped = toEventCalendarEvent(input);
+		expect(mapped.durationEditable).toBe(false);
+	});
+
+	it("keeps a timed block's duration editable (resize handle changes `duration` minutes)", () => {
+		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false });
+		const mapped = toEventCalendarEvent(input);
+		expect(mapped.durationEditable).toBe(true);
+	});
+});
+
+describe("fromEventCalendarDrop", () => {
+	it("converts a timed block moved within the time grid (start and end both convert)", () => {
+		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-11T10:00")),
+			end: toJsDate(date("2026-09-11T10:30")),
+			allDay: false,
+		});
+		expect(result.start).toBe("2026-09-11T10:00");
+		expect(result.end).toBe("2026-09-11T10:30");
+	});
+
+	it("converts a timed block resized to a later end", () => {
+		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-10T09:00")),
+			end: toJsDate(date("2026-09-10T10:00")),
+			allDay: false,
+		});
+		expect(result.start).toBe("2026-09-10T09:00");
+		expect(result.end).toBe("2026-09-10T10:00");
+	});
+
+	it("drops a zero-length move as end: undefined (not a fabricated duration)", () => {
+		const input = event({ start: date("2026-09-10T09:00"), allDay: false });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-11T09:00")),
+			end: toJsDate(date("2026-09-11T09:00")),
+			allDay: false,
+		});
+		expect(result.start).toBe("2026-09-11T09:00");
+		expect(result.end).toBeUndefined();
+	});
+
+	it("drags a date-only chip into the all-day row and keeps it date-only", () => {
+		const input = event({ start: date("2026-09-10"), allDay: true });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-15")),
+			end: toJsDate(date("2026-09-15")),
+			allDay: true,
+		});
+		expect(result.start).toBe("2026-09-15");
+		expect(result.end).toBeUndefined();
+	});
+
+	it("drags an ADR-0011 timed all-day chip to another day and keeps its time-of-day", () => {
+		const input = event({ start: date("2026-09-10T14:30"), allDay: true });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-15")),
+			end: toJsDate(date("2026-09-15")),
+			allDay: true,
+		});
+		expect(result.start).toBe("2026-09-15T14:30");
+		expect(result.end).toBeUndefined();
+	});
+
+	it("changes kind to date-only when a date-only chip is what got dropped as all-day (no time to keep)", () => {
+		const input = event({ start: date("2026-09-10"), allDay: true });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-16")),
+			end: toJsDate(date("2026-09-16")),
+			allDay: true,
+		});
+		expect(result.start).toBe("2026-09-16");
+	});
+
+	it("converts a timed block dragged up into the all-day row, dropping its time-grid end", () => {
+		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-12")),
+			end: toJsDate(date("2026-09-12")),
+			allDay: true,
+		});
+		expect(result.start).toBe("2026-09-12T09:00");
+		expect(result.end).toBeUndefined();
 	});
 });
 
