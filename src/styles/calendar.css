@@ -355,15 +355,15 @@
  * area (theme option in the vendored bundle), a sibling of `.ec-all-day` —
  * scoping to it (not just `.ec-time-grid .ec-event`) keeps the all-day row
  * on the dot-only rule above rather than picking up a surface here too.
- * Priority reads via a solid `border-inline-start` bar (no dashed style
- * anywhere, per the maintainer's "broken ladder" note); due/scheduled
- * still reads via the same ring/filled dot before the title.
+ * Priority reads via an inset pill bar (a `::before`, below) rather than a
+ * `border-inline-start` — a border follows the box's own `border-radius`
+ * and tapers around the corners instead of reading as a clean bar; due/
+ * scheduled still reads via the same ring/filled dot before the title.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	border-radius: var(--radius-s);
-	border-inline-start: 2px solid var(--obtask-dot-color, var(--text-faint));
 	box-shadow: none;
 	overflow: hidden;
 	/*
@@ -391,7 +391,10 @@
 	 * property name either side used, so only `!important` here can raise
 	 * the floor past the library's own inline value.
 	 */
-	padding: 2px var(--size-4-2);
+	padding-block: 2px;
+	padding-inline-end: var(--size-4-2);
+	/* Clears the inset pill bar below: 4px inset + 3px width + 4px gap. */
+	padding-inline-start: calc(var(--size-4-1) + 3px + var(--size-4-2));
 	font-size: var(--font-ui-smaller);
 	min-height: 24px !important;
 	min-block-size: 24px !important;
@@ -411,6 +414,25 @@
 	 */
 	container-type: size;
 	container-name: obtask-event;
+}
+
+/*
+ * The priority bar itself: an inset pill, not a border, so it never
+ * tapers around `border-radius`. `.ec-event` is `position: relative`
+ * already (vendored `events.css`), so this absolutely-positioned
+ * pseudo-element needs no positioning change on the parent. The 24px
+ * `min-height` floor above guarantees at least 16px of pill height, so it
+ * never inverts even on the shortest (15-minute) block.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event::before {
+	content: "";
+	position: absolute;
+	inset-block: var(--size-4-1);
+	inset-inline-start: var(--size-4-1);
+	inline-size: 3px;
+	border-radius: var(--radius-l);
+	background-color: var(--obtask-dot-color, var(--text-faint));
+	pointer-events: none;
 }
 
 .obtask-calendar .ec-time-grid .ec-body .ec-event:hover {
