@@ -1,9 +1,10 @@
-import { createCalendar, DayGrid, destroyCalendar, TimeGrid } from "@event-calendar/core";
+import { createCalendar, DayGrid, destroyCalendar, Interaction, TimeGrid } from "@event-calendar/core";
 import type { Calendar } from "@event-calendar/core";
 
-import { toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
+import { fromEventCalendarDrop, toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
 import { eventContent } from "@/adapters/calendar/event-calendar/event-content";
 import type { CalendarEvent } from "@/domain/calendar-events";
+import { fromJsDate, fromJsDateTime } from "@/domain/dates";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer } from "@/ports/calendar-renderer";
 
 /**
@@ -43,7 +44,52 @@ export class EventCalendarRenderer implements CalendarRenderer {
 						},
 					};
 
-		const calendar = createCalendar(container, [DayGrid, TimeGrid], {
+		const onEventMoved = options.callbacks.onEventMoved;
+		const onSlotClick = options.callbacks.onSlotClick;
+
+		// eventDrop and eventResize differ only in which handle the user grabbed;
+		// both report the event's new position the same way, so they share one handler.
+		const applyMove = (info: Calendar.EventDropInfo | Calendar.EventResizeInfo): void => {
+			if (onEventMoved === undefined) {
+				return;
+			}
+			const moved = eventsById.get(String(info.event.id));
+			if (moved === undefined) {
+				return;
+			}
+			const { start, end } = fromEventCalendarDrop(moved, info.event);
+			// `onEventMoved` returns a `Promise` but Event Calendar's own
+			// eventDrop/eventResize callbacks aren't awaited, so the await is
+			// wrapped in a fire-and-forget async IIFE. `revert()` undoes the
+			// optimistic visual move when the write failed, which matters because a
+			// failed write changes nothing in the vault and therefore produces no
+			// re-render to correct the event's position.
+			void (async () => {
+				if (!(await onEventMoved(moved, start, end))) {
+					info.revert();
+				}
+			})();
+		};
+
+		const eventDropOption: Pick<Calendar.Options, "eventDrop"> = onEventMoved === undefined ? {} : { eventDrop: applyMove };
+		const eventResizeOption: Pick<Calendar.Options, "eventResize"> = onEventMoved === undefined ? {} : { eventResize: applyMove };
+
+		const dateClickOption: Pick<Calendar.Options, "dateClick"> =
+			onSlotClick === undefined
+				? {}
+				: {
+						dateClick: (info: Calendar.DateClickInfo) => {
+							onSlotClick(info.allDay ? fromJsDate(info.date) : fromJsDateTime(info.date));
+						},
+					};
+
+		// `Interaction` is what provides `dateClick`, and `editable`/drag and
+		// resize (`eventDrop`, `eventResize`) — `eventClick` needs no plugin,
+		// which is why M3 got away without it. The import is static (not
+		// dynamic/conditional on which callbacks `options.callbacks` wires) —
+		// this file is the composition point for the calendar library, not a
+		// place worth adding lazy-loading complexity for a plugin this small.
+		const calendar = createCalendar(container, [DayGrid, TimeGrid, Interaction], {
 			view: toEventCalendarView(options.initialView),
 			firstDay: toEventCalendarFirstDay(options.firstDay),
 			editable: options.editable ?? false,
@@ -89,7 +135,18 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				timeGridDay: "Day",
 			},
 			events: [],
+			// Roadmap M4 "long-press + drag (touch)": the library's default
+			// (1000ms) feels unresponsive next to Obsidian's own long-press
+			// affordances, so a touch has to be held for less time before it
+			// starts a drag rather than scrolling the view.
+			longPressDelay: 500,
+			// Keeps the grid auto-scrolling while dragging near its edge, so a
+			// drag can reach a slot that is off-screen on a phone.
+			dragScroll: true,
 			...eventClickOption,
+			...eventDropOption,
+			...eventResizeOption,
+			...dateClickOption,
 		});
 
 		return {
