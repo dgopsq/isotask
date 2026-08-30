@@ -1,10 +1,11 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { browser, expect } from "@wdio/globals";
 import { addDays, format, parseISO } from "date-fns";
 import { after, afterEach, before, describe, it } from "mocha";
+import { obsidianPage } from "wdio-obsidian-service";
 
 import { BUCKET_LABELS, buildFixtures } from "../fixtures.ts";
 import { BUCKET_ORDER } from "@/domain/buckets";
@@ -1241,6 +1242,299 @@ describe("Views", function () {
 			const timedIndexes = chips.map((c, i) => (c.time !== "" ? i : -1)).filter((i) => i >= 0);
 			expect(dateOnlyIndexes.length).toBeGreaterThan(0);
 			expect(Math.max(...dateOnlyIndexes)).toBeLessThan(Math.min(...timedIndexes));
+		});
+
+		/**
+		 * M4 "calendar interactions" (docs/ROADMAP.md, commits 47c9558, 866dc09,
+		 * ec9cd87): clicking an event opens its note, clicking an empty
+		 * day-grid cell opens the create-task modal pre-filled with that date,
+		 * and dragging an event reschedules the underlying task. Each test
+		 * below is self-contained about which calendar option it needs
+		 * (explicit `config.set("initialView", "month")`) rather than relying
+		 * on whatever state the tests above happened to leave the shared
+		 * `CalendarBasesView` in.
+		 */
+		async function setCalendarInitialView(view: "month" | "week" | "day"): Promise<void> {
+			await browser.executeObsidian(
+				({ app }, v: string) => {
+					const leaves = app.workspace.getLeavesOfType("bases");
+					const leaf = leaves[0];
+					if (leaf === undefined) {
+						throw new Error("no bases leaf found");
+					}
+					const outerView = leaf.view as unknown as {
+						controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+					};
+					outerView.controller.view.config.set("initialView", v);
+				},
+				view,
+			);
+		}
+
+		/**
+		 * Re-opens Tasks.base and switches to the Calendar view — used to
+		 * restore the calendar after a test navigates away from it (clicking
+		 * an event opens its note via `openLinkText(path, "", false)`, which
+		 * replaces the leaf's Bases view with the plain note). Mirrors the
+		 * top-level `before` hook + this describe's own `before` above.
+		 */
+		async function reopenCalendarView(): Promise<void> {
+			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
+			await browser.$(`.${cssClass("feed")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			// Re-clicks the views-menu toggle until the "Calendar" item shows up
+			// — a single click occasionally lands before the toolbar has
+			// finished re-attaching its handlers right after `openLinkText`
+			// swaps the leaf's view back to a freshly mounted Bases file (the
+			// menu opens then immediately closes, unlike this describe's own
+			// `before` hook above, which does this exact click sequence once
+			// against an already-settled window).
+			const calendarMenuItem = browser.$(".bases-toolbar-menu-item-name=Calendar");
+			await browser.waitUntil(
+				async () => {
+					if (await calendarMenuItem.isDisplayed().catch(() => false)) {
+						return true;
+					}
+					await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button").click();
+					return calendarMenuItem.isDisplayed().catch(() => false);
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: 'the "Calendar" view menu item never appeared' },
+			);
+			await calendarMenuItem.click();
+
+			await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
+		}
+
+		/**
+		 * Reads a raw frontmatter scalar out of a note's on-disk text (not the
+		 * parsed `metadataCache`) — the most direct proof that a drag actually
+		 * reached `app.fileManager.processFrontMatter` and landed on disk, per
+		 * AGENTS.md's frontmatter-write rule. wdio-obsidian-service copies
+		 * `e2e/vault/` into a temporary sandbox per run (`wdio.conf.mts`'s doc
+		 * comment), so the file has to be read from `obsidianPage.getVaultPath()`,
+		 * not the checked-in `e2e/vault/` path. Strips optional surrounding
+		 * quotes since Obsidian's own YAML serialiser is free to add them on a
+		 * rewrite, unlike `e2e/fixtures.ts`'s bare-scalar generator.
+		 */
+		async function frontmatterValueOnDisk(vaultRelativePath: string, key: string): Promise<string | undefined> {
+			const content = await readFile(join(obsidianPage.getVaultPath(), vaultRelativePath), "utf8");
+			const match = new RegExp(`^${key}:\\s*(.+)$`, "m").exec(content);
+			return match?.[1]?.trim().replace(/^["']|["']$/g, "");
+		}
+
+		it("clicking a calendar event opens the task note, then returns to the calendar view", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the click-to-open test" },
+			);
+
+			const events = await readCalendarEvents();
+			const index = events.findIndex((e) => e.title === "Today task" && e.className.includes(cssClass("event--due")));
+			expect(index).toBeGreaterThanOrEqual(0);
+
+			// Same technique as the hover screenshot above: read via
+			// `readCalendarEvents()` (execute round trip), act via the matching
+			// index into a `$$` array of real elements.
+			const eventEls = await browser.$$(`.${cssClass("event")}`).getElements();
+			const eventEl = eventEls[index];
+			if (eventEl === undefined) {
+				throw new Error("could not resolve the Today task due event element");
+			}
+			await eventEl.click();
+
+			await browser.waitUntil(async () => (await activeFilePath()) === "Tasks/Today task.md", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "clicking the event never opened Tasks/Today task.md",
+			});
+
+			await reopenCalendarView();
+		});
+
+		it("clicking an empty day-grid cell opens the create-task modal pre-filled with that date", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(async () => (await readCalendarEvents()).length > 0, {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "no calendar events rendered before locating an empty day cell",
+			});
+
+			// Finds a `.ec-day` cell whose rect doesn't overlap any rendered
+			// event's rect. Events overlay the day grid as a separate,
+			// absolutely positioned layer (`@event-calendar/core`'s own
+			// `View.svelte` renders `.ec-day` cells and events in two sibling
+			// containers, not events nested inside their day cell), so "empty"
+			// has to be read from geometry rather than `cell.querySelector`.
+			// Each cell's date comes from its `<time datetime="...">` child
+			// (`BaseDay.svelte`/`Day.svelte`).
+			const emptyCell = await browser.execute(
+				(calendarCls, eventCls) => {
+					const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+					const eventRects = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .${eventCls}`)).map((el) =>
+						el.getBoundingClientRect(),
+					);
+					for (let i = 0; i < cells.length; i++) {
+						const cell = cells[i];
+						if (cell === undefined) {
+							continue;
+						}
+						const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
+						if (dateAttr === null || dateAttr === undefined) {
+							continue;
+						}
+						const rect = cell.getBoundingClientRect();
+						const overlapsEvent = eventRects.some(
+							(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+						);
+						if (!overlapsEvent) {
+							return { index: i, date: dateAttr };
+						}
+					}
+					return null;
+				},
+				cssClass("calendar"),
+				cssClass("event"),
+			);
+			if (emptyCell === null) {
+				throw new Error("could not find an empty day-grid cell to click");
+			}
+
+			const dayCells = await browser.$$(`.${cssClass("calendar")} .ec-day-grid .ec-day`).getElements();
+			const dayCell = dayCells[emptyCell.index];
+			if (dayCell === undefined) {
+				throw new Error("could not resolve the empty day cell element");
+			}
+			await dayCell.click();
+
+			const modalCls = cssClass("create-task-modal");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			// The default `events: both` view option pre-fills `scheduled`, not
+			// `due` (`CalendarBasesView#prefillForSlot`), which pulls "More
+			// options" open automatically (`hasMoreOptionsPrefill`) — so the
+			// *second* `input[type="date"]` in the modal (Due is always
+			// rendered first, and stays empty here) is the pre-filled
+			// Scheduled field.
+			const scheduledInput = await inputAt(modalCls, "date", 1);
+			expect(await scheduledInput.getValue()).toEqual(emptyCell.date);
+
+			await browser.keys("Escape");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT, reverse: true });
+		});
+
+		/**
+		 * Drags "Today task"'s due event (today, month view) to an empty cell
+		 * in the same grid row using wdio's low-level pointer Actions API — plain
+		 * `.click()`/`execute()`-dispatched events don't work here because
+		 * Event Calendar's drag (`Interaction` plugin, `Action.svelte`) is
+		 * driven entirely off real `pointerdown`/`pointermove`/`pointerup`,
+		 * not a `click` or HTML5 drag-and-drop event. Verified via the note's
+		 * on-disk frontmatter (not `metadataCache`) — the most direct proof
+		 * the drag reached `processFrontMatter` and landed on disk.
+		 */
+		it("dragging an event to a different day reschedules the task", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the drag test" },
+			);
+
+			// Resolves viewport-relative center coordinates for the source
+			// event and an empty target cell, rather than WebdriverIO element
+			// handles: the pointerdown below flips the library's event display
+			// to `"ghost"`/`"preview"` (`Action.svelte#move`), which re-renders
+			// the source chip's own DOM node mid-gesture — a `move({ origin:
+			// <element> })` pointing at that same element handle later in the
+			// same action chain then fails with a stale element reference.
+			// Plain coordinates sidestep that entirely.
+			//
+			// The target is picked as an empty cell in the *same grid row* as
+			// the source (`Math.abs(rect.top - sourceRect.top)`), rather than
+			// a fixed "tomorrow" offset: month view can span several rows
+			// taller than the Obsidian window, and a fixed offset landed in
+			// the next row down on a run where "today" fell on the last day
+			// of its row (a Sunday, Monday-first week) — off-screen, which
+			// wdio's pointer actions refuse ("move target out of bounds").
+			// Same-row keeps the whole gesture within the visible viewport
+			// regardless of which weekday the suite happens to run on.
+			const dragPlan = await browser.execute(
+				(calendarCls, eventCls, dueCls, excludeDate) => {
+					const events = Array.from(document.querySelectorAll(`.${calendarCls} .${eventCls}`));
+					const sourceEl = events.find(
+						(el) => el.querySelector(".ec-event-title")?.textContent === "Today task" && el.classList.contains(dueCls),
+					);
+					if (sourceEl === undefined) {
+						return null;
+					}
+					const sourceRect = sourceEl.getBoundingClientRect();
+					const eventRects = events.map((el) => el.getBoundingClientRect());
+
+					const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+					const targetEl = cells.find((cell) => {
+						const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
+						if (dateAttr === null || dateAttr === undefined || dateAttr === excludeDate) {
+							return false;
+						}
+						const rect = cell.getBoundingClientRect();
+						if (Math.abs(rect.top - sourceRect.top) > rect.height / 2) {
+							return false;
+						}
+						return !eventRects.some(
+							(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+						);
+					});
+					if (targetEl === undefined) {
+						return null;
+					}
+					const targetDate = targetEl.querySelector("time[datetime]")?.getAttribute("datetime");
+					if (targetDate === null || targetDate === undefined) {
+						return null;
+					}
+					const targetRect = targetEl.getBoundingClientRect();
+					return {
+						date: targetDate,
+						source: { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
+						target: { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 },
+					};
+				},
+				cssClass("calendar"),
+				cssClass("event"),
+				cssClass("event--due"),
+				fixtures.today,
+			);
+			if (dragPlan === null) {
+				throw new Error("could not resolve Today task's due event and an empty same-row day cell for the drag");
+			}
+			const { date: targetDate, source, target } = dragPlan;
+
+			// A real mouse-pointer drag: down on the event, a short intermediate
+			// move to clear `eventDragMinDistance` (5px) and flip the library
+			// into its dragging state, then a move onto the target cell before
+			// releasing. `elementsFromPoint` (not `elementFromPoint`) is how the
+			// library finds the day cell underneath the visually-on-top event
+			// chip (`lib/dom.js#getElementWithPayload`), which is what makes
+			// dragging the chip itself work at all.
+			await browser
+				.action("pointer", { parameters: { pointerType: "mouse" } })
+				.move({ x: Math.round(source.x), y: Math.round(source.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.move({ x: Math.round(source.x) + 10, y: Math.round(source.y) + 10, origin: "viewport", duration: 100 })
+				.move({ x: Math.round(target.x), y: Math.round(target.y), origin: "viewport", duration: 250 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === targetDate,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${targetDate} after the drag` },
+			);
+
+			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(targetDate);
 		});
 	});
 
