@@ -147,3 +147,50 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 		expect(thisWeek.map((t) => t.title)).toEqual(["B cancelled mid", "C todo early", "Z done early", "A todo late"]);
 	});
 });
+
+describe("groupIntoBuckets — order", () => {
+	it('"preserve" keeps the incoming order, ignoring date/priority/title', () => {
+		const tasks = [
+			task({ title: "Z late low", due: date("2026-09-04"), priority: "low" }),
+			task({ title: "A early high", due: date("2026-09-03"), priority: "high" }),
+			task({ title: "M mid normal", due: date("2026-09-03"), priority: "normal" }),
+		];
+		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due", order: "preserve" });
+		const thisWeek = grouped.get("this-week") ?? [];
+		expect(thisWeek.map((t) => t.title)).toEqual(["Z late low", "A early high", "M mid normal"]);
+	});
+
+	it('"preserve" + completedAtBottom still moves terminal tasks last, keeping relative order on each side', () => {
+		const tasks = [
+			task({ title: "Z done early", due: date("2026-09-03"), status: "done" as Task["status"] }),
+			task({ title: "A todo late", due: date("2026-09-04"), status: "todo" as Task["status"] }),
+			task({ title: "B cancelled mid", due: date("2026-09-03"), status: "cancelled" as Task["status"] }),
+			task({ title: "C todo early", due: date("2026-09-03"), status: "todo" as Task["status"] }),
+		];
+		const grouped = groupIntoBuckets(tasks, {
+			today: TODAY,
+			firstDay: 0,
+			source: "due",
+			statuses: DEFAULT_STATUSES,
+			completedAtBottom: true,
+			order: "preserve",
+		});
+		const thisWeek = grouped.get("this-week") ?? [];
+		expect(thisWeek.map((t) => t.title)).toEqual(["A todo late", "C todo early", "Z done early", "B cancelled mid"]);
+	});
+
+	it('omitting `order` (or passing "smart") is unchanged from the pre-existing date/priority/title behavior', () => {
+		const tasks = [
+			task({ title: "B late high", due: date("2026-09-04"), priority: "high" }),
+			task({ title: "A early", due: date("2026-09-03"), priority: "low" }),
+			task({ title: "C late low", due: date("2026-09-04"), priority: "low" }),
+		];
+		const expected = ["A early", "B late high", "C late low"];
+
+		const omitted = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		expect((omitted.get("this-week") ?? []).map((t) => t.title)).toEqual(expected);
+
+		const explicit = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due", order: "smart" });
+		expect((explicit.get("this-week") ?? []).map((t) => t.title)).toEqual(expected);
+	});
+});

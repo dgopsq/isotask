@@ -67,6 +67,16 @@ export interface BucketOptions {
 	readonly statuses?: readonly StatusConfig[];
 	/** When true, terminal-kind tasks (see `domain/status.ts#isTerminal`) sort after all others within each bucket. Defaults to false. */
 	readonly completedAtBottom?: boolean;
+	/**
+	 * Within-bucket ordering, after the terminal/non-terminal split above.
+	 * `"smart"` (default) sorts by date (per `source`) ascending -> priority
+	 * descending -> title ascending. `"preserve"` applies no further
+	 * comparison, keeping whatever order the tasks arrived in — used when
+	 * the caller's incoming order is already meaningful (e.g. the Bases
+	 * toolbar's user-configured sort), since `Array.prototype.sort` is
+	 * stable and a comparator returning `0` never reorders equal elements.
+	 */
+	readonly order?: "smart" | "preserve";
 }
 
 function compareOptionalDate(a: Option<TaskDate>, b: Option<TaskDate>): number {
@@ -94,6 +104,9 @@ function compareWithinBucket(a: Task, b: Task, options: BucketOptions): number {
 			return terminalCompare;
 		}
 	}
+	if (options.order === "preserve") {
+		return 0;
+	}
 	const dateCompare = compareOptionalDate(taskAnchorDate(a, options.source), taskAnchorDate(b, options.source));
 	if (dateCompare !== 0) {
 		return dateCompare;
@@ -108,7 +121,9 @@ function compareWithinBucket(a: Task, b: Task, options: BucketOptions): number {
 /**
  * Groups tasks into buckets by the configured date source, sorted within
  * each bucket: (when `completedAtBottom` is set) terminal-kind tasks last,
- * then date ascending -> priority descending -> title ascending on each side.
+ * then — per `options.order` — either `"smart"` (date ascending -> priority
+ * descending -> title ascending on each side, the default) or `"preserve"`
+ * (keep the incoming order, e.g. a Bases toolbar sort, on each side).
  * Terminal-kind tasks are not excluded here — visibility is Bases' filter's
  * job (see `docs/ARCHITECTURE.md#why-views-never-filter`).
  */

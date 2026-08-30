@@ -128,6 +128,7 @@ export class FeedBasesView extends BasesView {
 				source: options.dateSource,
 				statuses,
 				completedAtBottom: options.completedAtBottom,
+				order: this.config.getSort().length === 0 ? "smart" : "preserve",
 			});
 
 			for (const bucket of BUCKET_ORDER) {

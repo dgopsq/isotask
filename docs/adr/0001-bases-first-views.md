@@ -34,6 +34,18 @@ Negative:
 - Floor raised to 1.13.0 on 2026-08-29 to use the declarative settings API (settings search);
   decided by the maintainer ("good to be on the edge").
 
+### Addendum, 2026-08-30
+
+The Bases toolbar (Sort/Filter/Properties/Search/New) is always shown for every registered view
+type and cannot be hidden or replaced per view — so each control must either visibly apply in our
+views, or its no-op must be documented rather than left to look like a bug. Filter/Properties/
+Search/New already visibly apply. Sort did not: `groupIntoBuckets` re-sorted every bucket
+regardless of `BasesViewConfig.getSort()`, making toolbar Sort silently inert in the feed. Fixed
+by having the feed pass `order: "preserve"` (`buckets.ts#BucketOptions`) whenever a sort is
+configured, keeping Bases' incoming order within each bucket instead of re-deriving one. The
+calendar's no-op remains intentional and documented (`docs/DOMAIN-MODEL.md#feed-buckets`): events
+are placed by time, not list position, so a toolbar sort has nothing to visibly change there.
+
 ## Alternatives considered
 
 - **Standalone `ItemView`s with a custom query engine.** Rejected: duplicates filter/sort/group

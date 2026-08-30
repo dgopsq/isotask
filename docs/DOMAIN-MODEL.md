@@ -119,12 +119,21 @@ week) · **Next week** (the following full week) · **Later** (after next week) 
 Terminal-kind tasks are not excluded from bucketing by the buckets function itself — whether they
 are visible at all is decided by the Bases filter on the underlying `.base` view.
 
-Within a bucket, rows sort: (when `completedAtBottom` is on) terminal-kind tasks (`domain/status.ts#isTerminal`)
-last, then — on each side of that split — date (date source) ascending -> priority descending ->
-title ascending. `completedAtBottom` reorders which tasks come first; it never replaces the
-date/priority/title ordering, only splits it into a non-terminal group and a terminal group, each
-independently sorted the same way. This ordering is fixed by the view and ignores whatever order
-Bases applied upstream; this is documented view behavior, not a bug.
+Within a bucket, rows sort: (when `completedAtBottom` is on) terminal-kind tasks
+(`domain/status.ts#isTerminal`) last, then — on each side of that split — one of two orders,
+chosen by the feed view per `this.config.getSort()` (`buckets.ts`'s `BucketOptions.order`):
+
+- **No sort configured in the Bases toolbar** (`getSort()` returns `[]`): the *smart* order — date
+  (date source) ascending -> priority descending -> title ascending.
+- **A sort is configured in the Bases toolbar**: Bases has already sorted `group.entries`
+  accordingly, and the feed keeps that order as-is within each bucket (`order: "preserve"` — the
+  within-bucket comparator applies only the `completedAtBottom` split and otherwise returns `0`,
+  relying on `Array.prototype.sort`'s stability to leave Bases' order untouched).
+
+Either way, `completedAtBottom` only reorders which tasks come first; it never replaces the
+chosen order, only splits it into a non-terminal group and a terminal group, each independently
+keeping that order. The calendar view ignores the toolbar sort entirely — its events are placed
+by time, not list position (see "Calendar event derivation" below).
 
 ### Feed view options
 
