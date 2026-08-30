@@ -70,6 +70,8 @@ export default class ObtaskPlugin extends Plugin {
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 			getWeekStart: () => this.pluginSettings.weekStart,
+			getTaskFolder: () => this.pluginSettings.taskFolder,
+			createTask,
 			renderer: calendarRenderer,
 			setStatus,
 			setPriority,

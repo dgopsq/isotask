@@ -98,10 +98,12 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			deps.notifier.error(`A file already exists at ${path}.`);
 			return;
 		}
-		const content = renderTasksBase(deps.getPropertyKeys(), deps.getStatuses(), {
-			feed: VIEW_TYPE_FEED,
-			calendar: VIEW_TYPE_CALENDAR,
-		});
+		const content = renderTasksBase(
+			deps.getPropertyKeys(),
+			deps.getStatuses(),
+			{ feed: VIEW_TYPE_FEED, calendar: VIEW_TYPE_CALENDAR },
+			deps.getTaskFolder(),
+		);
 		try {
 			const file = await deps.app.vault.create(path, content);
 			await deps.app.workspace.getLeaf().openFile(file);

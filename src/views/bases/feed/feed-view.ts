@@ -3,6 +3,7 @@ import { BasesView, Component, Menu, setIcon } from "obsidian";
 
 import type { TaskWithEntry } from "@/adapters/obsidian/bases-entries";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
+import type { makeCreateTask } from "@/app/create-task";
 import type { DateField } from "@/app/set-date";
 import type { makeSetDate } from "@/app/set-date";
 import type { makeSetDuration } from "@/app/set-duration";
@@ -30,10 +31,18 @@ import { describeTaskParseError, priorityChipClass, priorityLabel } from "@/doma
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
+import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
 import { buildPriorityMenu, priorityIcon } from "@/ui/priority-menu";
 import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
+
+/** One entry in the results-count dropdown's undocumented `getViewActions` hook (see below) — mirrors the shape read off `BasesView` instances in the Bases toolbar bundle, not exported by `obsidian.d.ts`. */
+interface BasesViewAction {
+	readonly name: string;
+	readonly icon: string;
+	readonly callback: () => void;
+}
 
 const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	overdue: "Overdue",
@@ -66,6 +75,8 @@ export interface FeedBasesViewDeps {
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
+	readonly getTaskFolder: () => string;
+	readonly createTask: ReturnType<typeof makeCreateTask>;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
@@ -107,6 +118,39 @@ export class FeedBasesView extends BasesView {
 		this.viewContainerEl.addClass(cssClass("feed"));
 
 		refreshAfterMetadataResolved(this, this.deps.app);
+	}
+
+	/**
+	 * Replaces Bases' own "New" note flow (the toolbar `+ New` button, and
+	 * anything else that calls this hook) with the full create-task modal.
+	 * Bases' default implementation infers frontmatter from the base's own
+	 * filters via `frontmatterProcessor` — for `Tasks.base` that can only
+	 * ever produce `type: task` (every status filter it reads is a `!=`,
+	 * which Bases does not use for inference), never a usable `status`. The
+	 * modal is a strictly better "new task" experience than that inferred
+	 * note, so `frontmatterProcessor` is accepted (to match the base class's
+	 * signature) but intentionally never called. `baseFileName`, when given,
+	 * seeds the modal's title field.
+	 */
+	override async createFileForView(baseFileName?: string, _frontmatterProcessor?: (frontmatter: Record<string, unknown>) => void): Promise<void> {
+		new CreateTaskModal(this.deps.app, {
+			app: this.deps.app,
+			createTask: this.deps.createTask,
+			getStatuses: this.deps.getStatuses,
+			getDefaultFolder: this.deps.getTaskFolder,
+			...(baseFileName !== undefined ? { initial: { title: baseFileName } } : {}),
+		}).open();
+	}
+
+	/**
+	 * Undocumented Bases hook: entries returned here are appended to the
+	 * results-count dropdown next to "Copy"/"Export CSV" (verified in the
+	 * Obsidian 1.13.7 bundle; not declared in `obsidian.d.ts`, so this is a
+	 * plain method rather than `override`). Offers the same create-task flow
+	 * as `createFileForView` as an explicit, discoverable action.
+	 */
+	getViewActions(): readonly BasesViewAction[] {
+		return [{ name: "New task", icon: "plus", callback: () => void this.createFileForView() }];
 	}
 
 	override onDataUpdated(): void {

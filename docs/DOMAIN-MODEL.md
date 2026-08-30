@@ -186,6 +186,31 @@ drive. The calendar's own three view options (`events`/`initialView`/`firstDay`,
 table) are unaffected either way. Toolbar Search still applies to whatever the calendar's
 `order:` contains, same as any other Bases view.
 
+### Search (Bases toolbar)
+
+The Bases toolbar's own Search box (not a plugin feature) matches against the properties listed
+in the view's `order:` — the same set "Properties (Bases toolbar)" above draws feed columns from.
+Both plugin views inherit it unmodified; there is nothing for the plugin to wire up.
+
+### New (Bases toolbar)
+
+The Bases toolbar's `+ New` button creates a plain note whose frontmatter Bases infers from the
+base file's own filters (`==`, `contains`, `hasTag`, `inFolder`, `hasProperty`, `isEmpty` — never
+`!=`) and places it in the view's `newItemFolder` (`app/generate-base.ts` emits this as the
+configured task folder on both generated views; falls back to the active file's folder / Obsidian's
+default new-note location otherwise). For `Tasks.base` that inference can only ever produce
+`type: task` — every status filter it reads is a `!=`, so no `status` is ever inferred. The note
+still parses as a normal open task: a missing `status` defaults to the first configured
+`open`-kind status (ADR 0012), and it carries the marker property, so it is a valid task from the
+moment it's created — just one with only a title and no other fields set.
+
+For a richer starting point, both views override the undocumented `createFileForView`/
+`getViewActions` Bases hooks: right-clicking the results-count area next to "Copy"/"Export CSV"
+offers a "New task" action, and the same flow backs the toolbar's `+ New` button too (a `BasesView`
+can override `createFileForView` outright) — both open the full create-task modal
+(`ui/create-task-modal.ts`) instead of the toolbar's plain-note inference, seeding its title from
+whatever name the toolbar prompted for.
+
 ### Date-chip anchor field
 
 The feed row's date chip edits whichever frontmatter property the configured `dateSource`

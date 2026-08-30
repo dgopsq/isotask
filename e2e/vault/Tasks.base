@@ -6,6 +6,7 @@ filters:
 views:
   - type: obtask-feed
     name: Feed
+    newItemFolder: Tasks
     order:
       - file.name
       - status
@@ -16,6 +17,7 @@ views:
       - tags
   - type: obtask-calendar
     name: Calendar
+    newItemFolder: Tasks
   - type: table
     name: All tasks
     order:

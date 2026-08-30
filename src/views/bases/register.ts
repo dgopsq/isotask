@@ -1,6 +1,7 @@
 import type { App, BasesAllOptions, Plugin } from "obsidian";
 import { Notice } from "obsidian";
 
+import type { makeCreateTask } from "@/app/create-task";
 import type { makeSetDate } from "@/app/set-date";
 import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
@@ -115,6 +116,8 @@ export interface RegisterViewsDeps {
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
+	readonly getTaskFolder: () => string;
+	readonly createTask: ReturnType<typeof makeCreateTask>;
 	readonly renderer: CalendarRenderer;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
@@ -137,6 +140,8 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				getPropertyKeys: deps.getPropertyKeys,
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,
+				getTaskFolder: deps.getTaskFolder,
+				createTask: deps.createTask,
 				setStatus: deps.setStatus,
 				setPriority: deps.setPriority,
 				setDate: deps.setDate,
@@ -158,6 +163,8 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				getPropertyKeys: deps.getPropertyKeys,
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,
+				getTaskFolder: deps.getTaskFolder,
+				createTask: deps.createTask,
 				renderer: deps.renderer,
 				notifier: deps.notifier,
 			}),

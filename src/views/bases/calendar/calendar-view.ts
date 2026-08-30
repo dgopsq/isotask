@@ -2,6 +2,7 @@ import type { App, QueryController } from "obsidian";
 import { BasesView } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
+import type { makeCreateTask } from "@/app/create-task";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
@@ -13,12 +14,22 @@ import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolv
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
+import { CreateTaskModal } from "@/ui/create-task-modal";
+
+/** One entry in the results-count dropdown's undocumented `getViewActions` hook — see the doc comment on `FeedBasesView`'s copy of this interface. */
+interface BasesViewAction {
+	readonly name: string;
+	readonly icon: string;
+	readonly callback: () => void;
+}
 
 export interface CalendarBasesViewDeps {
 	readonly app: App;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
+	readonly getTaskFolder: () => string;
+	readonly createTask: ReturnType<typeof makeCreateTask>;
 	readonly renderer: CalendarRenderer;
 	readonly notifier: Notifier;
 }
@@ -58,6 +69,26 @@ export class CalendarBasesView extends BasesView {
 		this.deps = deps;
 
 		refreshAfterMetadataResolved(this, this.deps.app);
+	}
+
+	/**
+	 * Replaces Bases' own "New" note flow with the full create-task modal —
+	 * see `FeedBasesView#createFileForView`'s doc comment for why
+	 * `frontmatterProcessor` is accepted but intentionally never called.
+	 */
+	override async createFileForView(baseFileName?: string, _frontmatterProcessor?: (frontmatter: Record<string, unknown>) => void): Promise<void> {
+		new CreateTaskModal(this.deps.app, {
+			app: this.deps.app,
+			createTask: this.deps.createTask,
+			getStatuses: this.deps.getStatuses,
+			getDefaultFolder: this.deps.getTaskFolder,
+			...(baseFileName !== undefined ? { initial: { title: baseFileName } } : {}),
+		}).open();
+	}
+
+	/** Undocumented Bases hook — see `FeedBasesView#getViewActions`'s doc comment. */
+	getViewActions(): readonly BasesViewAction[] {
+		return [{ name: "New task", icon: "plus", callback: () => void this.createFileForView() }];
 	}
 
 	override onDataUpdated(): void {
