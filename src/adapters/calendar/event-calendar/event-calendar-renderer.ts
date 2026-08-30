@@ -55,6 +55,13 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			}
 			const moved = eventsById.get(String(info.event.id));
 			if (moved === undefined) {
+				// Event Calendar applies a move to its own model *before*
+				// calling back, so by now the chip already sits on the new
+				// slot. If a `setEvents` landed mid-gesture and replaced the
+				// map, we can't tell which task this was and nothing will be
+				// written — so put it back rather than leaving it parked
+				// somewhere its note doesn't agree with.
+				info.revert();
 				return;
 			}
 			const { start, end } = fromEventCalendarDrop(moved, info.event);
