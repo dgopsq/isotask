@@ -1666,7 +1666,7 @@ describe("Views", function () {
 		 * navigate away or open the create-task modal) but is still a
 		 * descendant of the container, so the click bubbles focus up to it.
 		 */
-		it("undoes a drag with Cmd+Z after clicking inside the calendar container", async function () {
+		it("undoes a drag with Cmd+Z straight after the drop, with no intervening click", async function () {
 			await setCalendarInitialView("month");
 			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
 			await browser.waitUntil(
@@ -1685,7 +1685,11 @@ describe("Views", function () {
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${targetDate} after the drag` },
 			);
 
-			await browser.$(`.${cssClass("calendar")} .ec-header .ec-col-head`).click();
+			// Deliberately NO click here. Event Calendar's drag ghost leaves
+			// focus on `document.body` after a drop, which used to pop the
+			// view's keymap scope and leave Cmd+Z dead exactly when an undo
+			// had just become available; `onEventMoved` now takes focus back.
+			// Clicking first would hide that regression.
 
 			// "Mod" resolves to Cmd on macOS, Ctrl elsewhere — mirrors what
 			// `Scope.register(["Mod"], "z", ...)` itself claims.
@@ -1695,7 +1699,7 @@ describe("Views", function () {
 
 			await browser.waitUntil(
 				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === originalDue,
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Cmd+Z (after a click inside the calendar) never restored the original due date" },
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Cmd+Z straight after the drop never restored the original due date" },
 			);
 			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(originalDue);
 		});

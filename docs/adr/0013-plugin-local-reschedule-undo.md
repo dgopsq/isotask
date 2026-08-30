@@ -49,7 +49,9 @@ Negative:
   undoing a reschedule then focusing the note's editor gives an unrelated history.
 - The stack is memory-only, lost when the view is destroyed or Obsidian restarts, and an undo is
   itself a frontmatter write — it shows up in file history as a modification, not a reversal.
-- Focus-scoped keys mean Cmd+Z does nothing until the calendar has actually been clicked.
+- Focus-scoped keys mean Cmd+Z does nothing until the calendar has been interacted with. A drag or
+  resize has to take focus back explicitly, because Event Calendar's drag ghost drops focus to
+  `document.body` — otherwise the keystroke is dead at the one moment an undo exists.
 
 ## Alternatives considered
 

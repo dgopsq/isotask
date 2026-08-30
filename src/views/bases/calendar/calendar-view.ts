@@ -201,6 +201,13 @@ export class CalendarBasesView extends BasesView {
 						const result = await this.deps.rescheduleTask(event.taskPath, event.source, start, end === undefined ? none() : some(end));
 						if (result.ok) {
 							this.deps.history.record(result.value);
+							// Event Calendar replaces the dragged element with a
+							// ghost mid-gesture, so by the time the drop lands
+							// focus has fallen back to `document.body` — which
+							// popped our scope and left Cmd+Z dead at exactly the
+							// moment an undo became available. Take focus back so
+							// the keystroke is armed for the gesture just made.
+							this.viewContainerEl.focus();
 							return true;
 						}
 						this.deps.notifier.error(describeAppError(result.error));
