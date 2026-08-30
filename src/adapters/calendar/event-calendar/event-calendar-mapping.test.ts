@@ -201,6 +201,17 @@ describe("fromEventCalendarDrop", () => {
 		expect(result.start).toBe("2026-09-12T09:00");
 		expect(result.end).toBeUndefined();
 	});
+
+	it("converts an all-day due chip dragged into the time grid, writing the dropped date and time (ADR 0011 — it re-renders as an all-day chip carrying the new time)", () => {
+		const input = event({ start: date("2026-09-10"), allDay: true, source: "due" });
+		const result = fromEventCalendarDrop(input, {
+			start: toJsDate(date("2026-09-12T14:00")),
+			end: toJsDate(date("2026-09-12T14:00")),
+			allDay: false,
+		});
+		expect(result.start).toBe("2026-09-12T14:00");
+		expect(result.end).toBeUndefined();
+	});
 });
 
 describe("isObtaskEventExtendedProps", () => {

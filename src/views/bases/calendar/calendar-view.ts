@@ -1,5 +1,5 @@
 import type { App, QueryController } from "obsidian";
-import { BasesView } from "obsidian";
+import { BasesView, TFile } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { makeCreateTask, TaskDraft } from "@/app/create-task";
@@ -130,6 +130,15 @@ export class CalendarBasesView extends BasesView {
 					// `getLeaf().openFile()`, which would need a resolved `TFile`
 					// where all we hold is a path.
 					onEventClick: (event) => {
+						// `openLinkText` on a path that no longer resolves to a file
+						// creates a new, empty note there instead of failing — silently
+						// resurrecting a task deleted between render and click. Resolve
+						// first and bail with an error instead of opening in that case.
+						const file = this.deps.app.vault.getAbstractFileByPath(event.taskPath);
+						if (!(file instanceof TFile)) {
+							this.deps.notifier.error(`Task not found: ${event.taskPath}`);
+							return;
+						}
 						void this.deps.app.workspace.openLinkText(event.taskPath, "", false);
 					},
 					onEventMoved: async (event, start, end) => {

@@ -293,6 +293,24 @@ each of them a consequence of the derivation above rather than a free choice:
 - **Time-of-day survives an all-day drop.** A `scheduled` datetime with no `duration` renders as an
   all-day chip that still carries its time (ADR 0011). Moving that chip to another day changes only
   the day; the `14:30` is preserved.
+- **Dragging a `due` chip into the time grid sets its time, then it snaps back to the all-day row.**
+  `due` carries no duration field, so `dueEvent` (`domain/calendar-events.ts`) always returns
+  `allDay: true` regardless of where the chip is dropped. Dropping an all-day `due` chip onto a
+  timed slot still writes the dropped date *and* time to `due` (`fromEventCalendarDrop` takes the
+  `!drop.allDay` branch, since the drop itself landed in the time grid), but on the next render the
+  chip is derived fresh from the task and is all-day again, now carrying that time as its
+  `obtaskTime` prefix. This looks like the drag snapped back, but it did what it was supposed to:
+  it is the only way to put a time-of-day on a `due` date, since `due` never becomes a time-grid
+  block (ADR 0011).
+- **Dragging a repeating task's event moves the anchor its next occurrence is computed from.**
+  `eventsForTask` ignores `repeat` entirely (ADR 0005: one note is one occurrence), so the event on
+  the calendar is always derived from the task's own `due`/`scheduled`, never from an expanded
+  RRULE occurrence. Rescheduling that event therefore reschedules the anchor itself: `repeat`
+  (`domain/recurrence.ts#nextOccurrence`) evaluates against `due` if present, else `scheduled`
+  (`domain/transitions.ts#anchorOf`), so dragging a repeating task's `due` or `scheduled` event
+  moves the date the *next* spawned occurrence is computed from, exactly as if the date had been
+  edited in Properties. It does not touch any already-spawned occurrence note, each of which is its
+  own independent task per ADR 0005.
 
 ## Parse-error policy
 
