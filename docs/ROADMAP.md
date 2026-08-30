@@ -82,11 +82,16 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 - [x] Click empty slot -> create-task modal pre-filled with the clicked date.
 - [x] Undo/redo a reschedule: Cmd+Z / Cmd+Shift+Z while the calendar has focus, plus the
       "Undo/Redo last calendar reschedule" commands (`app/undo-reschedule.ts`, ADR 0013).
-- [ ] Touch QA pass.
+- [x] Touch QA pass: e2e drives tap-to-open, tap-to-create, and the `longPressDelay` boundary with
+      a real `pointerType: "touch"` pointer (a short press-and-move must not reschedule, a hold
+      past 500ms must). Narrow-width layout is NOT covered — see M5.
 
 ## M5 — Release
 
-- [ ] Mobile QA across the full feature set.
+- [ ] Mobile QA across the full feature set. Note `app.emulateMobile(true)` only flips the
+      `is-mobile` flags — it does not resize the window, and the e2e session has no
+      window-resize command — so real phone-width layout (toolbar wrapping, touch target
+      sizing) is still unverified and needs a device or a resizable harness.
 - [ ] GitHub Actions release workflow triggered on tag.
 - [ ] Community plugin submission.
 

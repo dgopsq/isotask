@@ -1926,6 +1926,349 @@ describe("Views", function () {
 			expect(moved).toBeDefined();
 			expect(moved?.time).toBe("09:15");
 		});
+
+		/**
+		 * M4 "Touch QA pass" (docs/ROADMAP.md): the tests above drive every
+		 * calendar gesture with `pointerType: "mouse"` (`.click()` synthesises
+		 * a MouseEvent even for the drag tests' `browser.action("pointer",
+		 * ...)` calls, which default to `pointerType: "mouse"`) — these repeat
+		 * the tap/drag/slot-tap gestures with `pointerType: "touch"` instead,
+		 * so the actual runtime config (`longPressDelay: 500`, `dragScroll:
+		 * true`, `event-calendar-renderer.ts`) is exercised, not just the
+		 * shared mapping code both pointer types funnel through.
+		 *
+		 * Verified against the vendored Event Calendar source
+		 * (`@event-calendar/core/dist/index.js`, `Interaction`'s `common()`/
+		 * `move()`): for a non-mouse `jsEvent.pointerType`, `common()` arms a
+		 * `setTimeout(..., longPressDelay)` on pointerdown that only then sets
+		 * `interacting = true` and starts applying the drag — `move()`'s mouse
+		 * branch (`distance() >= eventDragMinDistance`) is gated on
+		 * `pointerType === "mouse"`, so a touch move before that timer fires
+		 * is not treated as a drag at all (deliberately: it leaves the
+		 * gesture free to be read as a page scroll instead). This was
+		 * confirmed interactively before writing these assertions (see the
+		 * task's own throwaway `e2e/specs/zz-probe.e2e.ts`, deleted afterward
+		 * per `docs/CONVENTIONS.md`'s DOM-probing note) by running a short and
+		 * a long touch press against the same event and reading the on-disk
+		 * "due" after each.
+		 */
+		it("taps a calendar event with a touch pointer to open the task note", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the touch-tap-to-open test" },
+			);
+
+			// Viewport-relative center coordinates via `getBoundingClientRect`,
+			// not a WebdriverIO element handle — same reasoning as the mouse
+			// drag test above (a pointerdown can flip the chip's own DOM node
+			// into a "ghost"/ordinary re-render mid-gesture).
+			const eventPoint = await browser.execute(
+				(calendarCls, eventCls, dueCls, title) => {
+					const el = Array.from(document.querySelectorAll(`.${calendarCls} .${eventCls}`)).find(
+						(e) => e.querySelector(".ec-event-title")?.textContent === title && e.classList.contains(dueCls),
+					);
+					if (el === undefined) {
+						return null;
+					}
+					const rect = el.getBoundingClientRect();
+					return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+				},
+				cssClass("calendar"),
+				cssClass("event"),
+				cssClass("event--due"),
+				"Today task",
+			);
+			if (eventPoint === null) {
+				throw new Error("could not resolve Today task's due event element for the touch tap");
+			}
+
+			// A real touch tap: down and up at (almost) the same point, well
+			// under `longPressDelay` — driven through wdio's low-level pointer
+			// Actions API (as the drag tests are) rather than `.click()`, so
+			// this actually dispatches PointerEvents with `pointerType:
+			// "touch"` instead of a synthetic mouse click.
+			await browser
+				.action("pointer", { parameters: { pointerType: "touch" } })
+				.move({ x: Math.round(eventPoint.x), y: Math.round(eventPoint.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			await browser.waitUntil(async () => (await activeFilePath()) === "Tasks/Today task.md", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "tapping the event with a touch pointer never opened Tasks/Today task.md",
+			});
+
+			await reopenCalendarView();
+		});
+
+		it("tapping an empty day-grid cell with a touch pointer opens the create-task modal", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(async () => (await readCalendarEvents()).length > 0, {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "no calendar events rendered before locating an empty day cell",
+			});
+
+			// Same empty-cell geometry search as the mouse slot-tap test
+			// above, but returning the cell's own center point too so the
+			// touch gesture below doesn't need a separate element lookup.
+			const emptyCell = await browser.execute(
+				(calendarCls, eventCls) => {
+					const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+					const eventRects = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .${eventCls}`)).map((el) =>
+						el.getBoundingClientRect(),
+					);
+					for (const cell of cells) {
+						const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
+						if (dateAttr === null || dateAttr === undefined) {
+							continue;
+						}
+						const rect = cell.getBoundingClientRect();
+						const overlapsEvent = eventRects.some(
+							(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+						);
+						if (!overlapsEvent) {
+							return { date: dateAttr, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+						}
+					}
+					return null;
+				},
+				cssClass("calendar"),
+				cssClass("event"),
+			);
+			if (emptyCell === null) {
+				throw new Error("could not find an empty day-grid cell to tap");
+			}
+
+			await browser
+				.action("pointer", { parameters: { pointerType: "touch" } })
+				.move({ x: Math.round(emptyCell.x), y: Math.round(emptyCell.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			const modalCls = cssClass("create-task-modal");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			// Same reasoning as the mouse slot-tap test above: `events: both`
+			// pre-fills Scheduled (the second `input[type="date"]`), which
+			// pulls "More options" open automatically.
+			const scheduledInput = await inputAt(modalCls, "date", 1);
+			expect(await scheduledInput.getValue()).toEqual(emptyCell.date);
+
+			await browser.keys("Escape");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT, reverse: true });
+		});
+
+		/**
+		 * Resolves "Today task"'s due chip and an empty same-row day-grid
+		 * cell — the same target-selection logic as
+		 * `dragTodayTaskDueToEmptyCellSameRow` above, factored out here
+		 * (without performing the gesture) because the short- and long-press
+		 * touch tests below need the identical source/target pair but drive
+		 * it with different pointer-action timings.
+		 */
+		async function resolveTodayTaskDragPlan(excludeDate: string): Promise<{
+			readonly date: string;
+			readonly source: { readonly x: number; readonly y: number };
+			readonly target: { readonly x: number; readonly y: number };
+		}> {
+			const plan = await browser.execute(
+				(calendarCls, eventCls, dueCls, excludeDateArg) => {
+					const events = Array.from(document.querySelectorAll(`.${calendarCls} .${eventCls}`));
+					const sourceEl = events.find(
+						(el) => el.querySelector(".ec-event-title")?.textContent === "Today task" && el.classList.contains(dueCls),
+					);
+					if (sourceEl === undefined) {
+						return null;
+					}
+					const sourceRect = sourceEl.getBoundingClientRect();
+					const eventRects = events.map((el) => el.getBoundingClientRect());
+					const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+					const targetEl = cells.find((cell) => {
+						const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
+						if (dateAttr === null || dateAttr === undefined || dateAttr === excludeDateArg) {
+							return false;
+						}
+						const rect = cell.getBoundingClientRect();
+						if (Math.abs(rect.top - sourceRect.top) > rect.height / 2) {
+							return false;
+						}
+						return !eventRects.some(
+							(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+						);
+					});
+					if (targetEl === undefined) {
+						return null;
+					}
+					const targetDate = targetEl.querySelector("time[datetime]")?.getAttribute("datetime");
+					if (targetDate === null || targetDate === undefined) {
+						return null;
+					}
+					const targetRect = targetEl.getBoundingClientRect();
+					return {
+						date: targetDate,
+						source: { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
+						target: { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 },
+					};
+				},
+				cssClass("calendar"),
+				cssClass("event"),
+				cssClass("event--due"),
+				excludeDate,
+			);
+			if (plan === null) {
+				throw new Error('could not resolve "Today task"\'s due event and an empty same-row day cell for a touch drag');
+			}
+			return plan;
+		}
+
+		it("a short touch press-and-move on an event does not reschedule it (below the long-press delay)", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the short-press test" },
+			);
+
+			const originalDue = await frontmatterValueOnDisk("Tasks/Today task.md", "due");
+			if (originalDue === undefined) {
+				throw new Error('Today task has no on-disk "due" to compare against');
+			}
+			const plan = await resolveTodayTaskDragPlan(originalDue);
+
+			// Down, a small move well inside the 500ms `longPressDelay`, then
+			// up — short enough overall (~200ms total) that the library's
+			// per-pointerdown timer (see the doc comment above) never fires,
+			// so `interacting` never becomes true and the move is ignored
+			// rather than treated as a drag (a real touch device would let
+			// this scroll the page instead).
+			await browser
+				.action("pointer", { parameters: { pointerType: "touch" } })
+				.move({ x: Math.round(plan.source.x), y: Math.round(plan.source.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(100)
+				.move({ x: Math.round(plan.source.x) + 15, y: Math.round(plan.source.y) + 15, origin: "viewport", duration: 60 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			// There's no frontmatter change to poll for here (this asserts a
+			// non-event) — same "let the fire-and-forget handling settle,
+			// then read" technique as "does not spawn a duplicate when
+			// completed again" in the Actions suite below.
+			await browser.pause(400);
+			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(originalDue);
+		});
+
+		it("a long-press past the 500ms delay, then drag, reschedules the event (touch)", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Today task" && e.className.includes(cssClass("event--due"))),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Today task's due event never appeared for the long-press-drag test" },
+			);
+
+			const originalDue = await frontmatterValueOnDisk("Tasks/Today task.md", "due");
+			if (originalDue === undefined) {
+				throw new Error('Today task has no on-disk "due" to compare against');
+			}
+			const plan = await resolveTodayTaskDragPlan(originalDue);
+
+			// Hold well past the 500ms `longPressDelay` before moving at all —
+			// the library arms the drag machinery on pointerdown but (per the
+			// short-press test above) only starts actually applying the move
+			// once that timer fires, so the hold has to genuinely exceed
+			// 500ms for this drag to take effect.
+			await browser
+				.action("pointer", { parameters: { pointerType: "touch" } })
+				.move({ x: Math.round(plan.source.x), y: Math.round(plan.source.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(650)
+				.move({ x: Math.round(plan.source.x) + 10, y: Math.round(plan.source.y) + 10, origin: "viewport", duration: 100 })
+				.move({ x: Math.round(plan.target.x), y: Math.round(plan.target.y), origin: "viewport", duration: 250 })
+				.pause(50)
+				.up({ button: 0 })
+				.perform();
+
+			await browser.waitUntil(
+				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === plan.date,
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${plan.date} after the touch long-press drag` },
+			);
+			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(plan.date);
+		});
+
+		/**
+		 * M4 "Touch QA pass" mobile-emulation smoke check. Obsidian exposes
+		 * an undocumented `app.emulateMobile(boolean)` (present at runtime,
+		 * confirmed by probing it in a throwaway spec before writing this
+		 * test — it's not declared in `obsidian.d.ts`) that flips the same
+		 * `is-mobile`/`is-tablet` body classes and mobile API flags a real
+		 * mobile client carries. It does NOT resize the window to phone
+		 * dimensions, and wdio-obsidian-service's Electron session exposes no
+		 * WebDriver window-resize command to do that ourselves (confirmed the
+		 * same way: `browser.setWindowSize()` fails here with "unknown
+		 * command: 'Browser.getWindowForTarget'") — so this only checks that
+		 * the calendar still renders correctly under the mobile *behavior*
+		 * flags at the suite's normal (desktop-sized) window, not whether the
+		 * layout holds up at an actual phone width. `E2E_SCREENSHOT=1` saves
+		 * `calendar-mobile-emulated.png` for manual visual review of that
+		 * narrower question.
+		 */
+		it("still renders the calendar under app.emulateMobile(true)", async function () {
+			await browser.executeObsidian(({ app }) => {
+				(app as unknown as { emulateMobile: (v: boolean) => void }).emulateMobile(true);
+			});
+
+			try {
+				// emulateMobile(true) tears down the active leaf's view (it
+				// comes back as an empty "New tab" pane) rather than
+				// re-rendering the Bases view in place, so the base and its
+				// Calendar view have to be reopened the same way the
+				// top-level `before` hooks do.
+				await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
+				await browser.$(`.${cssClass("feed")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+				// Same retry-click as `reopenCalendarView()` above: right after
+				// `openLinkText` swaps the leaf's view back in, the toolbar can
+				// take a moment to (re)attach its handlers, so a single click
+				// on the views-menu toggle occasionally opens then immediately
+				// closes the menu.
+				const calendarMenuItem = browser.$(".bases-toolbar-menu-item-name=Calendar");
+				await browser.waitUntil(
+					async () => {
+						if (await calendarMenuItem.isDisplayed().catch(() => false)) {
+							return true;
+						}
+						await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button").click();
+						return calendarMenuItem.isDisplayed().catch(() => false);
+					},
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: 'the "Calendar" view menu item never appeared under mobile emulation' },
+				);
+				await calendarMenuItem.click();
+				await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+				await browser.waitUntil(async () => (await readCalendarEvents()).length > 0, {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: "no calendar events rendered under app.emulateMobile(true)",
+				});
+				await expect(browser.$(`.${cssClass("calendar")} .ec`)).toExist();
+
+				if (process.env["E2E_SCREENSHOT"] === "1") {
+					await saveScreenshot("calendar-mobile-emulated");
+				}
+			} finally {
+				await browser.executeObsidian(({ app }) => {
+					(app as unknown as { emulateMobile: (v: boolean) => void }).emulateMobile(false);
+				});
+				await reopenCalendarView();
+			}
+		});
 	});
 
 	it("has no console errors in the Obsidian window", async function () {
