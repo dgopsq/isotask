@@ -28,5 +28,4 @@ export interface RescheduleHistory {
 	readonly pushUndone: (entry: RescheduleEntry) => void;
 	readonly takeRedo: () => Option<RescheduleEntry>;
 	readonly pushRedone: (entry: RescheduleEntry) => void;
-	readonly clear: () => void;
 }

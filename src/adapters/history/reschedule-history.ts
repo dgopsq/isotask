@@ -43,8 +43,5 @@ export function makeRescheduleHistory(limit = 20): RescheduleHistory {
 		pushRedone: (entry) => {
 			history = pushRedone(history, entry);
 		},
-		clear: () => {
-			history = emptyHistory();
-		},
 	};
 }

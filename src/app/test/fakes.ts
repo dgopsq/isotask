@@ -184,10 +184,6 @@ export class FakeRescheduleHistory implements RescheduleHistory {
 	pushRedone = (entry: RescheduleEntry): void => {
 		this.history = pushRedone(this.history, entry);
 	};
-
-	clear = (): void => {
-		this.history = emptyHistory();
-	};
 }
 
 /** Records every `info`/`error` call instead of showing a real `Notice`. */
