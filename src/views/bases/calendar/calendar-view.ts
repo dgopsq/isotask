@@ -3,7 +3,7 @@ import { BasesView } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { CalendarEvent } from "@/domain/calendar-events";
-import { eventsForTask } from "@/domain/calendar-events";
+import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import { parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
@@ -94,7 +94,12 @@ export class CalendarBasesView extends BasesView {
 			this.applied = { view: options.initialView, firstDay };
 		}
 
-		handle.setEvents(events);
+		// Event Calendar normalises all-day events' `start` to midnight
+		// before its own (stable) sort, so same-day chips at different
+		// times of day would tie there and keep insertion order — sorting
+		// here is what actually puts them in time order on screen (see
+		// `sortCalendarEvents`'s doc comment).
+		handle.setEvents(sortCalendarEvents(events));
 		const applied = this.applied;
 		if (applied?.view !== options.initialView) {
 			handle.setView(options.initialView);

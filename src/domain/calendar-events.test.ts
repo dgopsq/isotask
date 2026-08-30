@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CalendarEvent, CalendarEventsOptions } from "@/domain/calendar-events";
-import { eventsForTask } from "@/domain/calendar-events";
+import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarEventsSource } from "@/domain/calendar-view-options";
 import type { TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
@@ -143,5 +143,70 @@ describe("eventsForTask", () => {
 			repeat: rule("FREQ=WEEKLY;BYDAY=MO"),
 		});
 		expect(eventsFor(t, "due")).toHaveLength(1);
+	});
+});
+
+function calendarEvent(overrides: Partial<CalendarEvent> & { readonly id: string; readonly start: TaskDate }): CalendarEvent {
+	return {
+		taskPath: `${overrides.id}.md` as TaskPath,
+		title: overrides.id,
+		allDay: true,
+		source: "due",
+		priority: "normal",
+		...overrides,
+	};
+}
+
+describe("sortCalendarEvents", () => {
+	it("puts a date-only chip before a timed chip on the same day", () => {
+		const timed = calendarEvent({ id: "timed", start: date("2026-09-04T09:00") });
+		const dateOnly = calendarEvent({ id: "date-only", start: date("2026-09-04") });
+		expect(sortCalendarEvents([timed, dateOnly]).map((e) => e.id)).toEqual(["date-only", "timed"]);
+	});
+
+	it("orders same-day timed chips by time of day", () => {
+		const late = calendarEvent({ id: "late", start: date("2026-09-04T14:30") });
+		const early = calendarEvent({ id: "early", start: date("2026-09-04T09:15") });
+		const mid = calendarEvent({ id: "mid", start: date("2026-09-04T11:45") });
+		expect(sortCalendarEvents([late, early, mid]).map((e) => e.id)).toEqual(["early", "mid", "late"]);
+	});
+
+	it("orders events on different days by date first, regardless of time of day", () => {
+		const laterDayEarlyTime = calendarEvent({ id: "later-day", start: date("2026-09-05T00:01") });
+		const earlierDayLateTime = calendarEvent({ id: "earlier-day", start: date("2026-09-04T23:59") });
+		expect(sortCalendarEvents([laterDayEarlyTime, earlierDayLateTime]).map((e) => e.id)).toEqual([
+			"earlier-day",
+			"later-day",
+		]);
+	});
+
+	it("breaks a same-start tie by title", () => {
+		const b = calendarEvent({ id: "b-id", start: date("2026-09-04T09:00"), title: "Bravo" });
+		const a = calendarEvent({ id: "a-id", start: date("2026-09-04T09:00"), title: "Alpha" });
+		expect(sortCalendarEvents([b, a]).map((e) => e.title)).toEqual(["Alpha", "Bravo"]);
+	});
+
+	it("breaks a same-start-and-title tie by id, deterministically", () => {
+		const two = calendarEvent({ id: "b", start: date("2026-09-04"), title: "Same" });
+		const one = calendarEvent({ id: "a", start: date("2026-09-04"), title: "Same" });
+		expect(sortCalendarEvents([two, one]).map((e) => e.id)).toEqual(["a", "b"]);
+	});
+
+	it("is stable for fully identical sort keys", () => {
+		const first = calendarEvent({ id: "x", start: date("2026-09-04"), title: "Same" });
+		const second = { ...first, source: "scheduled" } as CalendarEvent;
+		expect(sortCalendarEvents([first, second])).toEqual([first, second]);
+	});
+
+	it("does not mutate the input array and returns a new one", () => {
+		const events = [calendarEvent({ id: "b", start: date("2026-09-05") }), calendarEvent({ id: "a", start: date("2026-09-04") })];
+		const original = [...events];
+		const sorted = sortCalendarEvents(events);
+		expect(events).toEqual(original);
+		expect(sorted).not.toBe(events);
+	});
+
+	it("returns an empty array unchanged", () => {
+		expect(sortCalendarEvents([])).toEqual([]);
 	});
 });

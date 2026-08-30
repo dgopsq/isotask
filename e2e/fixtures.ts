@@ -204,15 +204,37 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			title: "Deadline call",
 			// A timed `due` with no `scheduled` — `due` never carries a
 			// `duration` field, so per ADR 0011 this is a zero-duration point
-			// event: it renders as an all-day chip prefixed with its time
-			// ("14:30 Deadline call"), never as a marker inside the time-grid
-			// body. `views.e2e.ts`'s week-view test asserts both halves of
-			// that: present (prefixed) in `.ec-all-day`, absent from
-			// `.ec-time-grid .ec-body`. Bucket is "today" like the other
-			// due-today fixtures — `bucketFor` strips the time component
-			// before comparing.
+			// event: it renders as an all-day chip with its time as a separate
+			// label in front of the title ("14:30" + "Deadline call"), never
+			// as a marker inside the time-grid body. `views.e2e.ts`'s week-view
+			// test asserts both halves of that: present in `.ec-all-day`,
+			// absent from `.ec-time-grid .ec-body`. Bucket is "today" like the
+			// other due-today fixtures — `bucketFor` strips the time
+			// component before comparing.
 			frontmatter: { type: "task", status: "todo", due: `${today}T14:30`, priority: "normal" },
 			body: "Generated e2e fixture: timed due, no scheduled.",
+			bucket: dueToday.bucket,
+		},
+		{
+			filename: "Early ping.md",
+			title: "Early ping",
+			// A second timed `due` today, earlier than "Deadline call" — with
+			// "Late ping" below, these three timed-due chips (09:15, 11:45,
+			// 14:30) plus "Today task"'s date-only due chip give
+			// `views.e2e.ts` a same-day set to assert all-day chip ordering
+			// on: date-only first, then timed chips by time of day
+			// (`domain/calendar-events.ts#sortCalendarEvents`).
+			frontmatter: { type: "task", status: "todo", due: `${today}T09:15`, priority: "normal" },
+			body: "Generated e2e fixture: timed due, earlier than Deadline call, for chip-ordering.",
+			bucket: dueToday.bucket,
+		},
+		{
+			filename: "Late ping.md",
+			title: "Late ping",
+			// A third timed `due` today, between "Early ping" and "Deadline
+			// call" — see "Early ping" above.
+			frontmatter: { type: "task", status: "todo", due: `${today}T11:45`, priority: "normal" },
+			body: "Generated e2e fixture: timed due, between Early ping and Deadline call, for chip-ordering.",
 			bucket: dueToday.bucket,
 		},
 	];

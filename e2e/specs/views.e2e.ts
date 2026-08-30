@@ -945,6 +945,49 @@ describe("Views", function () {
 			);
 			expect(timeGridTitles.some((title) => title.includes("Deadline call"))).toBe(false);
 		});
+
+		/**
+		 * "Early ping" (09:15), "Late ping" (11:45) and "Deadline call"
+		 * (14:30) are three timed-`due` fixtures today (`e2e/fixtures.ts`),
+		 * alongside at least one date-only due-today fixture ("Today task").
+		 * Event Calendar normalises all-day events' `start` to midnight
+		 * before its own (stable) sort, so same-day chips at different times
+		 * of day would tie there and keep insertion order — this is what
+		 * `domain/calendar-events.ts#sortCalendarEvents` (applied in
+		 * `calendar-view.ts` before events reach the renderer) actually
+		 * fixes: date-only chips first, then timed chips in time order.
+		 * Runs on the day view left active by the previous test, whose
+		 * all-day row holds only today's chips (a broader view would also
+		 * capture other days' chips, whose relative order isn't this test's
+		 * concern).
+		 */
+		it("orders today's all-day chips: date-only first, then timed chips by time of day", async function () {
+			const chips = await readAllDayChips();
+
+			const earlyIndex = chips.findIndex((c) => c.title === "Early ping");
+			const lateIndex = chips.findIndex((c) => c.title === "Late ping");
+			const deadlineIndex = chips.findIndex((c) => c.title === "Deadline call");
+			expect(earlyIndex).toBeGreaterThanOrEqual(0);
+			expect(lateIndex).toBeGreaterThanOrEqual(0);
+			expect(deadlineIndex).toBeGreaterThanOrEqual(0);
+			expect(earlyIndex).toBeLessThan(lateIndex);
+			expect(lateIndex).toBeLessThan(deadlineIndex);
+
+			expect(chips[earlyIndex]?.time).toBe("09:15");
+			expect(chips[lateIndex]?.time).toBe("11:45");
+			expect(chips[deadlineIndex]?.time).toBe("14:30");
+
+			// Every date-only chip (no `.obtask-event-time` label, e.g. "Today
+			// task") comes before every timed chip — checked as "the last
+			// date-only chip's index is before the first timed chip's index"
+			// rather than a hard-coded date-only title list, since which
+			// other fixtures land in today's all-day row isn't this test's
+			// concern.
+			const dateOnlyIndexes = chips.map((c, i) => (c.time === "" ? i : -1)).filter((i) => i >= 0);
+			const timedIndexes = chips.map((c, i) => (c.time !== "" ? i : -1)).filter((i) => i >= 0);
+			expect(dateOnlyIndexes.length).toBeGreaterThan(0);
+			expect(Math.max(...dateOnlyIndexes)).toBeLessThan(Math.min(...timedIndexes));
+		});
 	});
 
 	it("has no console errors in the Obsidian window", async function () {

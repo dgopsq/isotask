@@ -186,6 +186,11 @@ Each task can contribute up to two calendar events, controlled by the `events` v
   renders it as `.obtask-event-time`, styled in `styles/calendar.css`) — the time-grid position is
   not shown, only the day and the label. A genuinely date-only chip carries no `obtaskTime` and
   shows no label.
+- Chips are ordered within the calendar by `domain/calendar-events.ts#sortCalendarEvents`
+  (start, then title, then id) before being handed to the renderer — Event Calendar normalises
+  all-day events' `start` to midnight before its own (stable) sort, so without this pre-sort,
+  same-day chips at different times of day would tie there and keep insertion order instead of
+  time order.
 
 A task with both `due` and `scheduled` set and `events: both` produces two separate calendar
 events for the same task. Event color follows `priority` by reusing the feed's existing

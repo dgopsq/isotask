@@ -105,3 +105,39 @@ export function eventsForTask(task: Task, options: CalendarEventsOptions): reado
 
 	return events;
 }
+
+/**
+ * Stable sort by `start` (ISO string compare — a date-only `TaskDate` like
+ * `"2026-09-04"` is a strict string-prefix of, and so sorts before, any
+ * timed value on the same day, e.g. `"2026-09-04T09:00"`; among timed
+ * values it sorts by time of day), then `title`, then `id` for full
+ * determinism. Exists because Event Calendar normalises all-day events'
+ * `start` to midnight before its own (stable) sort, so same-day chips that
+ * carry different times of day would otherwise tie and keep whatever order
+ * they were handed in — this pre-sort is what actually decides their
+ * on-screen order. Called by `views/bases/calendar/calendar-view.ts` on the
+ * assembled event list before handing it to `CalendarHandle#setEvents`.
+ */
+export function sortCalendarEvents(events: readonly CalendarEvent[]): readonly CalendarEvent[] {
+	return [...events].sort((a, b) => {
+		if (a.start < b.start) {
+			return -1;
+		}
+		if (a.start > b.start) {
+			return 1;
+		}
+		if (a.title < b.title) {
+			return -1;
+		}
+		if (a.title > b.title) {
+			return 1;
+		}
+		if (a.id < b.id) {
+			return -1;
+		}
+		if (a.id > b.id) {
+			return 1;
+		}
+		return 0;
+	});
+}
