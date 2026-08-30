@@ -39,6 +39,17 @@ export interface CalendarOptions {
 	readonly firstDay: Weekday;
 	/** Whether events can be dragged/resized. Defaults to `false`, which is also what a mount with no `onEventMoved` gets in practice. */
 	readonly editable?: boolean;
+	/**
+	 * Whether the pane is too narrow for a full 7-column week/month grid at
+	 * mount time. This is a LAYOUT fact — the calendar pane's own width
+	 * (`views/bases/calendar/calendar-view.ts` measures `clientWidth` against
+	 * `domain/calendar-view-options.ts`'s `COMPACT_CALENDAR_WIDTH`) — it is
+	 * NOT "is this a mobile client": a narrow split pane on desktop is
+	 * compact, a full-width pane on a phone in landscape isn't. Defaults to
+	 * `false`. See `CalendarHandle.setCompact` for how this is kept current
+	 * after mount.
+	 */
+	readonly compact?: boolean;
 	readonly callbacks: CalendarCallbacks;
 }
 
@@ -54,6 +65,25 @@ export interface CalendarHandle {
 	 * no live-update path to drive it from yet.
 	 */
 	readonly setFirstDay: (firstDay: Weekday) => void;
+	/**
+	 * Switches the "compact" (narrow-pane) chrome on or off — see
+	 * `CalendarOptions.compact` for what "compact" means (a pane-width fact,
+	 * never "is mobile"). In the Event Calendar adapter this means: dropping
+	 * `dayGridMonth` from the view switcher, giving `timeGridWeek` a rolling
+	 * `duration: { days: 3 }` (relabelled "3 days"), or restoring the normal
+	 * 7-day week + month button when switched back off.
+	 *
+	 * A live probe against the vendored @event-calendar/core@5.12.0 found
+	 * that none of `headerToolbar`, `buttonText`, or a per-view `duration`
+	 * override survive a plain `calendar.setOption(...)` once the user next
+	 * switches views — Event Calendar re-applies its CONSTRUCTION-TIME
+	 * per-view options snapshot on every view switch, silently overwriting
+	 * whatever was set live. The adapter therefore destroys and remounts its
+	 * widget here, preserving the currently displayed date (`getOption("date")`
+	 * before destroying, fed back in as the new mount's `date`) so the user
+	 * doesn't lose their navigated position.
+	 */
+	readonly setCompact: (compact: boolean) => void;
 	readonly goTo: (date: IsoDate) => void;
 	readonly next: () => void;
 	readonly prev: () => void;

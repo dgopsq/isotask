@@ -274,6 +274,28 @@ left-edge accent bar (`--text-muted`/`--text-faint`). No recurrence expansion: `
 never reads `repeat` — one note is one occurrence (ADR 0005), so a recurring task's calendar
 presence is exactly its own `due`/`scheduled` values, with no future-occurrence events synthesized.
 
+### Narrow-pane compaction
+
+Below `COMPACT_CALENDAR_WIDTH` (640px, `domain/calendar-view-options.ts`) a 7-column week/month
+grid has no room left for a legible event chip — at a 390px phone viewport a month cell is ~53px
+wide, room for a priority dot and nothing else. `views/bases/calendar/calendar-view.ts` measures
+the calendar **pane's own width** (`clientWidth`), not `is-mobile`: a narrow split pane on desktop
+gets the same treatment as a phone, and a full-width pane on a phone in landscape doesn't.
+
+Below the threshold, `domain/calendar-view-options.ts#effectiveCalendarView` maps `"month"` to
+`"week"` — which the Event Calendar adapter then draws not as the usual 7 days but as a **rolling
+3-day window** (`"3 days"` in the header, replacing "Week"; "Month" is dropped from the view
+switcher entirely). `"day"` and `"week"` already fit a narrow pane and pass through unchanged. The
+window is rolling from wherever the calendar is currently navigated to, not snapped to `firstDay` —
+confirmed against the vendored Event Calendar's own range derivation, which only snaps to
+`firstDay` for whole-week/month durations.
+
+**Known wart**: Bases' own view-option dropdown still lists "Month" (Bases view options can't vary
+at runtime by pane width — they're static per-`.base`-file config), so a user (or a saved `.base`
+file) choosing "Month" on a narrow pane silently renders 3 days instead of a 7-column grid. This is
+accepted, not a bug to fix — the alternative (hiding "Month" from the dropdown itself) would need
+the dropdown's own options to vary by live pane width, which Bases doesn't support.
+
 ### Reschedule semantics
 
 Dragging or resizing a calendar event writes back through `app/reschedule-task.ts`, which builds a

@@ -9,7 +9,7 @@ import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
-import { parseCalendarViewOptions } from "@/domain/calendar-view-options";
+import { COMPACT_CALENDAR_WIDTH, effectiveCalendarView, parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
 import { none, some } from "@/domain/result";
@@ -66,14 +66,21 @@ export class CalendarBasesView extends BasesView {
 	private readonly deps: CalendarBasesViewDeps;
 	private handle: CalendarHandle | undefined;
 	private invalidLineEl: HTMLElement | undefined;
+	/** The `.obtask-calendar` root the renderer is mounted into — kept so `obtask-calendar--compact` can be toggled on it from `onResize` as well as `onDataUpdated`. */
+	private calendarRootEl: HTMLElement | undefined;
 	/**
-	 * The view/firstDay last pushed to the handle. `onDataUpdated` fires on
-	 * every vault change, and the user may have switched views in the
-	 * calendar's own toolbar since the last one — re-applying the configured
-	 * `initialView` unconditionally would snap them back. Only a change to the
-	 * option itself is pushed.
+	 * The view/firstDay/compact last pushed to the handle. `onDataUpdated`
+	 * fires on every vault change, and the user may have switched views in
+	 * the calendar's own toolbar since the last one — re-applying the
+	 * configured `initialView` unconditionally would snap them back. Only a
+	 * change to one of these three is pushed. `compact` is a pane-width fact
+	 * (see `isCompact`), not part of the Bases config, but it's tracked here
+	 * for exactly the same reason: `onResize` fires far more often than the
+	 * width actually crosses the threshold, and `setCompact` destroys and
+	 * remounts the whole widget (`event-calendar-renderer.ts`), so it must
+	 * only be called on an actual change.
 	 */
-	private applied: { readonly view: CalendarViewKind; readonly firstDay: Weekday } | undefined;
+	private applied: { readonly view: CalendarViewKind; readonly firstDay: Weekday; readonly compact: boolean } | undefined;
 	/** Whether `scope` is currently pushed onto `app.keymap`'s scope stack — see the `focusin`/`focusout` handlers below. */
 	private scopePushed = false;
 	private readonly scope: Scope;
@@ -148,7 +155,7 @@ export class CalendarBasesView extends BasesView {
 		const keys = this.deps.getPropertyKeys();
 		const statuses = this.deps.getStatuses();
 		const options = parseCalendarViewOptions(this.config);
-		const firstDay = options.firstDay === "default" ? this.deps.getWeekStart() : options.firstDay;
+		const effective = this.computeEffective();
 
 		// The calendar has no notion of Bases' outer `groupedData` groups (a
 		// timeline can't be split into separate group sections the way the
@@ -169,9 +176,11 @@ export class CalendarBasesView extends BasesView {
 			this.viewContainerEl.empty();
 			this.invalidLineEl = this.viewContainerEl.createDiv({ cls: cssClass("calendar__invalid") });
 			const root = this.viewContainerEl.createDiv({ cls: cssClass("calendar") });
+			this.calendarRootEl = root;
 			handle = this.deps.renderer.mount(root, {
-				initialView: options.initialView,
-				firstDay,
+				initialView: effective.view,
+				firstDay: effective.firstDay,
+				compact: effective.compact,
 				// Unconditional: every other calendar view option changes what
 				// is *shown*, whereas a read-only toggle would change what is
 				// *permitted*, and a user who doesn't want to drag simply
@@ -219,7 +228,7 @@ export class CalendarBasesView extends BasesView {
 				},
 			});
 			this.handle = handle;
-			this.applied = { view: options.initialView, firstDay };
+			this.applied = effective;
 		}
 
 		// Event Calendar normalises all-day events' `start` to midnight
@@ -228,14 +237,7 @@ export class CalendarBasesView extends BasesView {
 		// here is what actually puts them in time order on screen (see
 		// `sortCalendarEvents`'s doc comment).
 		handle.setEvents(sortCalendarEvents(events));
-		const applied = this.applied;
-		if (applied?.view !== options.initialView) {
-			handle.setView(options.initialView);
-		}
-		if (applied?.firstDay !== firstDay) {
-			handle.setFirstDay(firstDay);
-		}
-		this.applied = { view: options.initialView, firstDay };
+		this.applyEffective(effective);
 		this.renderInvalidLine(invalidCount);
 	}
 
@@ -250,7 +252,75 @@ export class CalendarBasesView extends BasesView {
 		this.handle?.destroy();
 		this.handle = undefined;
 		this.applied = undefined;
+		this.calendarRootEl = undefined;
 		super.onunload();
+	}
+
+	/**
+	 * Undocumented-but-real Bases hook (see `getViewActions`'s doc comment
+	 * for the pattern): called when the leaf's own size changes — a pane
+	 * resize, a split being dragged, the workspace layout changing — without
+	 * a corresponding `onDataUpdated`. `onDataUpdated` alone would leave the
+	 * calendar showing 7-column chrome after the user drags a pane narrower
+	 * (or vice versa) until the next vault-driven re-render.
+	 */
+	onResize(): void {
+		if (this.handle === undefined) {
+			return;
+		}
+		this.applyEffective(this.computeEffective());
+	}
+
+	/**
+	 * Whether the pane is too narrow to sensibly render a 7-column week/month
+	 * grid — see `domain/calendar-view-options.ts`'s `COMPACT_CALENDAR_WIDTH`.
+	 * A pane-width fact, not "is this a mobile client": a narrow split pane
+	 * on desktop is compact, a full-width pane on a phone in landscape isn't.
+	 * `clientWidth` is `0` before the container has ever been laid out (e.g.
+	 * a view created in a background/hidden tab) — treated as "not compact"
+	 * rather than the false positive an unmeasured `0 < 640` would give.
+	 */
+	private isCompact(): boolean {
+		const width = this.viewContainerEl.clientWidth;
+		return width > 0 && width < COMPACT_CALENDAR_WIDTH;
+	}
+
+	/** The view/firstDay/compact that should currently be in effect, derived from the Bases config and the pane's current width. */
+	private computeEffective(): { readonly view: CalendarViewKind; readonly firstDay: Weekday; readonly compact: boolean } {
+		const options = parseCalendarViewOptions(this.config);
+		const firstDay = options.firstDay === "default" ? this.deps.getWeekStart() : options.firstDay;
+		const compact = this.isCompact();
+		return { view: effectiveCalendarView(options.initialView, compact), firstDay, compact };
+	}
+
+	/**
+	 * Pushes onto the handle whichever of view/firstDay/compact actually
+	 * changed since the last push, and keeps the `obtask-calendar--compact`
+	 * class (which `styles/calendar.css` keys its header compaction off of)
+	 * in sync with the same `compact` value the JS just computed — one
+	 * source of truth for the breakpoint instead of a second, drifting CSS
+	 * media query. Toggling the class is unconditional (cheap and
+	 * idempotent) rather than gated on "did compact change", so it can never
+	 * drift from `effective.compact` even if a future edit adds another
+	 * early-return before it.
+	 */
+	private applyEffective(effective: { readonly view: CalendarViewKind; readonly firstDay: Weekday; readonly compact: boolean }): void {
+		const handle = this.handle;
+		if (handle === undefined) {
+			return;
+		}
+		const applied = this.applied;
+		if (applied?.view !== effective.view) {
+			handle.setView(effective.view);
+		}
+		if (applied?.firstDay !== effective.firstDay) {
+			handle.setFirstDay(effective.firstDay);
+		}
+		if (applied?.compact !== effective.compact) {
+			handle.setCompact(effective.compact);
+		}
+		this.calendarRootEl?.toggleClass(cssClass("calendar--compact"), effective.compact);
+		this.applied = effective;
 	}
 
 	/**

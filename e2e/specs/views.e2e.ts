@@ -901,6 +901,18 @@ describe("Views", function () {
 		);
 	}
 
+	/**
+	 * Number of day columns Event Calendar is currently rendering — the
+	 * column-header cell (`.ec-col-head`) count is the same for month's
+	 * day-grid and week/day's time-grid, so this works across all three
+	 * views without caring which one is active. Used by the phone-viewport
+	 * compaction tests below to assert a rolling 3-day window renders
+	 * exactly 3 columns, never 7.
+	 */
+	async function readColumnHeaderCount(calendarClsArg: string): Promise<number> {
+		return browser.execute((cls) => document.querySelectorAll(`.${cls} .ec-col-head`).length, calendarClsArg);
+	}
+
 	describe("Calendar view", function () {
 		before(async function () {
 			// Switch from the default "Feed" view to "Calendar" through the Bases
@@ -2322,6 +2334,120 @@ describe("Views", function () {
 				// every other calendar test computes drag coordinates from
 				// rendered element rects, which a 390px-wide window changes.
 				await setWindowSize(originalSize[0], originalSize[1]);
+				await reopenCalendarView();
+			}
+		});
+
+		/**
+		 * The calendar-compaction feature this test covers: below
+		 * `COMPACT_CALENDAR_WIDTH` (`domain/calendar-view-options.ts`), month
+		 * collapses to the renderer's rolling 3-day view (`effectiveCalendarView`)
+		 * and the header stops offering "Month" at all — a 390px month cell is
+		 * ~53px wide, room for a priority dot and nothing else. Same
+		 * window-resize technique as the test above (`windowSize`/
+		 * `setWindowSize` — WebDriver's own `setWindowSize` doesn't work
+		 * against this Electron session), but this one doesn't need
+		 * `app.emulateMobile(true)` — compaction keys off the pane's own
+		 * `clientWidth`, not `is-mobile`, so plain desktop-Electron-at-390px
+		 * is enough to exercise it (and is closer to the narrow-*split-pane*-
+		 * on-desktop case the feature also covers).
+		 */
+		it("collapses to a rolling 3-day view and drops Month from the header under 640px", async function () {
+			const originalSize = await windowSize();
+			await setWindowSize(390, 844);
+			// Unlike the `app.emulateMobile(true)` test above (which switches
+			// Obsidian into its own mobile layout, hiding the sidebars), a plain
+			// 390px desktop window keeps both docked sidebars at their normal
+			// width — leaving so little room for the actual workspace leaf that
+			// its own Bases toolbar buttons overlap and become unclickable.
+			// Collapsing both sidebars is what makes this a fair "narrow PANE",
+			// not a broken desktop layout — closer to the split-pane case the
+			// compaction feature is meant to cover too. Their ORIGINAL collapsed
+			// state is captured so the `finally` below can restore it exactly —
+			// the right sidebar starts collapsed in this vault, and blindly
+			// `.expand()`-ing it back would leave it open (and the middle Bases
+			// pane visibly narrower than 640px) for every calendar test/screenshot
+			// that runs after this one.
+			const wasLeftCollapsed = await browser.executeObsidian(({ app }) => app.workspace.leftSplit.collapsed);
+			const wasRightCollapsed = await browser.executeObsidian(({ app }) => app.workspace.rightSplit.collapsed);
+			await browser.executeObsidian(({ app }) => {
+				app.workspace.leftSplit.collapse();
+				app.workspace.rightSplit.collapse();
+			});
+
+			try {
+				// Navigate fully away and back (rather than re-opening Tasks.base
+				// while already on it, a no-op that wouldn't force a fresh mount)
+				// so the calendar mounts fresh and measures the current 390px
+				// width — mirrors the mobile test above's own reasoning for why
+				// it re-opens the base after `emulateMobile` tears the view down.
+				await openFile("Tasks/Today task.md");
+				await reopenCalendarView();
+
+				// Tasks.base leaves `initialView` unset (defaults to "month"), but
+				// the pane is narrower than `COMPACT_CALENDAR_WIDTH` —
+				// `effectiveCalendarView` collapses that to the renderer's rolling
+				// 3-day week view instead of a 7-column month grid.
+				await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+				await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
+
+				await browser.waitUntil(async () => (await readColumnHeaderCount(cssClass("calendar"))) === 3, {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: "expected exactly 3 day columns in the compact narrow-pane calendar",
+				});
+
+				let textLabels = (await readToolbarButtons()).map((b) => b.text.trim()).filter((t) => t.length > 0);
+				expect(textLabels).toContain("3 days");
+				expect(textLabels).toContain("Day");
+				expect(textLabels).not.toContain("Month");
+				expect(textLabels).not.toContain("Week");
+
+				if (process.env["E2E_SCREENSHOT"] === "1") {
+					await saveScreenshot("calendar-compact-390");
+				}
+
+				// A user (or a saved `.base` file) explicitly choosing "Month" on a
+				// narrow pane is the documented wart (`docs/DOMAIN-MODEL.md`): Bases'
+				// own dropdown can't vary by pane width, so it still lists "Month",
+				// and picking it here must still render 3 days, not a 7-column grid.
+				await setCalendarInitialView("month");
+				await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+				await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
+				await browser.waitUntil(async () => (await readColumnHeaderCount(cssClass("calendar"))) === 3, {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: "expected 3 columns after explicitly re-selecting Month on a narrow pane",
+				});
+				textLabels = (await readToolbarButtons()).map((b) => b.text.trim()).filter((t) => t.length > 0);
+				expect(textLabels).not.toContain("Month");
+			} finally {
+				// Restore the desktop viewport and each sidebar's ORIGINAL
+				// collapsed state before any later calendar test/screenshot —
+				// they assume the normal desktop layout, and compute drag
+				// coordinates from rendered element rects.
+				await setWindowSize(originalSize[0], originalSize[1]);
+				await browser.executeObsidian(
+					({ app }, leftCollapsed: boolean, rightCollapsed: boolean) => {
+						if (leftCollapsed) {
+							app.workspace.leftSplit.collapse();
+						} else {
+							app.workspace.leftSplit.expand();
+						}
+						if (rightCollapsed) {
+							app.workspace.rightSplit.collapse();
+						} else {
+							app.workspace.rightSplit.expand();
+						}
+					},
+					wasLeftCollapsed,
+					wasRightCollapsed,
+				);
+				// Force a fresh mount at the restored width rather than trust
+				// `onResize` to have already caught up by the time later
+				// tests/screenshots run — navigating away and back (not a bare
+				// `reopenCalendarView()`, a no-op re-open of the file already
+				// active that never re-renders) guarantees the calendar leaves
+				// this test in the normal, non-compact state.
+				await openFile("Tasks/Today task.md");
 				await reopenCalendarView();
 			}
 		});

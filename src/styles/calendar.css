@@ -665,9 +665,13 @@
  * `Buttons.svelte`'s `ec-${button}` per-button class, e.g.
  * `.ec-dayGridMonth`/`.ec-timeGridWeek`/`.ec-timeGridDay`/`.ec-prev`/
  * `.ec-next` — confirmed against the vendored source, not documented in the
- * public API), so `:has(.ec-dayGridMonth)` is what scopes this to *only*
+ * public API), so `:has(.ec-timeGridWeek)` is what scopes this to *only*
  * the view trio and leaves the prev/next pair on the plain unfused-button
- * rules above.
+ * rules above. Anchored on `.ec-timeGridWeek` rather than `.ec-dayGridMonth`
+ * specifically so this still matches in a narrow pane's compact header
+ * (`obtask-calendar--compact`, below), which drops the month button from
+ * `headerToolbar` entirely (`event-calendar-renderer.ts`) but always keeps
+ * week + day.
  *
  * A first pass used a raised "card" active tab (`--background-primary` fill
  * + `--shadow-s`) on a `--background-modifier-hover` track, shadcn-Tabs
@@ -695,14 +699,14 @@
  * exactly inside the track's padding box, so the inset the radius math
  * assumes is the real one.
  */
-.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) {
+.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) {
 	gap: var(--size-2-1);
 	padding: var(--size-2-1);
 	border-radius: var(--radius-m);
 	background-color: var(--background-secondary);
 }
 
-.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button {
+.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button {
 	box-sizing: border-box;
 	background-color: transparent;
 	color: var(--text-muted);
@@ -715,7 +719,7 @@
 	border-radius: calc(var(--radius-m) - var(--size-2-1));
 }
 
-.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button:not(:disabled):hover {
+.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button:not(:disabled):hover {
 	background-color: transparent;
 	color: var(--text-normal);
 }
@@ -723,7 +727,7 @@
 /* Active tab: a flat tinted overlay, not a filled-accent pill (which would
  * read as a primary action rather than "the currently open view") and not
  * a raised card (see the shadow/darkness note above). */
-.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button.ec-active {
+.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	font-weight: var(--font-semibold);
@@ -731,7 +735,56 @@
 	box-shadow: none;
 }
 
-.obtask-calendar .ec-button-group:has(.ec-dayGridMonth) .ec-button.ec-active:not(:disabled):hover {
+.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active:not(:disabled):hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
+}
+
+/*
+ * Narrow-pane header compaction. `obtask-calendar--compact` is toggled by
+ * `calendar-view.ts` off the SAME `clientWidth` measurement
+ * (`domain/calendar-view-options.ts`'s `COMPACT_CALENDAR_WIDTH`) that
+ * decides whether month collapses to a rolling 3-day view — a pane-width
+ * fact, not `is-mobile`, so a narrow split pane on desktop gets this too.
+ *
+ * At a ~390px phone width the unmodified header (title, then today/prev/
+ * next, then the view-switcher trio) wraps to three stacked rows — each
+ * segment's natural size adds up to more than the available width. None of
+ * the rules below change *what* renders, only how much room each piece
+ * asks for: a smaller title, tighter button padding/font-size, and a
+ * smaller gap between the today/prev/next group and the trio, so more of
+ * the toolbar fits per row.
+ *
+ * `.obtask-calendar.obtask-calendar--compact` (two classes on the SAME
+ * root element the base rules above already target with one) — specificity
+ * 0,3,0 vs. their 0,2,0 — so these always win regardless of source order.
+ */
+.obtask-calendar.obtask-calendar--compact .ec-toolbar {
+	row-gap: var(--size-4-1);
+	column-gap: var(--size-4-2);
+	margin-block-end: var(--size-4-2);
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-title {
+	font-size: var(--font-ui-medium);
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-button {
+	font-size: var(--font-ui-smaller);
+	padding: var(--size-2-2) var(--size-4-2);
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-button[aria-label="Previous"],
+.obtask-calendar.obtask-calendar--compact .ec-button[aria-label="Next"] {
+	padding: var(--size-2-2) var(--size-2-2);
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) {
+	padding: var(--size-4-1) var(--size-2-1);
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button,
+.obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
+	font-size: var(--font-ui-smaller);
+	padding: var(--size-2-1) var(--size-4-2);
 }
