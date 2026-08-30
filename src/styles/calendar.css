@@ -393,7 +393,8 @@
 	 */
 	padding-block: 2px;
 	padding-inline-end: var(--size-4-2);
-	/* Clears the inset pill bar below: 4px inset + 3px width + 4px gap. */
+	/* Clears the inset pill (4px inset + 3px width), then an 8px gap to
+	 * the title text — same gap as the all-day dot-to-title spacing. */
 	padding-inline-start: calc(var(--size-4-1) + 3px + var(--size-4-2));
 	font-size: var(--font-ui-smaller);
 	min-height: 24px !important;
@@ -473,21 +474,9 @@
  * `align-items: stretch` already gives both items the container's full
  * width, so neither needs an explicit inline-size.
  *
- * The dot is a `::before` on `.ec-event-title` itself, kept as plain inline
- * content (an `inline-block` circle + `vertical-align: middle`, NOT a flex
- * item of a `display: flex` title) — deliberately: `.ec-event-title` is a
- * flex ITEM of `.ec-event-body`, and if it were *also* `display: flex` to
- * lay out "dot, then title text" as its own flex items, the title's raw
- * text would be wrapped in an anonymous flex-item box that
- * `overflow`/`text-overflow` set on the flex container can't reach —
- * ellipsis silently never fires (CSS Flexbox's "runs of inline-level
- * content are wrapped in an anonymous block box" rule; only the container's
- * own bounds get `overflow: hidden`, per-item ellipsis needs to live on the
- * actual box holding the text). Keeping `.ec-event-title` a plain
- * (non-flex) box means the `::before` dot and the title text are one
- * ordinary inline run inside it, so `white-space: nowrap; overflow: hidden;
- * text-overflow: ellipsis` set directly on `.ec-event-title` truncates the
- * text correctly — the dot, coming first, is never itself clipped.
+ * No dot here (unlike day-grid/all-day, below): the inset pill bar
+ * (`.ec-event::before`, further down) already encodes priority on these
+ * blocks, so a second colour cue on the title would be redundant.
  *
  * Both lines get `flex-shrink: 0` so a too-short block never compresses
  * either line's own text — instead, given `.ec-event-body`'s
@@ -522,22 +511,6 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-}
-
-.obtask-calendar .ec-time-grid .ec-body .ec-event-title::before {
-	content: "";
-	display: inline-block;
-	vertical-align: middle;
-	inline-size: 7px;
-	block-size: 7px;
-	margin-inline-end: var(--size-4-2);
-	border-radius: 50%;
-	background-color: var(--obtask-dot-color, var(--text-faint));
-}
-
-.obtask-calendar .ec-time-grid .ec-body .obtask-event--due .ec-event-title::before {
-	background-color: transparent;
-	box-shadow: inset 0 0 0 2px var(--obtask-dot-color, var(--text-faint));
 }
 
 /*
