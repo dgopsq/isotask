@@ -33,3 +33,4 @@ new ADR that supersedes it and update the `Status` line and the index below.
 | [0009](0009-obsidian-1-13-floor-declarative-settings.md) | Obsidian 1.13 floor, declarative settings | Accepted, 2026-08-29 |
 | [0010](0010-lenient-parse-canonical-write.md) | Lenient parse, canonical write | Accepted, 2026-08-29 |
 | [0011](0011-point-events-in-all-day-row.md) | Point events in the all-day row | Accepted, 2026-08-29 |
+| [0012](0012-missing-status-defaults-to-open.md) | Missing status defaults to the first open status | Accepted, 2026-08-30 |

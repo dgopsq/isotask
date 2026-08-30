@@ -58,6 +58,12 @@ the exact closed set beyond these four). `id`/`label`/`icon` are user-facing and
 - Bases filters operate on the raw `status` value, not `kind`. The generated `Tasks.base` filters
   `status != "done" && status != "cancelled"` and is regenerated from settings when the status
   list changes.
+- A missing or empty `status` parses as the first configured `open`-kind status rather than
+  failing (ADR 0012) — this is what makes a note created by the Bases toolbar's `+ New` button
+  (see "New (Bases toolbar)" below) parse as a normal open task instead of an invalid row. Parsing
+  never writes this default back to the note; the next write through any `app/*` use-case
+  persists it. Only when no `open`-kind status is configured at all does this still fail, with
+  `no-open-status`.
 
 ## Priority
 
@@ -255,6 +261,9 @@ Frontmatter parsing never throws and never crashes a view. `domain/frontmatter.t
 - A `repeat` present without a usable anchor (`due`/`scheduled`) is treated as a parse *warning*,
   not a hard error: the task still renders and behaves normally, it simply never spawns on
   completion.
+- A missing/empty `status` is not an error either (ADR 0012): it defaults to the first configured
+  `open`-kind status. `no-open-status` (no `open`-kind status configured at all) is the only
+  status-related hard error left; `unknown-status` (a present, unrecognized value) is unchanged.
 
 ### Lenient parse, canonical write
 

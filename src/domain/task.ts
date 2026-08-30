@@ -74,7 +74,8 @@ export interface Task {
 
 export type TaskParseError =
 	| { readonly kind: "not-a-task" }
-	| { readonly kind: "missing-status" }
+	/** No/empty `status` AND no `open`-kind status is configured to default to (ADR 0012). */
+	| { readonly kind: "no-open-status" }
 	| { readonly kind: "unknown-status"; readonly value: string; readonly allowed: readonly string[] }
 	| { readonly kind: "invalid-priority"; readonly value: string; readonly allowed: readonly string[] }
 	| { readonly kind: "invalid-date"; readonly property: string; readonly value: string }
@@ -93,8 +94,8 @@ export function describeTaskParseError(error: TaskParseError): string {
 	switch (error.kind) {
 		case "not-a-task":
 			return "Not a task note";
-		case "missing-status":
-			return "Missing status";
+		case "no-open-status":
+			return "No open status configured to default to";
 		case "unknown-status":
 			return `Unknown status "${error.value}" (allowed: ${error.allowed.join(", ")})`;
 		case "invalid-priority":

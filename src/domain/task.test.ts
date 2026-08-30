@@ -61,7 +61,7 @@ describe("describeTaskParseError", () => {
 
 	it.each<[TaskParseError, string]>([
 		[{ kind: "not-a-task" }, "Not a task note"],
-		[{ kind: "missing-status" }, "Missing status"],
+		[{ kind: "no-open-status" }, "No open status configured to default to"],
 		[{ kind: "invalid-duration", value: "abc" }, 'Invalid duration "abc"'],
 		[{ kind: "invalid-tags", value: "5" }, 'Invalid tags "5"'],
 		[{ kind: "invalid-project", value: "5" }, 'Invalid project "5"'],

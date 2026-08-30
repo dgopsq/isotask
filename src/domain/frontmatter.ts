@@ -7,7 +7,7 @@ import type { PropertyKeys } from "@/domain/property-keys";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
-import { findStatus } from "@/domain/status";
+import { findStatus, firstOpenStatus } from "@/domain/status";
 import type { Minutes, Priority, RRuleString, StatusId, Task, TaskParseError, TaskPath } from "@/domain/task";
 import { PRIORITIES } from "@/domain/task";
 
@@ -63,10 +63,17 @@ export function isTaskNote(raw: Readonly<Record<string, unknown>>, keys: Propert
 	return raw[keys.markerKey] === keys.markerValue;
 }
 
+/**
+ * A missing/empty `status` (ADR 0012 — the Bases toolbar "New" button can't
+ * be made to write one) defaults to the first configured `open`-kind status,
+ * same lenient-parse spirit as ADR 0010's other folds. Only when no `open`
+ * status is configured at all does this still fail to parse.
+ */
 function parseStatus(value: unknown, statuses: readonly StatusConfig[]): Result<StatusId, TaskParseError> {
 	const parsed = v.safeParse(NonEmptyStringSchema, value);
 	if (!parsed.success) {
-		return err({ kind: "missing-status" });
+		const openStatus = firstOpenStatus(statuses);
+		return openStatus.some ? ok(openStatus.value.id) : err({ kind: "no-open-status" });
 	}
 	const id = parsed.output as StatusId;
 	return findStatus(statuses, id).some

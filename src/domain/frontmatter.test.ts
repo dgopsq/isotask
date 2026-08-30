@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { isTaskNote, parseTask, projectFromWikilink, taskToPatch, toWikilink } from "@/domain/frontmatter";
+import type { StatusConfig } from "@/domain/status";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { TaskDate } from "@/domain/dates";
 import type { Task, TaskPath } from "@/domain/task";
@@ -132,6 +133,42 @@ describe("parseTask", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error).toHaveLength(2);
+		}
+	});
+});
+
+describe("parseTask — missing status defaults to the first open status (ADR 0012)", () => {
+	it("defaults a missing status to the first configured open status", () => {
+		const result = parseTask(path, "Buy milk", { type: "task" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.status).toBe("todo");
+		}
+	});
+
+	it("defaults an empty-string status to the first configured open status", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.status).toBe("todo");
+		}
+	});
+
+	it("fails with no-open-status when no open status is configured at all", () => {
+		const noOpenStatuses: readonly StatusConfig[] = statuses.map((status) => ({ ...status, kind: "done" as const }));
+		const result = parseTask(path, "Buy milk", { type: "task" }, keys, noOpenStatuses);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContainEqual({ kind: "no-open-status" });
+		}
+	});
+
+	it("round-trips the defaulted status through taskToPatch", () => {
+		const result = parseTask(path, "Buy milk", { type: "task" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const patch = taskToPatch(result.value, keys);
+			expect(patch[keys.status]).toBe("todo");
 		}
 	});
 });
