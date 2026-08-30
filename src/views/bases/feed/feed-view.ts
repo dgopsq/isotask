@@ -1,5 +1,5 @@
 import type { App, BasesEntry, BasesPropertyId, QueryController } from "obsidian";
-import { BasesView, Component, Menu, setIcon } from "obsidian";
+import { BasesView, Component, Menu, NullValue, setIcon } from "obsidian";
 
 import type { TaskWithEntry } from "@/adapters/obsidian/bases-entries";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
@@ -387,17 +387,25 @@ export class FeedBasesView extends BasesView {
 	 * rejected (2026-08-30): it draws Bases' *table-cell editors* (a boxed,
 	 * segmented date input for `file.mtime`, for instance), which is a form
 	 * control, not a chip. Renders nothing when the property is absent
-	 * (`getValue` returns `null`) or falsy.
+	 * (`getValue` returns `null` or Bases' `NullValue`) or prints as empty
+	 * text — deliberately not `isTruthy()`, which would also hide a
+	 * meaningful `false` or `0`.
 	 */
 	private renderGenericChip(row: HTMLElement, entry: BasesEntry, propertyId: string): void {
 		const value = entry.getValue(propertyId as BasesPropertyId);
-		if (value?.isTruthy() !== true) {
+		// `NullValue.toString()` is the literal "null", so it has to be
+		// recognised by type, not by its text.
+		if (value === null || value instanceof NullValue) {
+			return;
+		}
+		const text = value.toString().trim();
+		if (text === "") {
 			return;
 		}
 
 		const chip = row.createSpan({ cls: cssClass("feed__generic") });
 		chip.createSpan({ text: this.config.getDisplayName(propertyId as BasesPropertyId), cls: cssClass("feed__generic-label") });
-		chip.createSpan({ text: value.toString(), cls: cssClass("feed__generic-value") });
+		chip.createSpan({ text, cls: cssClass("feed__generic-value") });
 	}
 
 	/** Button-like span (icon + label) that opens the status `Menu` on click/Enter/Space and dispatches to `setStatus`. */
