@@ -84,14 +84,19 @@ are not in `package.json` yet — added back when the calendar adapter and recur
       "Undo/Redo last calendar reschedule" commands (`app/undo-reschedule.ts`, ADR 0013).
 - [x] Touch QA pass: e2e drives tap-to-open, tap-to-create, and the `longPressDelay` boundary with
       a real `pointerType: "touch"` pointer (a short press-and-move must not reschedule, a hold
-      past 500ms must). Narrow-width layout is NOT covered — see M5.
+      past 500ms must), plus a render check at a 390x844 phone viewport.
 
 ## M5 — Release
 
-- [ ] Mobile QA across the full feature set. Note `app.emulateMobile(true)` only flips the
-      `is-mobile` flags — it does not resize the window, and the e2e session has no
-      window-resize command — so real phone-width layout (toolbar wrapping, touch target
-      sizing) is still unverified and needs a device or a resizable harness.
+- [ ] Mobile QA across the full feature set. `app.emulateMobile(true)` only flips the `is-mobile`
+      flags; the viewport itself is resized through Electron's own `BrowserWindow` (see
+      `windowSize`/`setWindowSize` in `e2e/specs/views.e2e.ts` — WebDriver's `setWindowSize` is
+      unimplemented in this Electron session and wdio's `emulate()` is Bidi-only).
+- [ ] Month view is barely usable at phone width: at 390px a day cell is ~53px, so event chips
+      render as a priority dot with no readable title. Decide between a dots-only month rendering
+      with a day detail on tap, a horizontally scrollable grid, or steering narrow viewports to
+      week/day view. Event Calendar's own header also wraps to three rows there, eating most of
+      the screen before the grid starts.
 - [ ] GitHub Actions release workflow triggered on tag.
 - [ ] Community plugin submission.
 

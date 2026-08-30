@@ -39,6 +39,52 @@ async function saveScreenshot(name: string): Promise<void> {
 	await browser.saveScreenshot(fileURLToPath(new URL(`../screenshots/${name}.png`, import.meta.url)));
 }
 
+/**
+ * Reads/sets the real Obsidian window size through Electron's own
+ * `BrowserWindow`, reached via the renderer's `window.require("electron")`.
+ *
+ * WebDriver's `browser.setWindowSize()` does NOT work against this Electron
+ * session — it fails with "unknown command: 'Browser.getWindowForTarget'",
+ * and wdio 9's `browser.emulate()` is Bidi-only, which this session is not.
+ * Electron's own API is unaffected by either limitation, so this is how a
+ * spec gets an actual phone-sized viewport rather than only the `is-mobile`
+ * class that `app.emulateMobile()` flips.
+ */
+async function windowSize(): Promise<readonly [number, number]> {
+	const size = await browser.execute(() => {
+		const req = (window as unknown as { require?: (m: string) => unknown }).require;
+		if (typeof req !== "function") {
+			throw new Error("window.require is unavailable — not an Electron renderer");
+		}
+		const electron = req("electron") as { remote: { getCurrentWindow: () => { getSize: () => number[] } } };
+		return electron.remote.getCurrentWindow().getSize();
+	});
+	const [width, height] = size;
+	if (width === undefined || height === undefined) {
+		throw new Error(`Electron getSize() returned an unusable value: ${JSON.stringify(size)}`);
+	}
+	return [width, height];
+}
+
+async function setWindowSize(width: number, height: number): Promise<void> {
+	await browser.execute(
+		(w: number, h: number) => {
+			const req = (window as unknown as { require?: (m: string) => unknown }).require;
+			if (typeof req !== "function") {
+				throw new Error("window.require is unavailable — not an Electron renderer");
+			}
+			const electron = req("electron") as { remote: { getCurrentWindow: () => { setSize: (a: number, b: number) => void } } };
+			electron.remote.getCurrentWindow().setSize(w, h);
+		},
+		width,
+		height,
+	);
+	await browser.waitUntil(async () => (await browser.execute(() => window.innerWidth)) <= width, {
+		timeout: SELECT_TIMEOUT,
+		timeoutMsg: `the window never resized to ${String(width)}px wide`,
+	});
+}
+
 /** Saves a screenshot to an arbitrary absolute path (for the "New/Search (Bases toolbar)" review screenshots, which live outside `e2e/screenshots/`). */
 async function saveScreenshotAt(absolutePath: string): Promise<void> {
 	await mkdir(dirname(absolutePath), { recursive: true });
@@ -2208,23 +2254,25 @@ describe("Views", function () {
 		});
 
 		/**
-		 * M4 "Touch QA pass" mobile-emulation smoke check. Obsidian exposes
-		 * an undocumented `app.emulateMobile(boolean)` (present at runtime,
-		 * confirmed by probing it in a throwaway spec before writing this
-		 * test — it's not declared in `obsidian.d.ts`) that flips the same
-		 * `is-mobile`/`is-tablet` body classes and mobile API flags a real
-		 * mobile client carries. It does NOT resize the window to phone
-		 * dimensions, and wdio-obsidian-service's Electron session exposes no
-		 * WebDriver window-resize command to do that ourselves (confirmed the
-		 * same way: `browser.setWindowSize()` fails here with "unknown
-		 * command: 'Browser.getWindowForTarget'") — so this only checks that
-		 * the calendar still renders correctly under the mobile *behavior*
-		 * flags at the suite's normal (desktop-sized) window, not whether the
-		 * layout holds up at an actual phone width. `E2E_SCREENSHOT=1` saves
-		 * `calendar-mobile-emulated.png` for manual visual review of that
-		 * narrower question.
+		 * M4 "Touch QA pass" mobile check: the calendar at an actual phone
+		 * viewport, not merely under the mobile flags.
+		 *
+		 * Two independent things are needed and both are non-obvious.
+		 * `app.emulateMobile(boolean)` is undocumented (present at runtime,
+		 * not in `obsidian.d.ts`) and flips the `is-mobile`/`is-tablet` body
+		 * classes and mobile API flags a real mobile client carries — but it
+		 * does NOT resize anything. The resize has to come from Electron
+		 * directly (`windowSize`/`setWindowSize` above), because WebDriver's
+		 * own `setWindowSize` is unimplemented in this Electron session and
+		 * wdio 9's `emulate()` is Bidi-only.
+		 *
+		 * 390x844 is an iPhone 14/15-class logical viewport — narrow enough
+		 * that a toolbar or month grid that can't cope will visibly break.
+		 * `E2E_SCREENSHOT=1` saves `calendar-mobile-emulated.png` for review.
 		 */
-		it("still renders the calendar under app.emulateMobile(true)", async function () {
+		it("renders the calendar at a phone viewport under app.emulateMobile(true)", async function () {
+			const originalSize = await windowSize();
+			await setWindowSize(390, 844);
 			await browser.executeObsidian(({ app }) => {
 				(app as unknown as { emulateMobile: (v: boolean) => void }).emulateMobile(true);
 			});
@@ -2270,6 +2318,10 @@ describe("Views", function () {
 				await browser.executeObsidian(({ app }) => {
 					(app as unknown as { emulateMobile: (v: boolean) => void }).emulateMobile(false);
 				});
+				// Restore the desktop viewport before any later spec runs —
+				// every other calendar test computes drag coordinates from
+				// rendered element rects, which a 390px-wide window changes.
+				await setWindowSize(originalSize[0], originalSize[1]);
 				await reopenCalendarView();
 			}
 		});
