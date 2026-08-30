@@ -112,17 +112,19 @@ export interface EventCalendarDrop {
 
 /**
  * Converts an Event Calendar drag/resize result back into domain dates.
- * Branches on `drop.allDay` — the event's NEW all-day-ness, which may differ
- * from `event.allDay` when a timed block was dragged into (or out of) the
- * all-day row.
+ * Branches on `drop.allDay` — the event's NEW all-day-ness. Event Calendar
+ * 5.12.0 clamps a drag to the region it started in, so today that can never
+ * actually differ from `event.allDay` (see the reschedule semantics in
+ * `docs/DOMAIN-MODEL.md`); the branch is kept, and unit-tested, so a
+ * renderer that does allow the crossing maps correctly without a rewrite.
  */
 export function fromEventCalendarDrop(event: CalendarEvent, drop: EventCalendarDrop): { readonly start: TaskDate; readonly end: TaskDate | undefined } {
 	if (!drop.allDay) {
 		// Absolute conversion, not delta arithmetic: shifting the domain date
 		// by `drop.start - oldStart` breaks twice, across a DST boundary a
 		// one-day drag is 23 or 25 real hours but the wall clock must not
-		// move, and a delta can't express a change of kind (a timed block
-		// dragged up out of the all-day row). Converting the new position
+		// move, and a delta can't express a change of kind (an all-day chip
+		// becoming a timed block). Converting the new position
 		// absolutely is DST-correct because a real local `Date` -> wall-clock
 		// digits is exactly what `fromJsDateTime` does.
 		const start = fromJsDateTime(drop.start);

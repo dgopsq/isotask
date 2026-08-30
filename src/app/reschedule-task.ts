@@ -21,11 +21,10 @@ import type { RescheduleEntry } from "@/ports/reschedule-history";
  * never part of the patch for it. For `scheduled`, `end` distinguishes a
  * move (dragging the whole block, `end` is `none`) from a resize (dragging
  * an edge, `end` is `some`): only a resize writes `duration`. Leaving
- * `duration` out of the patch — rather than setting it to `null` — means a
- * block dragged into the all-day row (which drops `end`) keeps its stored
- * duration in frontmatter, so dragging it back out restores the same block
- * size, and a time estimate set via the "set duration" command is never
- * clobbered by an unrelated move.
+ * `duration` out of the patch — rather than setting it to `null` — means an
+ * all-day `scheduled` chip moved along the all-day row (which has no `end`)
+ * keeps its stored duration in frontmatter, so a time estimate set via the
+ * "set duration" command is never clobbered by an unrelated move.
  *
  * Returns the written patch alongside its inverse (a `RescheduleEntry`) so a
  * caller — `views/bases/calendar` — can push it onto `deps.history` for

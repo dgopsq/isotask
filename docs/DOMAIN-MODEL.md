@@ -285,23 +285,27 @@ each of them a consequence of the derivation above rather than a free choice:
   `scheduled`. A calendar showing both never has to guess.
 - **A `due` event has no span**, so a drag of one never touches `duration`, and `due` has no
   resize handle to grab in the first place.
-- **`duration` is written only by a resize.** Dragging a block into the all-day row drops its span,
-  but the stored `duration` is left in place rather than cleared: dragging it back restores the
-  same block, and `duration` doubles as a standalone time estimate that an unrelated move has no
-  business destroying. Such a `duration` is inert while `scheduled` has no time — per the
-  derivation above it takes both to make a block — not incorrect.
+- **`duration` is written only by a resize.** A move leaves the stored `duration` in place rather
+  than clearing it: `duration` doubles as a standalone time estimate that an unrelated move has no
+  business destroying. This matters for an all-day `scheduled` chip (a datetime with no `duration`,
+  or a date-only `scheduled`) dragged along the all-day row — the patch omits `duration`, so an
+  estimate set by the "set duration" command survives. Such a `duration` is inert while `scheduled`
+  has no time — per the derivation above it takes both to make a block — not incorrect.
 - **Time-of-day survives an all-day drop.** A `scheduled` datetime with no `duration` renders as an
   all-day chip that still carries its time (ADR 0011). Moving that chip to another day changes only
   the day; the `14:30` is preserved.
-- **Dragging a `due` chip into the time grid sets its time, then it snaps back to the all-day row.**
-  `due` carries no duration field, so `dueEvent` (`domain/calendar-events.ts`) always returns
-  `allDay: true` regardless of where the chip is dropped. Dropping an all-day `due` chip onto a
-  timed slot still writes the dropped date *and* time to `due` (`fromEventCalendarDrop` takes the
-  `!drop.allDay` branch, since the drop itself landed in the time grid), but on the next render the
-  chip is derived fresh from the task and is all-day again, now carrying that time as its
-  `obtaskTime` prefix. This looks like the drag snapped back, but it did what it was supposed to:
-  it is the only way to put a time-of-day on a `due` date, since `due` never becomes a time-grid
-  block (ADR 0011).
+- **A drag cannot cross between the all-day row and the time grid.** This is a limitation of Event
+  Calendar 5.12.0, not a decision of ours, and it applies to a real mouse as much as to a synthetic
+  one. Its `Action` component captures which region the gesture started in at `pointerdown`
+  (`allDaySlot`), freezes a `viewport` rect around that region, and clamps the pointer into that
+  rect before hit-testing which cell is under it (`findDayEl`); a cell whose all-day-ness differs
+  from the gesture's start is rejected outright (`if (newAllDay === allDay)`). So a `due` chip
+  cannot be dragged down into the time grid to give it a time, and a block cannot be dragged up
+  into the all-day row to clear its. Use the "set due date"/"set scheduled date" commands for that.
+  `fromEventCalendarDrop` still branches on `drop.allDay` and would map such a drop correctly if
+  the gesture ever became possible (a newer Event Calendar, or a different renderer behind the
+  `CalendarRenderer` port) — the branch is kept and unit-tested for that reason, not because a drag
+  reaches it today.
 - **Dragging a repeating task's event moves the anchor its next occurrence is computed from.**
   `eventsForTask` ignores `repeat` entirely (ADR 0005: one note is one occurrence), so the event on
   the calendar is always derived from the task's own `due`/`scheduled`, never from an expanded
