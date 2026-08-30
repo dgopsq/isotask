@@ -209,15 +209,17 @@ user drags/resizes an event (desktop) or long-presses + drags (touch)
         │
         ▼
 CalendarRenderer adapter (event-calendar) fires its native drop/resize callback
+        │  - event-calendar-mapping.ts#fromEventCalendarDrop: the widget's new
+        │    position (JS Dates + allDay) back into domain start/end TaskDates
+        ▼
+obtask-calendar BasesView — callbacks.onEventMoved
         │
         ▼
-obtask-calendar BasesView action handler
-        │
+app/reschedule-task.ts (use-case)
+        │  - one FrontmatterPatch: the event's own date field, plus duration
+        │    only when the gesture was a resize
         ▼
-app/rescheduleTask.ts (use-case)
-        │  - domain: recompute due/scheduled (+duration) from the new slot
-        ▼
-ports.TaskStore.write(path, patch)
+ports.TaskStore.updateProperties(path, patch)
         │
         ▼
 adapters/obsidian TaskStore → app.fileManager.processFrontMatter(file, fn)
@@ -225,8 +227,26 @@ adapters/obsidian TaskStore → app.fileManager.processFrontMatter(file, fn)
         ▼
 metadataCache change event fires → Bases re-queries → view re-renders with new data
 ```
-Click on an empty calendar slot follows the same shape but calls `app/createTask.ts` instead,
-pre-filled with the clicked date.
+Click on an empty calendar slot follows the same shape but calls `app/create-task.ts` instead
+(via the create-task modal), pre-filled with the clicked date. Click on an existing event opens
+its note instead — `dateClick` does not fire there, because the event's own `pointerdown` claims
+the gesture before the day cell's handler sees it.
+
+The use-case returns a `Result`, and `onEventMoved` reports it back to the adapter as a boolean so
+a failed write can be reverted: a failed write leaves the vault unchanged, so no `metadataCache`
+event fires and nothing would otherwise come along to move the event back off the slot the user
+dropped it on.
+
+Two rules of the mapping are worth stating because they are not obvious from the widget's API:
+
+- **A drop is converted absolutely, never as a delta applied to the old date.** A one-day drag
+  across a DST boundary is 23 or 25 real hours, but the task's wall-clock time must not move; and a
+  delta cannot express a *change of kind*, which is exactly what dragging a timed block into the
+  all-day row is.
+- **An all-day drop keeps the event's time-of-day.** Per ADR 0011 a `scheduled` datetime with no
+  `duration` renders as an all-day chip that still carries its time, and Event Calendar normalises
+  an all-day event's `start` to midnight — so the new *day* comes from the drop and the
+  *time-of-day* from the original event (`domain/dates.ts#withDatePart`).
 
 ## Ports
 
@@ -246,8 +266,9 @@ use-cases (never imported directly by `domain`).
 - **CalendarRenderer** — abstracts the calendar widget library (`src/ports/calendar-renderer.ts`,
   finalized M3). One method, `mount(container: HTMLElement, options: CalendarOptions):
   CalendarHandle`; `CalendarOptions` carries `initialView`/`firstDay`/`editable?` plus an all-optional
-  `CalendarCallbacks` (`onEventClick`/`onEventMoved`/`onSlotClick` — unwired in M3, `callbacks: {}`;
-  M4's extension point). The returned `CalendarHandle` is how a view drives an already-mounted
+  `CalendarCallbacks` (`onEventClick`/`onEventMoved`/`onSlotClick`) — all three wired by the
+  calendar view, `callbacks: {}` mounting a read-only calendar. `onEventMoved` resolves to whether
+  the move was persisted, so the adapter can revert an optimistic drag whose write failed. The returned `CalendarHandle` is how a view drives an already-mounted
   calendar without remounting it: `setEvents`, `setView`, `setFirstDay`, `goTo`, `next`, `prev`,
   `today`, `destroy`. `CalendarEvent`/`CalendarViewKind` are domain types
   (`domain/calendar-events.ts`, `domain/calendar-view-options.ts`), imported by the port rather than

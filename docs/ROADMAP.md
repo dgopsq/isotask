@@ -76,10 +76,10 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 
 ## M4 — Calendar interactions
 
-- [ ] Click event -> open note.
-- [ ] Drag/resize (desktop) -> `rescheduleTask` use-case.
-- [ ] Long-press + drag (touch) -> same reschedule path.
-- [ ] Click empty slot -> create-task modal pre-filled with the clicked date.
+- [x] Click event -> open note.
+- [x] Drag/resize (desktop) -> `rescheduleTask` use-case (`app/reschedule-task.ts`).
+- [x] Long-press + drag (touch) -> same reschedule path (`longPressDelay`/`dragScroll`).
+- [x] Click empty slot -> create-task modal pre-filled with the clicked date.
 - [ ] Touch QA pass.
 
 ## M5 — Release

@@ -274,6 +274,26 @@ left-edge accent bar (`--text-muted`/`--text-faint`). No recurrence expansion: `
 never reads `repeat` — one note is one occurrence (ADR 0005), so a recurring task's calendar
 presence is exactly its own `due`/`scheduled` values, with no future-occurrence events synthesized.
 
+### Reschedule semantics
+
+Dragging or resizing a calendar event writes back through `app/reschedule-task.ts`, which builds a
+single frontmatter patch (one gesture, one write, one re-render). Four rules govern what it writes,
+each of them a consequence of the derivation above rather than a free choice:
+
+- **The event's own field is the one written.** A `CalendarEvent` records the `source` it was
+  derived from, so a dragged due-date chip writes `due` and a dragged scheduled block writes
+  `scheduled`. A calendar showing both never has to guess.
+- **A `due` event has no span**, so a drag of one never touches `duration`, and `due` has no
+  resize handle to grab in the first place.
+- **`duration` is written only by a resize.** Dragging a block into the all-day row drops its span,
+  but the stored `duration` is left in place rather than cleared: dragging it back restores the
+  same block, and `duration` doubles as a standalone time estimate that an unrelated move has no
+  business destroying. Such a `duration` is inert while `scheduled` has no time — per the
+  derivation above it takes both to make a block — not incorrect.
+- **Time-of-day survives an all-day drop.** A `scheduled` datetime with no `duration` renders as an
+  all-day chip that still carries its time (ADR 0011). Moving that chip to another day changes only
+  the day; the `14:30` is preserved.
+
 ## Parse-error policy
 
 Frontmatter parsing never throws and never crashes a view. `domain/frontmatter.ts` returns
