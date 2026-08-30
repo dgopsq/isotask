@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { browser, expect } from "@wdio/globals";
@@ -35,6 +36,12 @@ const screenshotDir = fileURLToPath(new URL("../screenshots/", import.meta.url))
 async function saveScreenshot(name: string): Promise<void> {
 	await mkdir(screenshotDir, { recursive: true });
 	await browser.saveScreenshot(fileURLToPath(new URL(`../screenshots/${name}.png`, import.meta.url)));
+}
+
+/** Saves a screenshot to an arbitrary absolute path (for the "New/Search (Bases toolbar)" review screenshots, which live outside `e2e/screenshots/`). */
+async function saveScreenshotAt(absolutePath: string): Promise<void> {
+	await mkdir(dirname(absolutePath), { recursive: true });
+	await browser.saveScreenshot(absolutePath);
 }
 
 /**
@@ -629,6 +636,149 @@ describe("Views", function () {
 				await setFeedOrder(previousOrder);
 				await browser.$(`.${dateCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
 			}
+		});
+
+		/**
+		 * Screenshots for the "New/Search (Bases toolbar)" work: the feed at
+		 * its default Properties order (chips visible), and again after
+		 * widening the order with an extra generic property (`file.mtime`,
+		 * not one of the feed's first-class columns — see "Properties (Bases
+		 * toolbar)" in `docs/DOMAIN-MODEL.md`) to show the muted generic
+		 * chip it renders. Always taken (not gated behind `E2E_SCREENSHOT`)
+		 * since they're the deliverable here, not just a debugging aid.
+		 */
+		it("captures the feed at its default order and again with a generic chip", async function () {
+			const screenshotOutDir = "/Users/dgopsq/.claude/jobs/4adbd2c8/tmp";
+
+			await browser.$(`.${cssClass("feed__row")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await saveScreenshotAt(`${screenshotOutDir}/feed-default-order.png`);
+
+			const defaultOrder = await getFeedOrder();
+			try {
+				const genericCls = cssClass("feed__generic");
+				const { usedSetOrder } = await setFeedOrder([...defaultOrder, "file.mtime"]);
+				expect(usedSetOrder).toBe(true);
+
+				await browser.$(`.${genericCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+				await saveScreenshotAt(`${screenshotOutDir}/feed-generic-chip.png`);
+			} finally {
+				await setFeedOrder(defaultOrder);
+				await browser.$(`.${cssClass("feed__date")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			}
+		});
+	});
+
+	describe("Search (Bases toolbar)", function () {
+		async function setSearchQuery(query: string): Promise<void> {
+			await browser.executeObsidian(({ app }, q: string) => {
+				const leaves = app.workspace.getLeavesOfType("bases");
+				const leaf = leaves[0];
+				if (leaf === undefined) {
+					throw new Error("no bases leaf found");
+				}
+				const outerView = leaf.view as unknown as { controller: { updateSearchQuery: (query: string) => void } };
+				outerView.controller.updateSearchQuery(q);
+			}, query);
+		}
+
+		async function feedRowTitles(): Promise<string[]> {
+			return browser.execute(
+				(rowCls, titleCls) =>
+					Array.from(document.querySelectorAll(`.${rowCls}`)).map((row) => row.querySelector(`.${titleCls}`)?.textContent ?? ""),
+				cssClass("feed__row"),
+				cssClass("feed__title"),
+			);
+		}
+
+		afterEach(async function () {
+			// Never leave a search query applied for a later test in this file.
+			await setSearchQuery("");
+			await browser.waitUntil(async () => (await feedRowTitles()).length > 0, { timeout: SELECT_TIMEOUT });
+		});
+
+		it("narrows the feed to rows matching the query, then restores every row once cleared", async function () {
+			const before = await feedRowTitles();
+			expect(before.length).toBeGreaterThan(0);
+
+			await setSearchQuery("Team");
+			await browser.waitUntil(
+				async () => {
+					const titles = await feedRowTitles();
+					return titles.length > 0 && titles.length < before.length;
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: 'feed row count never dropped after searching "Team"' },
+			);
+
+			const filtered = await feedRowTitles();
+			for (const title of filtered) {
+				expect(title.toLowerCase()).toContain("team");
+			}
+
+			await setSearchQuery("");
+			await browser.waitUntil(async () => (await feedRowTitles()).length === before.length, {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "feed row count never restored after clearing the search query",
+			});
+		});
+	});
+
+	/**
+	 * Simulates exactly what the Bases toolbar's `+ New` button produces
+	 * against `Tasks.base`'s filters (`type == "task"`, every status filter a
+	 * `!=` — see `app/generate-base.ts`): a note with the marker property and
+	 * no `status` at all. Per ADR 0012 this must parse as a normal open task,
+	 * not the red "could not be parsed" row it was before that decision.
+	 */
+	describe("New (Bases toolbar)", function () {
+		const path = "Tasks/Toolbar new.md";
+
+		afterEach(async function () {
+			await browser.executeObsidian(async ({ app }, p: string) => {
+				const file = app.vault.getFileByPath(p);
+				if (file !== null) {
+					await app.fileManager.trashFile(file);
+				}
+			}, path);
+		});
+
+		it("parses a status-less note as an open task with the first configured open status", async function () {
+			await browser.executeObsidian(async ({ app }, p: string) => {
+				await app.vault.create(p, "---\ntype: task\n---\n");
+			}, path);
+
+			await browser.waitUntil(
+				async () => {
+					const titles = await browser.execute(
+						(rowCls, rowInvalidCls, titleCls) =>
+							Array.from(document.querySelectorAll(`.${rowCls}:not(.${rowInvalidCls})`)).map(
+								(row) => row.querySelector(`.${titleCls}`)?.textContent ?? "",
+							),
+						cssClass("feed__row"),
+						cssClass("feed__row--invalid"),
+						cssClass("feed__title"),
+					);
+					return titles.includes("Toolbar new");
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Toolbar new" never rendered as a valid (non-invalid) feed row' },
+			);
+
+			const statusLabel = await browser.execute(
+				(rowCls, rowInvalidCls, titleCls, statusLabelCls, wantedTitle) => {
+					for (const row of Array.from(document.querySelectorAll(`.${rowCls}:not(.${rowInvalidCls})`))) {
+						const titleEl = row.querySelector(`.${titleCls}`);
+						if (titleEl?.textContent === wantedTitle) {
+							return row.querySelector(`.${statusLabelCls}`)?.textContent ?? null;
+						}
+					}
+					return null;
+				},
+				cssClass("feed__row"),
+				cssClass("feed__row--invalid"),
+				cssClass("feed__title"),
+				cssClass("feed__status-label"),
+				"Toolbar new",
+			);
+			expect(statusLabel).toEqual("To do");
 		});
 	});
 
