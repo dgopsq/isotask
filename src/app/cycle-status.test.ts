@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { makeCycleStatus } from "@/app/cycle-status";
 import type { AppDeps } from "@/app/deps";
-import { FakeClock, FakeNotifier, FakeTaskStore } from "@/app/test/fakes";
+import { FakeClock, FakeNotifier, FakeRescheduleHistory, FakeTaskStore } from "@/app/test/fakes";
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
@@ -17,7 +17,7 @@ function makeDeps(): { readonly deps: AppDeps; readonly store: FakeTaskStore } {
 	const store = new FakeTaskStore({ keys: DEFAULT_PROPERTY_KEYS, statuses: DEFAULT_STATUSES });
 	const clock = new FakeClock("2026-09-02T10:00" as IsoDateTime, "2026-09-02" as IsoDate);
 	const notifier = new FakeNotifier();
-	return { deps: { store, clock, notifier, settings: () => DEFAULT_SETTINGS }, store };
+	return { deps: { store, clock, notifier, history: new FakeRescheduleHistory(), settings: () => DEFAULT_SETTINGS }, store };
 }
 
 describe("makeCycleStatus", () => {
@@ -51,7 +51,13 @@ describe("makeCycleStatus", () => {
 		const store = new FakeTaskStore({ keys: DEFAULT_PROPERTY_KEYS, statuses: DEFAULT_STATUSES });
 		store.seed(path("Tasks/Buy milk.md"), { type: "task", status: "todo" });
 		const clock = new FakeClock("2026-09-02T10:00" as IsoDateTime, "2026-09-02" as IsoDate);
-		const deps: AppDeps = { store, clock, notifier: new FakeNotifier(), settings: () => ({ ...DEFAULT_SETTINGS, statuses: [] }) };
+		const deps: AppDeps = {
+			store,
+			clock,
+			notifier: new FakeNotifier(),
+			history: new FakeRescheduleHistory(),
+			settings: () => ({ ...DEFAULT_SETTINGS, statuses: [] }),
+		};
 
 		const result = await makeCycleStatus(deps)(path("Tasks/Buy milk.md"));
 		expect(result.ok).toBe(false);

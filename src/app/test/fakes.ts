@@ -1,13 +1,16 @@
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
 import { isTaskNote, parseTask } from "@/domain/frontmatter";
+import type { History } from "@/domain/history";
+import { emptyHistory, pushRedone, pushUndone, record, takeRedo, takeUndo } from "@/domain/history";
 import type { PropertyKeys } from "@/domain/property-keys";
-import type { Result } from "@/domain/result";
-import { err, ok } from "@/domain/result";
+import type { Option, Result } from "@/domain/result";
+import { err, none, ok, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
 import type { Clock } from "@/ports/clock";
 import type { Notifier } from "@/ports/notifier";
+import type { RescheduleEntry, RescheduleHistory } from "@/ports/reschedule-history";
 import type { NewTaskFile, TaskStore, TaskStoreError } from "@/ports/task-store";
 
 interface FakeNote {
@@ -133,6 +136,58 @@ export class FakeClock implements Clock {
 		this.currentNow = now;
 		this.currentToday = today;
 	}
+}
+
+/**
+ * In-memory `RescheduleHistory` for `app/` use-case tests. This is the same
+ * closure-over-`History<T>` shape as `adapters/history/reschedule-history.ts`,
+ * duplicated here rather than imported: `src/app` may not depend on
+ * `src/adapters` (see `AGENTS.md`'s layer import boundaries), and the real
+ * adapter is thin enough that reimplementing it against the pure
+ * `domain/history.ts` functions — the same functions it itself delegates
+ * to — is honest rather than a shortcut.
+ */
+export class FakeRescheduleHistory implements RescheduleHistory {
+	private history: History<RescheduleEntry> = emptyHistory();
+	private readonly limit: number;
+
+	constructor(limit = 20) {
+		this.limit = limit;
+	}
+
+	record = (entry: RescheduleEntry): void => {
+		this.history = record(this.history, entry, this.limit);
+	};
+
+	takeUndo = (): Option<RescheduleEntry> => {
+		const result = takeUndo(this.history);
+		if (!result.some) {
+			return none();
+		}
+		this.history = result.value.next;
+		return some(result.value.entry);
+	};
+
+	pushUndone = (entry: RescheduleEntry): void => {
+		this.history = pushUndone(this.history, entry);
+	};
+
+	takeRedo = (): Option<RescheduleEntry> => {
+		const result = takeRedo(this.history);
+		if (!result.some) {
+			return none();
+		}
+		this.history = result.value.next;
+		return some(result.value.entry);
+	};
+
+	pushRedone = (entry: RescheduleEntry): void => {
+		this.history = pushRedone(this.history, entry);
+	};
+
+	clear = (): void => {
+		this.history = emptyHistory();
+	};
 }
 
 /** Records every `info`/`error` call instead of showing a real `Notice`. */

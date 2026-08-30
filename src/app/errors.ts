@@ -8,7 +8,8 @@ export type AppError =
 	| { readonly kind: "unknown-status"; readonly statusId: string }
 	| { readonly kind: "invalid-rrule"; readonly reason: string }
 	| { readonly kind: "not-a-task"; readonly path: TaskPath }
-	| { readonly kind: "no-status-configured" };
+	| { readonly kind: "no-status-configured" }
+	| { readonly kind: "stale-undo"; readonly path: TaskPath; readonly direction: "undo" | "redo" };
 
 /** Wraps a `TaskStoreError` (from `ports/task-store.ts`) as an `AppError`. */
 export function storeError(error: TaskStoreError): AppError {
@@ -17,6 +18,11 @@ export function storeError(error: TaskStoreError): AppError {
 
 export function unknownStatusError(statusId: StatusId): AppError {
 	return { kind: "unknown-status", statusId };
+}
+
+/** The note changed (edited elsewhere, or acted on again) between a reschedule gesture and undoing/redoing it. */
+export function staleUndoError(path: TaskPath, direction: "undo" | "redo"): AppError {
+	return { kind: "stale-undo", path, direction };
 }
 
 function describeStoreError(error: TaskStoreError): string {
@@ -49,6 +55,8 @@ export function describeAppError(error: AppError): string {
 			return `${error.path} is not a task note.`;
 		case "no-status-configured":
 			return "No open status is configured.";
+		case "stale-undo":
+			return `${error.path} changed since that action, so it was not ${error.direction === "undo" ? "undone" : "redone"}.`;
 		default: {
 			const exhaustive: never = error;
 			return exhaustive;

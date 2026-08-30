@@ -10,6 +10,7 @@ import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
+import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
 import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
@@ -18,6 +19,7 @@ import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
+import type { RescheduleHistory } from "@/ports/reschedule-history";
 import { CalendarBasesView } from "@/views/bases/calendar/calendar-view";
 import { FeedBasesView } from "@/views/bases/feed/feed-view";
 
@@ -121,6 +123,9 @@ export interface RegisterViewsDeps {
 	readonly createTask: ReturnType<typeof makeCreateTask>;
 	readonly rescheduleTask: RescheduleTask;
 	readonly renderer: CalendarRenderer;
+	readonly history: RescheduleHistory;
+	readonly undoReschedule: UndoReschedule;
+	readonly redoReschedule: RedoReschedule;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
@@ -170,6 +175,9 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				rescheduleTask: deps.rescheduleTask,
 				renderer: deps.renderer,
 				notifier: deps.notifier,
+				history: deps.history,
+				undoReschedule: deps.undoReschedule,
+				redoReschedule: deps.redoReschedule,
 			}),
 		options: () => calendarViewOptions(deps.getWeekStart),
 	});

@@ -1,10 +1,11 @@
 import type { App, QueryController } from "obsidian";
-import { BasesView, TFile } from "obsidian";
+import { BasesView, Scope, TFile } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import type { makeCreateTask, TaskDraft } from "@/app/create-task";
 import { describeAppError } from "@/app/errors";
 import type { RescheduleTask } from "@/app/reschedule-task";
+import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
@@ -17,6 +18,7 @@ import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolv
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
+import type { RescheduleHistory } from "@/ports/reschedule-history";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook — see the doc comment on `FeedBasesView`'s copy of this interface. */
@@ -36,6 +38,9 @@ export interface CalendarBasesViewDeps {
 	readonly rescheduleTask: RescheduleTask;
 	readonly renderer: CalendarRenderer;
 	readonly notifier: Notifier;
+	readonly history: RescheduleHistory;
+	readonly undoReschedule: UndoReschedule;
+	readonly redoReschedule: RedoReschedule;
 }
 
 /**
@@ -69,11 +74,58 @@ export class CalendarBasesView extends BasesView {
 	 * option itself is pushed.
 	 */
 	private applied: { readonly view: CalendarViewKind; readonly firstDay: Weekday } | undefined;
+	/** Whether `scope` is currently pushed onto `app.keymap`'s scope stack — see the `focusin`/`focusout` handlers below. */
+	private scopePushed = false;
+	private readonly scope: Scope;
 
 	constructor(controller: QueryController, containerEl: HTMLElement, deps: CalendarBasesViewDeps) {
 		super(controller);
 		this.viewContainerEl = containerEl;
 		this.deps = deps;
+
+		// Obsidian's Cmd+Z (`editor:undo`) only fires against a focused
+		// CodeMirror editor; a BasesView has none, so undo/redo here must be
+		// claimed explicitly via a `Scope`. Making the container focusable is
+		// what lets a click anywhere inside it arm that scope (clicking a
+		// non-focusable descendant focuses the nearest focusable ancestor).
+		// The added class is what `styles/calendar.css` targets to suppress
+		// the resulting focus ring for pointer focus only.
+		this.viewContainerEl.tabIndex = -1;
+		this.viewContainerEl.addClass(cssClass("calendar-view"));
+
+		// `app.scope` as the parent means any key this scope doesn't handle
+		// falls through to Obsidian's own defaults instead of being swallowed
+		// while the calendar has focus.
+		this.scope = new Scope(this.deps.app.scope);
+		this.scope.register(["Mod"], "z", (evt) => {
+			evt.preventDefault();
+			void this.runHistoryStep(this.deps.undoReschedule, "Nothing to undo.");
+			return false;
+		});
+		this.scope.register(["Mod", "Shift"], "z", (evt) => {
+			evt.preventDefault();
+			void this.runHistoryStep(this.deps.redoReschedule, "Nothing to redo.");
+			return false;
+		});
+
+		this.registerDomEvent(this.viewContainerEl, "focusin", () => {
+			if (!this.scopePushed) {
+				this.deps.app.keymap.pushScope(this.scope);
+				this.scopePushed = true;
+			}
+		});
+		this.registerDomEvent(this.viewContainerEl, "focusout", (evt) => {
+			// Focus moving between two descendants of the container (e.g. from
+			// one calendar toolbar button to another) fires `focusout` too —
+			// only pop once focus has actually left the container entirely.
+			if (evt.relatedTarget instanceof Node && this.viewContainerEl.contains(evt.relatedTarget)) {
+				return;
+			}
+			if (this.scopePushed) {
+				this.deps.app.keymap.popScope(this.scope);
+				this.scopePushed = false;
+			}
+		});
 
 		refreshAfterMetadataResolved(this, this.deps.app);
 	}
@@ -148,6 +200,7 @@ export class CalendarBasesView extends BasesView {
 						// from, so a drag can never write the wrong one.
 						const result = await this.deps.rescheduleTask(event.taskPath, event.source, start, end === undefined ? none() : some(end));
 						if (result.ok) {
+							this.deps.history.record(result.value);
 							return true;
 						}
 						this.deps.notifier.error(describeAppError(result.error));
@@ -180,10 +233,34 @@ export class CalendarBasesView extends BasesView {
 	}
 
 	override onunload(): void {
+		// A view can be destroyed while it still has focus (e.g. the pane is
+		// closed) — pop the pushed scope so it doesn't leak on `app.keymap`'s
+		// scope stack.
+		if (this.scopePushed) {
+			this.deps.app.keymap.popScope(this.scope);
+			this.scopePushed = false;
+		}
 		this.handle?.destroy();
 		this.handle = undefined;
 		this.applied = undefined;
 		super.onunload();
+	}
+
+	/**
+	 * Shared body of the Cmd+Z/Cmd+Shift+Z handlers: run one history step,
+	 * and tell the user only when there was nothing to do — a successful
+	 * undo/redo is visible on the calendar itself, so a notice on top of
+	 * that would be noise.
+	 */
+	private async runHistoryStep(step: UndoReschedule | RedoReschedule, emptyMessage: string): Promise<void> {
+		const result = await step();
+		if (!result.ok) {
+			this.deps.notifier.error(describeAppError(result.error));
+			return;
+		}
+		if (!result.value.some) {
+			this.deps.notifier.info(emptyMessage);
+		}
 	}
 
 	/**

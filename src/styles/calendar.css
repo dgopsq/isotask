@@ -29,6 +29,18 @@
 	padding: var(--size-4-1) var(--size-4-2) 0 var(--size-4-2);
 }
 
+/*
+ * The calendar root is a focusable container (see calendar-view.ts — this
+ * is what arms the Cmd+Z/Cmd+Shift+Z undo/redo scope while the calendar has
+ * focus), so it now draws a focus ring on click like any other focusable
+ * element. Suppress it for pointer focus only (`:focus:not(:focus-visible)`)
+ * — never `outline: none` unconditionally, which would also drop the ring
+ * for keyboard navigation.
+ */
+.obtask-calendar-view:focus:not(:focus-visible) {
+	outline: none;
+}
+
 .obtask-calendar .ec {
 	/* Main colors -> the Obsidian scale closest to each role. */
 	--ec-color-50: var(--background-secondary);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AppDeps } from "@/app/deps";
 import { makeConvertNote } from "@/app/convert-note";
-import { FakeClock, FakeNotifier, FakeTaskStore } from "@/app/test/fakes";
+import { FakeClock, FakeNotifier, FakeRescheduleHistory, FakeTaskStore } from "@/app/test/fakes";
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
@@ -17,7 +17,7 @@ function makeDeps(): { readonly deps: AppDeps; readonly store: FakeTaskStore; re
 	const store = new FakeTaskStore({ keys: DEFAULT_PROPERTY_KEYS, statuses: DEFAULT_STATUSES });
 	const clock = new FakeClock("2026-09-02T10:00" as IsoDateTime, "2026-09-02" as IsoDate);
 	const notifier = new FakeNotifier();
-	return { deps: { store, clock, notifier, settings: () => DEFAULT_SETTINGS }, store, notifier };
+	return { deps: { store, clock, notifier, history: new FakeRescheduleHistory(), settings: () => DEFAULT_SETTINGS }, store, notifier };
 }
 
 describe("makeConvertNote", () => {

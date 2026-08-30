@@ -4,6 +4,7 @@ import "@/styles/calendar.css";
 import "@/styles/obtask.css";
 
 import { EventCalendarRenderer } from "@/adapters/calendar/event-calendar/event-calendar-renderer";
+import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
@@ -20,6 +21,7 @@ import { makeSetProject } from "@/app/set-project";
 import { makeSetRecurrence } from "@/app/set-recurrence";
 import { makeSetStatus } from "@/app/set-status";
 import { makeSetTags } from "@/app/set-tags";
+import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
 import { parseSettings } from "@/domain/settings";
 import type { ObtaskSettings } from "@/domain/settings";
@@ -47,11 +49,16 @@ export default class ObtaskPlugin extends Plugin {
 		const clock = createObsidianClock();
 		const notifier = createObsidianNotifier();
 		const calendarRenderer = new EventCalendarRenderer();
+		// Session-only: deliberately not persisted across reloads (see
+		// `adapters/history/reschedule-history.ts`), so it's built fresh here
+		// rather than restored from `loadData`.
+		const rescheduleHistory = makeRescheduleHistory();
 
 		const appDeps: AppDeps = {
 			store,
 			clock,
 			notifier,
+			history: rescheduleHistory,
 			settings: () => this.pluginSettings,
 		};
 
@@ -66,6 +73,8 @@ export default class ObtaskPlugin extends Plugin {
 		const setProject = makeSetProject(appDeps);
 		const setRecurrence = makeSetRecurrence(appDeps);
 		const setTags = makeSetTags(appDeps);
+		const undoReschedule = makeUndoReschedule(appDeps);
+		const redoReschedule = makeRedoReschedule(appDeps);
 
 		registerViews(this, {
 			app: this.app,
@@ -76,6 +85,9 @@ export default class ObtaskPlugin extends Plugin {
 			createTask,
 			rescheduleTask,
 			renderer: calendarRenderer,
+			history: rescheduleHistory,
+			undoReschedule,
+			redoReschedule,
 			setStatus,
 			setPriority,
 			setDate,
@@ -100,6 +112,8 @@ export default class ObtaskPlugin extends Plugin {
 			cycleStatus,
 			setDate,
 			setRecurrence,
+			undoReschedule,
+			redoReschedule,
 		});
 
 		registerTaskMenus(this, {

@@ -4,10 +4,11 @@ import type { AppError } from "@/app/errors";
 import type { DateField } from "@/app/set-date";
 import { differenceInMinutes } from "@/domain/dates";
 import type { TaskDate } from "@/domain/dates";
-import type { FrontmatterPatch } from "@/domain/frontmatter";
+import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
 import type { Option, Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
 import type { Minutes, TaskPath } from "@/domain/task";
+import type { RescheduleEntry } from "@/ports/reschedule-history";
 
 /**
  * Moves or resizes a task's `due`/`scheduled` date from a single calendar
@@ -25,9 +26,24 @@ import type { Minutes, TaskPath } from "@/domain/task";
  * duration in frontmatter, so dragging it back out restores the same block
  * size, and a time estimate set via the "set duration" command is never
  * clobbered by an unrelated move.
+ *
+ * Returns the written patch alongside its inverse (a `RescheduleEntry`) so a
+ * caller — `views/bases/calendar` — can push it onto `deps.history` for
+ * undo/redo (`app/undo-reschedule.ts`). The inverse is built from a
+ * `rawFrontmatter` read taken immediately before the write: for every key
+ * the patch is about to touch, the undo patch restores the value currently
+ * on disk, or `null` (delete) for a key that isn't set yet — matching
+ * `TaskStore.updateProperties`' own `null`-removes-a-key contract, so undoing
+ * a write that *added* a property removes it again instead of leaving it
+ * behind.
  */
 export function makeRescheduleTask(deps: AppDeps) {
-	return async (path: TaskPath, field: DateField, start: TaskDate, end: Option<TaskDate>): Promise<Result<void, AppError>> => {
+	return async (
+		path: TaskPath,
+		field: DateField,
+		start: TaskDate,
+		end: Option<TaskDate>,
+	): Promise<Result<RescheduleEntry, AppError>> => {
 		const keys = deps.settings().propertyKeys;
 
 		let patch: FrontmatterPatch;
@@ -38,8 +54,19 @@ export function makeRescheduleTask(deps: AppDeps) {
 			patch = { [keys.scheduled]: start, ...(minutes !== undefined ? { [keys.duration]: minutes } : {}) };
 		}
 
+		const rawResult = await deps.store.rawFrontmatter(path);
+		if (!rawResult.ok) {
+			return err(storeError(rawResult.error));
+		}
+		const raw = rawResult.value;
+		const undo: FrontmatterPatch = Object.keys(patch).reduce<Record<string, FrontmatterValue | null>>((acc, key) => {
+			const stored = raw[key];
+			acc[key] = stored === undefined ? null : stored;
+			return acc;
+		}, {});
+
 		const result = await deps.store.updateProperties(path, patch);
-		return result.ok ? ok(undefined) : err(storeError(result.error));
+		return result.ok ? ok({ path, undo, redo: patch }) : err(storeError(result.error));
 	};
 }
 

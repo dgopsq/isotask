@@ -1,6 +1,7 @@
 import type { ObtaskSettings } from "@/domain/settings";
 import type { Clock } from "@/ports/clock";
 import type { Notifier } from "@/ports/notifier";
+import type { RescheduleHistory } from "@/ports/reschedule-history";
 import type { TaskStore } from "@/ports/task-store";
 
 /**
@@ -12,5 +13,6 @@ export interface AppDeps {
 	readonly store: TaskStore;
 	readonly clock: Clock;
 	readonly notifier: Notifier;
+	readonly history: RescheduleHistory;
 	readonly settings: () => ObtaskSettings;
 }

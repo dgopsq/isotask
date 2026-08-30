@@ -10,6 +10,7 @@ import { renderTasksBase } from "@/app/generate-base";
 import type { DateField, makeSetDate } from "@/app/set-date";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
 import type { makeSetStatus } from "@/app/set-status";
+import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import { isTaskNote } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Result } from "@/domain/result";
@@ -38,6 +39,8 @@ export interface RegisterCommandsDeps {
 	readonly cycleStatus: ReturnType<typeof makeCycleStatus>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly undoReschedule: UndoReschedule;
+	readonly redoReschedule: RedoReschedule;
 }
 
 function describeError(error: unknown): string {
@@ -62,6 +65,26 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 	function report(result: Result<unknown, AppError>): void {
 		if (!result.ok) {
 			deps.notifier.error(describeAppError(result.error));
+		}
+	}
+
+	/**
+	 * Shared body of the "Undo/redo last calendar reschedule" commands: run
+	 * one history step, and tell the user only when there was nothing to
+	 * do — a successful undo/redo is visible on the calendar itself (if
+	 * open), so a notice on top of that would be noise. These operate on the
+	 * same shared `RescheduleHistory` instance the calendar view records
+	 * into, so they work regardless of what is focused — the mobile path,
+	 * where there is no Cmd+Z.
+	 */
+	async function runHistoryStep(step: UndoReschedule | RedoReschedule, emptyMessage: string): Promise<void> {
+		const result = await step();
+		if (!result.ok) {
+			deps.notifier.error(describeAppError(result.error));
+			return;
+		}
+		if (!result.value.some) {
+			deps.notifier.info(emptyMessage);
 		}
 	}
 
@@ -263,6 +286,22 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		name: "Open tasks base",
 		callback: () => {
 			void openTasksBase();
+		},
+	});
+
+	plugin.addCommand({
+		id: "undo-reschedule",
+		name: "Undo last calendar reschedule",
+		callback: () => {
+			void runHistoryStep(deps.undoReschedule, "Nothing to undo.");
+		},
+	});
+
+	plugin.addCommand({
+		id: "redo-reschedule",
+		name: "Redo last calendar reschedule",
+		callback: () => {
+			void runHistoryStep(deps.redoReschedule, "Nothing to redo.");
 		},
 	});
 }
