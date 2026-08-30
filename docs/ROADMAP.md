@@ -80,6 +80,8 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 - [x] Drag/resize (desktop) -> `rescheduleTask` use-case (`app/reschedule-task.ts`).
 - [x] Long-press + drag (touch) -> same reschedule path (`longPressDelay`/`dragScroll`).
 - [x] Click empty slot -> create-task modal pre-filled with the clicked date.
+- [x] Undo/redo a reschedule: Cmd+Z / Cmd+Shift+Z while the calendar has focus, plus the
+      "Undo/Redo last calendar reschedule" commands (`app/undo-reschedule.ts`, ADR 0013).
 - [ ] Touch QA pass.
 
 ## M5 — Release
