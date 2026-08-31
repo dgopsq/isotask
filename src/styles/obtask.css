@@ -6,8 +6,20 @@
  */
 
 .obtask-feed {
+	/*
+	 * Cap on the metadata cells that can carry arbitrarily long values
+	 * (project, tags, generic): each ellipsizes past it, so its max-content
+	 * track hugs the cap instead of letting one long value widen the whole
+	 * column. The title's own track floor keeps it readable when many
+	 * columns outgrow the pane — the metadata tracks cannot shrink, so past
+	 * that point the pane scrolls horizontally rather than crushing the
+	 * title to zero (the narrow-pane answer is the planned two-line
+	 * collapse, not tighter squeezing).
+	 */
+	--obtask-feed-meta-col-max: 180px;
+	--obtask-feed-title-min: 200px;
 	display: grid;
-	grid-template-columns: max-content minmax(0, 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
+	grid-template-columns: max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
 	column-gap: var(--size-4-2);
 	padding: var(--size-4-2);
 }
@@ -125,15 +137,30 @@
 	color: var(--text-faint);
 }
 
+/*
+ * The three metadata cells that can carry arbitrarily long values. Each is
+ * capped at --obtask-feed-meta-col-max and ellipsizes past it, so its
+ * max-content track hugs the cap instead of the full value.
+ */
 .obtask-feed__project {
+	max-width: var(--obtask-feed-meta-col-max);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 	color: var(--text-accent);
 	font-size: var(--font-ui-small);
 }
 
+/*
+ * Not a flex row (which would clip mid-tag with no ellipsis): the tags stay
+ * inline content so the container's own text-overflow can elide them, with
+ * the inter-tag gap coming from margins instead of flex `gap`.
+ */
 .obtask-feed__tags {
-	display: inline-flex;
-	flex-wrap: wrap;
-	gap: var(--size-4-1);
+	max-width: var(--obtask-feed-meta-col-max);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 .obtask-feed__tag {
@@ -141,10 +168,15 @@
 	font-size: var(--font-ui-small);
 }
 
+.obtask-feed__tag + .obtask-feed__tag {
+	margin-inline-start: var(--size-4-1);
+}
+
 .obtask-feed__generic {
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--size-4-1);
+	max-width: var(--obtask-feed-meta-col-max);
 	font-size: var(--font-ui-small);
 }
 
@@ -154,6 +186,10 @@
 }
 
 .obtask-feed__generic-value {
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 	color: var(--text-muted);
 }
 
