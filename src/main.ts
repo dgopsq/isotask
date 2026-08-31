@@ -29,7 +29,8 @@ import type { ObtaskSettings } from "@/domain/settings";
 import { VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { ObtaskSettingTab } from "@/settings/settings-tab";
 import { registerViews } from "@/views/bases/register";
-import { TaskPanelView } from "@/views/task-panel/task-panel-view";
+import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
+import { TASK_PANEL_ICON, TaskPanelView } from "@/views/task-panel/task-panel-view";
 
 /**
  * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads
@@ -141,6 +142,29 @@ export default class ObtaskPlugin extends Plugin {
 		registerTaskViewActions(this, taskMenuDeps);
 
 		this.registerView(VIEW_TYPE_TASK_PANEL, (leaf) => new TaskPanelView(leaf, { ...taskMenuDeps, convertNote }));
+
+		this.addRibbonIcon(TASK_PANEL_ICON, "Open task panel", () => {
+			void revealTaskPanel(this.app);
+		});
+
+		// One-time auto-open of the sidebar task panel on first enable, gated
+		// by the persisted `taskPanelIntroduced` flag (`domain/settings.ts`):
+		// persist the flag before revealing anything, so a reload or crash
+		// mid-reveal can never cause a second auto-open, and skip revealing
+		// if a leaf of that type is already open (e.g. restored from a
+		// previous session's layout) — but still mark the flag used.
+		this.app.workspace.onLayoutReady(() => {
+			void (async () => {
+				if (this.pluginSettings.taskPanelIntroduced) {
+					return;
+				}
+				const alreadyOpen = this.app.workspace.getLeavesOfType(VIEW_TYPE_TASK_PANEL).length > 0;
+				await this.saveSettings({ ...this.pluginSettings, taskPanelIntroduced: true });
+				if (!alreadyOpen) {
+					await revealTaskPanel(this.app);
+				}
+			})();
+		});
 
 		this.addSettingTab(
 			new ObtaskSettingTab(this.app, this, {

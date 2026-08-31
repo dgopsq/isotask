@@ -108,6 +108,11 @@ export default defineConfig([
 			"no-undef": "off",
 			"obsidianmd/no-nodejs-modules": "off",
 			"obsidianmd/rule-custom-message": "off",
+			// This Node script reads/writes the sandbox vault's `.obsidian/`
+			// folder directly on disk (there's no running `Vault` instance to
+			// ask for `configDir`) — the guideline this rule enforces is about
+			// plugin runtime code, which none of e2e/ is.
+			"obsidianmd/hardcoded-config-path": "off",
 		},
 	},
 	{

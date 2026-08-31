@@ -15,7 +15,8 @@ import { formatDurationMinutes } from "@/domain/task-display";
 import { cssClass, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
 
-const TASK_PANEL_ICON = "square-check";
+/** Shared with the ribbon icon (`main.ts`) so the two never drift apart. */
+export const TASK_PANEL_ICON = "square-check";
 const TASK_PANEL_DISPLAY_TEXT = "Task";
 
 /** Debounce window for a `metadataCache` `changed` re-render, matching the feed row's touch-and-hold pattern's use of a plain `window.setTimeout`. */

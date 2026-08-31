@@ -94,6 +94,11 @@ describe("parseSettings", () => {
 		expect(parseSettings({ weekStart: 9 }).weekStart).toBe(DEFAULT_SETTINGS.weekStart);
 	});
 
+	it("keeps a valid taskPanelIntroduced flag and falls back an invalid one", () => {
+		expect(parseSettings({ taskPanelIntroduced: true }).taskPanelIntroduced).toBe(true);
+		expect(parseSettings({ taskPanelIntroduced: "yes" }).taskPanelIntroduced).toBe(DEFAULT_SETTINGS.taskPanelIntroduced);
+	});
+
 	it("falls back version when not literal 1, without touching other fields", () => {
 		const result = parseSettings({ version: 2, taskFolder: "Tasks 2" });
 		expect(result.version).toBe(1);

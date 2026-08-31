@@ -16,6 +16,13 @@ export interface ObtaskSettings {
 	readonly newTaskFilenameTemplate: string;
 	readonly spawnFilenameTemplate: string;
 	readonly weekStart: Weekday;
+	/**
+	 * Set once the sidebar task panel has been auto-opened for the user
+	 * (or that first-open opportunity has otherwise been used up — see
+	 * `main.ts`'s `onLayoutReady` handler). Never reset, so the panel is
+	 * auto-opened at most once per vault, even if the user closes it again.
+	 */
+	readonly taskPanelIntroduced: boolean;
 }
 
 export const DEFAULT_SETTINGS: ObtaskSettings = {
@@ -27,6 +34,7 @@ export const DEFAULT_SETTINGS: ObtaskSettings = {
 	newTaskFilenameTemplate: "{{title}}",
 	spawnFilenameTemplate: "{{title}} {{due}}",
 	weekStart: 0,
+	taskPanelIntroduced: false,
 };
 
 function fallbackString(defaultValue: string) {
@@ -90,6 +98,7 @@ const SettingsSchema = v.object({
 	newTaskFilenameTemplate: fallbackString(DEFAULT_SETTINGS.newTaskFilenameTemplate),
 	spawnFilenameTemplate: fallbackString(DEFAULT_SETTINGS.spawnFilenameTemplate),
 	weekStart: WeekdaySchema,
+	taskPanelIntroduced: v.fallback(v.boolean(), DEFAULT_SETTINGS.taskPanelIntroduced),
 });
 
 function toStatusConfig(status: ParsedStatusConfig): StatusConfig {

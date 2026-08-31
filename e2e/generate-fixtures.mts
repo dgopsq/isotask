@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildFixtures, noteContent } from "./fixtures.ts";
+import { PLUGIN_ID } from "@/plugin-id";
 
 /**
  * Generates the date-relative task notes into `e2e/vault/Tasks/` before
@@ -21,7 +22,35 @@ import { buildFixtures, noteContent } from "./fixtures.ts";
 
 const vaultDir = fileURLToPath(new URL("./vault/", import.meta.url));
 const tasksDir = join(fileURLToPath(new URL("./vault/Tasks/", import.meta.url)));
+const pluginDataPath = join(fileURLToPath(new URL("./vault/.obsidian/plugins/", import.meta.url)), PLUGIN_ID, "data.json");
 const verbose = process.env["E2E_VERBOSE"] === "1";
+
+/**
+ * Pre-seeds the plugin's persisted settings (`src/domain/settings.ts`) in
+ * the sandbox vault so `main.ts`'s one-time task-panel auto-open has
+ * already "used up" its first-open on every e2e run — otherwise the right
+ * sidebar would pop open on launch and perturb specs/screenshots that don't
+ * expect it. wdio-obsidian-service's local-plugin install only overwrites
+ * this vault's `data.json` when *this repo's own* (gitignored, dev-only)
+ * root `data.json` exists (it normally doesn't), so writing it here is
+ * enough — it isn't clobbered by the plugin install step.
+ *
+ * Only `taskPanelIntroduced` is set; every other field falls back to its
+ * default via `parseSettings`, so this stays correct as the settings shape
+ * evolves. `e2e/vault/.obsidian/plugins/` is gitignored (same blanket
+ * `data.json` rule as the repo root) and regenerated here on every run, so
+ * nothing plugin-settings-related needs to be checked in.
+ */
+async function writePluginData(): Promise<boolean> {
+	const desired = `${JSON.stringify({ taskPanelIntroduced: true }, undefined, "\t")}\n`;
+	const current = await readFile(pluginDataPath, "utf8").catch(() => undefined);
+	if (current === desired) {
+		return false;
+	}
+	await mkdir(join(pluginDataPath, ".."), { recursive: true });
+	await writeFile(pluginDataPath, desired, "utf8");
+	return true;
+}
 
 /**
  * Vault-root fixtures (outside `Tasks/`) that e2e "Actions" specs create
@@ -34,6 +63,8 @@ const staleVaultRootFiles = ["Plain.md", "Task panel plain note.md"];
 
 async function main(): Promise<void> {
 	await mkdir(tasksDir, { recursive: true });
+
+	const pluginDataWritten = await writePluginData();
 
 	await Promise.all(staleVaultRootFiles.map((name) => rm(join(vaultDir, name), { force: true })));
 
@@ -75,7 +106,7 @@ async function main(): Promise<void> {
 	);
 
 	console.log(
-		`[generate-fixtures] today=${fixtures.today} wrote ${String(writtenCount)}/${String(desired.size)} note(s) (rest unchanged) to ${tasksDir}`,
+		`[generate-fixtures] today=${fixtures.today} wrote ${String(writtenCount)}/${String(desired.size)} note(s) (rest unchanged) to ${tasksDir}; plugin data.json ${pluginDataWritten ? "written" : "unchanged"}`,
 	);
 	if (verbose) {
 		for (const task of fixtures.tasks) {

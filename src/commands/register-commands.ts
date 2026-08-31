@@ -21,13 +21,14 @@ import type { Result } from "@/domain/result";
 import { err } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
-import { VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
+import { VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
 import { PrioritySuggestModal } from "@/ui/priority-suggest-modal";
 import { StatusSuggestModal } from "@/ui/status-suggest-modal";
+import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
 
 export interface RegisterCommandsDeps {
 	readonly app: App;
@@ -170,20 +171,6 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			return;
 		}
 		await deps.app.workspace.getLeaf().openFile(file);
-	}
-
-	/** Reveals the sidebar task panel (`views/task-panel/task-panel-view.ts`), reusing an already-open leaf of that type if there is one, else opening a new one in the right sidebar. */
-	async function revealTaskPanel(): Promise<void> {
-		const existing = deps.app.workspace.getLeavesOfType(VIEW_TYPE_TASK_PANEL)[0];
-		if (existing !== undefined) {
-			await deps.app.workspace.revealLeaf(existing);
-			return;
-		}
-		// `getRightLeaf` can come back null (no right split available); fall
-		// back to a main-area tab so the command never silently no-ops.
-		const leaf = deps.app.workspace.getRightLeaf(false) ?? deps.app.workspace.getLeaf(true);
-		await leaf.setViewState({ type: VIEW_TYPE_TASK_PANEL, active: true });
-		await deps.app.workspace.revealLeaf(leaf);
 	}
 
 	plugin.addCommand({
@@ -397,7 +384,7 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		id: "open-task-panel",
 		name: "Open task panel",
 		callback: () => {
-			void revealTaskPanel();
+			void revealTaskPanel(deps.app);
 		},
 	});
 
