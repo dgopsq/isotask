@@ -405,6 +405,12 @@ export class FeedBasesView extends BasesView {
 	 */
 	private renderPriorityControl(parent: HTMLElement, task: Task): void {
 		if (task.priority === "normal") {
+			// Still emits an (empty, inert) grid cell: in wide mode the meta
+			// chips are direct subgrid items of the row (`.obtask-feed__meta`
+			// is `display: contents`), so skipping the element entirely would
+			// shift this row's later columns (project, tags) one track left
+			// relative to rows that do render a mark.
+			parent.createSpan({ cls: [cssClass("feed__priority"), cssClass("feed__priority--empty")] });
 			return;
 		}
 
