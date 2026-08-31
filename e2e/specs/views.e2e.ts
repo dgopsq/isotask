@@ -1013,6 +1013,72 @@ describe("Views", function () {
 		return browser.execute((cls) => document.querySelectorAll(`.${cls} .ec-col-head`).length, calendarClsArg);
 	}
 
+	/**
+	 * Geometry + visibility of every event in a compact MONTH cell — used by
+	 * the narrow-pane compaction test to prove the dot-grid rewrite (`month`
+	 * is back below `COMPACT_CALENDAR_WIDTH`, rendered as dots instead of the
+	 * rolling 3-day fallback it used to collapse into): each dot's title text
+	 * must stay in the DOM (`titleText`) but be visually clipped
+	 * (`titleWidth` ~0, the same clip-to-1px treatment as the compact
+	 * time-axis gutter's "all-day" label), and `visible` reads
+	 * `.ec-event`'s own `visibility` (Event Calendar's own `dayMaxEvents`
+	 * hide() sets `visibility: hidden` — not `display: none` — on whatever a
+	 * busy day's cap hides). `date` is resolved the same geometry-overlap way
+	 * the wide-pane "empty day cell" test resolves an event's day (events
+	 * aren't nested inside their day cell's own DOM — a separate absolutely/
+	 * grid-positioned overlay layer — so the correspondence has to be read
+	 * from rendered rects, not `querySelector`).
+	 */
+	async function readCompactMonthDots(): Promise<
+		{ readonly date: string; readonly visible: boolean; readonly titleText: string; readonly titleWidth: number }[]
+	> {
+		return browser.execute(
+			(calendarCls, eventCls) => {
+				const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`)).map((cell) => ({
+					date: cell.querySelector("time[datetime]")?.getAttribute("datetime") ?? "",
+					rect: cell.getBoundingClientRect(),
+				}));
+				const events = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .${eventCls}`));
+				return events.map((el) => {
+					const rect = el.getBoundingClientRect();
+					const cell = cells.find(
+						(c) => !(rect.right <= c.rect.left || rect.left >= c.rect.right || rect.bottom <= c.rect.top || rect.top >= c.rect.bottom),
+					);
+					const titleEl = el.querySelector(".ec-event-title");
+					return {
+						date: cell?.date ?? "",
+						visible: getComputedStyle(el).visibility !== "hidden",
+						titleText: titleEl?.textContent ?? "",
+						titleWidth: titleEl?.getBoundingClientRect().width ?? 0,
+					};
+				});
+			},
+			cssClass("calendar"),
+			cssClass("event"),
+		);
+	}
+
+	/** Resolves the WebdriverIO element for a month-view day-grid cell by its `datetime`, for a click gesture. */
+	async function monthDayCellByDate(dateIso: string): Promise<WebdriverIO.Element> {
+		const index = await browser.execute(
+			(calendarCls, iso) => {
+				const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+				return cells.findIndex((cell) => cell.querySelector("time[datetime]")?.getAttribute("datetime") === iso);
+			},
+			cssClass("calendar"),
+			dateIso,
+		);
+		if (index < 0) {
+			throw new Error(`no month-view day cell found for ${dateIso}`);
+		}
+		const cells = await browser.$$(`.${cssClass("calendar")} .ec-day-grid .ec-day`).getElements();
+		const cell = cells[index];
+		if (cell === undefined) {
+			throw new Error(`could not resolve the day cell element for ${dateIso}`);
+		}
+		return cell;
+	}
+
 	describe("Calendar view", function () {
 		before(async function () {
 			// Switch from the default "Feed" view to "Calendar" through the Bases
@@ -2434,18 +2500,24 @@ describe("Views", function () {
 		/**
 		 * The calendar-compaction feature this test covers: below
 		 * `COMPACT_CALENDAR_WIDTH` (`domain/calendar-view-options.ts`), month
-		 * collapses to the renderer's rolling 3-day view (`effectiveCalendarView`)
-		 * and the header stops offering "Month" at all — a 390px month cell is
-		 * ~53px wide, room for a priority dot and nothing else. Same
-		 * window-resize technique as the test above (`windowSize`/
-		 * `setWindowSize` — WebDriver's own `setWindowSize` doesn't work
-		 * against this Electron session), but this one doesn't need
-		 * `app.emulateMobile(true)` — compaction keys off the pane's own
-		 * `clientWidth`, not `is-mobile`, so plain desktop-Electron-at-390px
-		 * is enough to exercise it (and is closer to the narrow-*split-pane*-
-		 * on-desktop case the feature also covers).
+		 * renders as a grid of small DOTS instead of chips (a 390px month
+		 * cell is ~53px wide, room for a legible dot but not a chip's title),
+		 * week still collapses to a rolling 3-day view, and tapping a compact
+		 * month day cell drills into Day view instead of opening the
+		 * create-task modal. There is no "Month falls back to 3 days" wart
+		 * any more — `domain/calendar-view-options.ts` no longer remaps any
+		 * view when compact, so the header keeps listing (and rendering)
+		 * Month at every pane width; only its CHROME (dots vs. chips, no
+		 * create-on-tap) changes below the threshold. Same window-resize
+		 * technique as the test above (`windowSize`/`setWindowSize` —
+		 * WebDriver's own `setWindowSize` doesn't work against this Electron
+		 * session), but this one doesn't need `app.emulateMobile(true)` —
+		 * compaction keys off the pane's own `clientWidth`, not `is-mobile`,
+		 * so plain desktop-Electron-at-390px is enough to exercise it (and is
+		 * closer to the narrow-*split-pane*-on-desktop case the feature also
+		 * covers).
 		 */
-		it("collapses to a rolling 3-day view and drops Month from the header under 640px", async function () {
+		it("renders a dot grid for compact month, keeps the rolling 3-day week view, and drills a tap into Day view", async function () {
 			const originalSize = await windowSize();
 			await setWindowSize(390, 844);
 			// Unlike the `app.emulateMobile(true)` test above (which switches
@@ -2477,23 +2549,116 @@ describe("Views", function () {
 				await openFile("Tasks/Today task.md");
 				await reopenCalendarView();
 
-				// Tasks.base leaves `initialView` unset (defaults to "month"), but
-				// the pane is narrower than `COMPACT_CALENDAR_WIDTH` —
-				// `effectiveCalendarView` collapses that to the renderer's rolling
-				// 3-day week view instead of a 7-column month grid.
-				await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
-				await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
-
-				await browser.waitUntil(async () => (await readColumnHeaderCount(cssClass("calendar"))) === 3, {
+				// Tasks.base leaves `initialView` unset (defaults to "month"), and
+				// compact no longer remaps that to anything else — the pane still
+				// renders the full 7-column day-grid, just with dots instead of
+				// chips (asserted below).
+				await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+				await expect(browser.$(`.${cssClass("calendar")} .ec-week-view`)).not.toExist();
+				await browser.waitUntil(async () => (await readColumnHeaderCount(cssClass("calendar"))) === 7, {
 					timeout: SELECT_TIMEOUT,
-					timeoutMsg: "expected exactly 3 day columns in the compact narrow-pane calendar",
+					timeoutMsg: "expected exactly 7 day columns in the compact month grid",
 				});
 
 				let textLabels = (await readToolbarButtons()).map((b) => b.text.trim()).filter((t) => t.length > 0);
+				expect(textLabels).toContain("Month");
 				expect(textLabels).toContain("3 days");
 				expect(textLabels).toContain("Day");
-				expect(textLabels).not.toContain("Month");
 				expect(textLabels).not.toContain("Week");
+				const active = (await readToolbarButtons()).filter((b) => b.isActive);
+				expect(active).toHaveLength(1);
+				expect(active[0]?.text.trim()).toEqual("Month");
+
+				// "Today" carries several due/scheduled fixtures (`e2e/fixtures.ts`:
+				// "Today task", "Deadline call", "Early ping", "Late ping", "Team
+				// sync", "Standup", "Planning session" — 7 candidates under the
+				// default `events: both`), so its month cell is the busy day this
+				// suite uses to prove the cap without adding any fixture of its own.
+				await browser.waitUntil(async () => (await readCompactMonthDots()).some((d) => d.date === fixtures.today), {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: "no compact month dots rendered for today",
+				});
+				const dots = await readCompactMonthDots();
+
+				// No visible chip titles anywhere in the compact month grid: the
+				// title text stays in the DOM (assistive tech still gets it) but
+				// is clipped to ~0 rendered width, the same treatment already
+				// proven for the compact time-axis gutter's "all-day" label.
+				expect(dots.length).toBeGreaterThan(0);
+				for (const dot of dots) {
+					expect(dot.titleText.trim().length).toBeGreaterThan(0);
+					expect(dot.titleWidth).toBeLessThanOrEqual(1);
+				}
+
+				// Today's cell: several tasks, but only a handful of dots actually
+				// visible — `dayMaxEvents: true` (compact month only,
+				// `event-calendar-renderer.ts`) plus `calendar.css`'s fixed
+				// `--ec-row-height` cap the stack rather than letting it grow the
+				// whole week row taller.
+				const todayDots = dots.filter((d) => d.date === fixtures.today);
+				expect(todayDots.length).toBeGreaterThan(4);
+				const visibleTodayDots = todayDots.filter((d) => d.visible);
+				expect(visibleTodayDots.length).toBeGreaterThan(1);
+				expect(visibleTodayDots.length).toBeLessThanOrEqual(4);
+
+				if (process.env["E2E_SCREENSHOT"] === "1") {
+					await saveScreenshot("calendar-compact-month-390");
+				}
+
+				// Tapping a day cell — even a busy one, directly over its dots —
+				// drills into Day view for that date instead of opening the
+				// create-task modal (`calendar-view.ts#onSlotClick`). Clicking
+				// squarely on a dot is deliberate here (not an "empty" cell like
+				// the wide-pane click-to-create test needs): dots are
+				// `pointer-events: none` precisely so this works.
+				const todayCell = await monthDayCellByDate(fixtures.today);
+				await todayCell.click();
+
+				await browser.$(`.${cssClass("calendar")} .ec-day-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+				const modalCls = cssClass("create-task-modal");
+				await expect(browser.$(`.${modalCls}`)).not.toExist();
+				const shownDate = await browser.execute(
+					(calendarCls) => document.querySelector(`.${calendarCls} .ec-day-view time[datetime]`)?.getAttribute("datetime") ?? null,
+					cssClass("calendar"),
+				);
+				expect(shownDate).toEqual(fixtures.today);
+
+				// The tap above navigated Event Calendar's OWN internal view to
+				// "day" without touching the Bases `initialView` config (by
+				// design — see `calendar-view.ts`'s `onSlotClick` doc comment:
+				// the view never learns about a switch made through Event
+				// Calendar itself). No Bases navigation happened either (unlike
+				// clicking an EVENT, which opens the task note and replaces the
+				// leaf), so the SAME calendar instance is still mounted — setting
+				// `initialView` straight to "week" below still lands there: the
+				// view's own change-detection compares against what it last
+				// applied ("month", untouched by the tap), which differs from
+				// "week" regardless of what Event Calendar is actually showing
+				// right now.
+				//
+				// Week is unaffected by any of this — still the rolling 3-day view,
+				// unchanged from before this feature (item kept "exactly as it
+				// is"): same column count, same "3 days" label, and the same
+				// stacked time-above-title chip layout at this column width.
+				await setCalendarInitialView("week");
+				await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+				await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
+				await browser.waitUntil(async () => (await readColumnHeaderCount(cssClass("calendar"))) === 3, {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: "expected exactly 3 day columns in the compact rolling week view",
+				});
+				// The switcher itself lists the same three buttons regardless of
+				// which one is currently active (Month included — there is no
+				// "compact hides Month" suppression any more), only the currently
+				// active one differs.
+				textLabels = (await readToolbarButtons()).map((b) => b.text.trim()).filter((t) => t.length > 0);
+				expect(textLabels).toContain("Month");
+				expect(textLabels).toContain("3 days");
+				expect(textLabels).toContain("Day");
+				expect(textLabels).not.toContain("Week");
+				const activeInWeek = (await readToolbarButtons()).filter((b) => b.isActive);
+				expect(activeInWeek).toHaveLength(1);
+				expect(activeInWeek[0]?.text.trim()).toEqual("3 days");
 
 				// The narrow (~86px) compact column has no room for a timed
 				// all-day chip's time and title on one line — at this width the
@@ -2512,22 +2677,8 @@ describe("Views", function () {
 				}
 
 				if (process.env["E2E_SCREENSHOT"] === "1") {
-					await saveScreenshot("calendar-compact-390");
+					await saveScreenshot("calendar-compact-week-390");
 				}
-
-				// A user (or a saved `.base` file) explicitly choosing "Month" on a
-				// narrow pane is the documented wart (`docs/DOMAIN-MODEL.md`): Bases'
-				// own dropdown can't vary by pane width, so it still lists "Month",
-				// and picking it here must still render 3 days, not a 7-column grid.
-				await setCalendarInitialView("month");
-				await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
-				await expect(browser.$(`.${cssClass("calendar")} .ec-day-grid`)).not.toExist();
-				await browser.waitUntil(async () => (await readColumnHeaderCount(cssClass("calendar"))) === 3, {
-					timeout: SELECT_TIMEOUT,
-					timeoutMsg: "expected 3 columns after explicitly re-selecting Month on a narrow pane",
-				});
-				textLabels = (await readToolbarButtons()).map((b) => b.text.trim()).filter((t) => t.length > 0);
-				expect(textLabels).not.toContain("Month");
 			} finally {
 				// Restore the desktop viewport and each sidebar's ORIGINAL
 				// collapsed state before any later calendar test/screenshot —

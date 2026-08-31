@@ -9,8 +9,9 @@ import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
-import { COMPACT_CALENDAR_WIDTH, effectiveCalendarView, parseCalendarViewOptions } from "@/domain/calendar-view-options";
+import { COMPACT_CALENDAR_WIDTH, parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
+import { toDateOnly } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
@@ -58,6 +59,18 @@ export interface CalendarBasesViewDeps {
  * outlive any number of `onDataUpdated` passes, so anything of theirs that
  * depends on a view option re-reads `this.config` when it fires rather than
  * closing over the value the option happened to have at mount time.
+ *
+ * **Compact month is read-and-navigate only, never create-on-tap.** Below
+ * `COMPACT_CALENDAR_WIDTH` month renders as a grid of small dots
+ * (`styles/calendar.css`), too small to reliably drag or to distinguish by
+ * title — so `onSlotClick` there jumps into Day view for the tapped date
+ * (`handle.goTo` + `handle.setView("day")`) instead of opening the
+ * create-task modal. Creating a task from a narrow pane means either the
+ * Bases toolbar's "+ New" (`createFileForView`, unaffected by this) or
+ * drilling into Day view and tapping a time slot there. `handle.getView()`
+ * (not the Bases-configured `initialView`) decides whether "month" is
+ * actually on screen, since the user can switch views with Event Calendar's
+ * own header buttons without this view ever finding out.
  */
 export class CalendarBasesView extends BasesView {
 	override type = VIEW_TYPE_CALENDAR;
@@ -223,6 +236,33 @@ export class CalendarBasesView extends BasesView {
 						return false;
 					},
 					onSlotClick: (date) => {
+						// Compact month is read-and-navigate only (see the class
+						// doc comment on drilling into Day view): a tap on a day
+						// cell there jumps to Day view for that date instead of
+						// opening the create-task modal. `handle.getView()` (not
+						// `this.applied.view`/the raw Bases config) is what
+						// actually decides this — the user can switch views with
+						// Event Calendar's own header buttons, which this view
+						// never learns about, so a stale `applied.view` would
+						// wrongly navigate a click made after switching to Day.
+						// `isCompact()` is read fresh for the same reason: it's a
+						// live pane-width fact, not something cached at mount.
+						// Read via `this.handle` (rather than the `handle` local
+						// this closure was built inside) so the check is
+						// meaningful rather than a type-narrowing formality: by
+						// the time a user can click anything the mount below has
+						// always finished and `this.handle` is set, but a click
+						// firing before that (this callback outlives the mount
+						// call it's defined inside) has nothing to act on yet.
+						const currentHandle = this.handle;
+						if (currentHandle === undefined) {
+							return;
+						}
+						if (this.isCompact() && currentHandle.getView() === "month") {
+							currentHandle.goTo(toDateOnly(date));
+							currentHandle.setView("day");
+							return;
+						}
 						this.openCreateModal(this.prefillForSlot(date));
 					},
 				},
@@ -290,7 +330,7 @@ export class CalendarBasesView extends BasesView {
 		const options = parseCalendarViewOptions(this.config);
 		const firstDay = options.firstDay === "default" ? this.deps.getWeekStart() : options.firstDay;
 		const compact = this.isCompact();
-		return { view: effectiveCalendarView(options.initialView, compact), firstDay, compact };
+		return { view: options.initialView, firstDay, compact };
 	}
 
 	/**

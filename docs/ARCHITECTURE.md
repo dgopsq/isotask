@@ -170,31 +170,59 @@ above the calendar root when at least one entry in view is invalid.
 to `getWeekStart()` at render time, not at option-registration time, so it always tracks the
 current plugin setting for a view that has never had `firstDay` explicitly overridden.
 
-**Narrow-pane compaction (rolling 3-day view, no month).** Below `COMPACT_CALENDAR_WIDTH` (640px,
-`domain/calendar-view-options.ts`), a 7-column week/month grid has no room for a legible event chip
-— at a 390px phone viewport a month cell is ~53px wide, just a priority dot and no readable title.
-This is a **pane-width** fact, not `is-mobile`: `CalendarBasesView` measures its own
-`viewContainerEl.clientWidth` (re-evaluated on every `onDataUpdated` and on Obsidian's
+**Narrow-pane compaction (dot-grid month, rolling 3-day week).** Below `COMPACT_CALENDAR_WIDTH`
+(640px, `domain/calendar-view-options.ts`), a 7-column week/month grid has no room for a legible
+event CHIP — at a 390px phone viewport a month cell is ~53px wide, just enough for a small dot and
+no readable title. This is a **pane-width** fact, not `is-mobile`: `CalendarBasesView` measures its
+own `viewContainerEl.clientWidth` (re-evaluated on every `onDataUpdated` and on Obsidian's
 undocumented-but-real `BasesView.onResize()` hook, confirmed to fire — repeatedly — on a real leaf
 resize) against the threshold, so a narrow *split pane* on desktop gets the same treatment as a
 phone, and a full-width pane on a phone in landscape doesn't. The `applied` record already tracked
 for view/firstDay change-detection also tracks `compact` for the same reason: `onResize` fires far
 more often than the derived boolean actually flips.
 
-`domain/calendar-view-options.ts#effectiveCalendarView(kind, compact)` is the pure mapping: when
-compact, `"month"` becomes `"week"` (which the renderer then draws as 3 days, not 7) and `"day"`/
-`"week"` pass through unchanged; identity when not compact. The view pushes `effectiveCalendarView`'s
-result to `CalendarHandle.setView`/the initial `mount()` call, never the raw Bases-configured
-`initialView` — so **Bases' own view-option dropdown still lists "Month"** (Bases view options
-can't vary at runtime by pane width) and choosing it on a narrow pane silently renders 3 days
-instead. Known, accepted wart.
+There is no `effectiveCalendarView`/view-remap function any more: `computeEffective()` pushes the
+Bases-configured `initialView` straight through to `CalendarHandle.setView`/the initial `mount()`
+call, compact or not. Month used to collapse into the renderer's rolling 3-day view below the
+threshold (too narrow for a 7-column CHIP grid); it no longer does, because compact month doesn't
+need 7 columns of chips any more — `styles/calendar.css`'s `.obtask-calendar--compact .ec-day-grid`
+rules render every event as a small dot instead (the title stays in the DOM, clipped to 1px, so
+assistive tech still gets it; only the existing priority-coloured `::before` dot — already drawn for
+the wide-pane "dot + title" chip — stays visible), and `pointer-events: none` on every event lets a
+tap anywhere in the cell, dot included, reach the day cell's own click handler. `week` still becomes
+a rolling 3-day window when compact (`"3 days"` in the header, replacing "Week") — that part is
+unchanged, driven entirely inside the renderer (see `EventCalendarRenderer#setCompact` below), never
+by a `CalendarViewKind` remap. Since Bases' own view-option dropdown listing "Month" now renders the
+same thing at every pane width, choosing it is no longer the wart it used to be.
+
+A busy month cell is capped, not left to grow the whole week row: `EventCalendarRenderer#buildOptions`
+sets `dayMaxEvents: true` only when compact, which is Event Calendar's own per-day "does this one
+still fit" hide (`day-grid/Event.svelte`'s `hide()`, measuring each day cell's own available height)
+— no per-day counting logic lives in this codebase; every task still renders its own `.ec-event`
+element; the library decides which ones still fit. `calendar.css` pins the day-grid's row height to
+a small fixed px value (rather than Event Calendar's own height-filling `minmax(0, 1fr)` default for
+`dayMaxEvents`, which would let far more than a handful of tiny dots through on a tall phone) so the
+visible cap stays a small, predictable number — around four, by the geometry documented at that CSS
+rule — regardless of pane height. The library's own "+N more" overflow link is hidden entirely
+(`.ec-day-foot`): compact month has no popover UI, only the tap-to-Day-view navigation below.
+
+`views/bases/calendar/calendar-view.ts#onSlotClick` is what that tap drives: compact month is
+**read-and-navigate only**, so a tap there calls `handle.goTo(toDateOnly(date))` then
+`handle.setView("day")` instead of opening the create-task modal — creating a task from a narrow
+pane goes through the Bases toolbar's "+ New", or by drilling into Day view and tapping a time slot.
+Deciding "is compact month actually on screen right now" needs `CalendarHandle.getView()` (backed by
+`calendar.getOption("view")` through `event-calendar-mapping.ts#fromEventCalendarView`, the total
+reverse of `toEventCalendarView`, falling back to `DEFAULT_CALENDAR_VIEW_OPTIONS.initialView` for
+anything it doesn't recognise), not the view this handle last pushed or the raw Bases config: the
+user can switch views with Event Calendar's own header buttons, entirely outside this port, so a
+stale cached view would make a tap in Day view wrongly navigate instead of creating.
 
 `CalendarHandle.setCompact(compact)` is how the view pushes a compactness change to the renderer.
 A live probe against the vendored `@event-calendar/core@5.12.0` (see the port's doc comment on
-`setCompact`) found that none of `headerToolbar`, `buttonText`, or a per-view `duration` override
-survive a bare `calendar.setOption(...)` once the user next switches views — Event Calendar bakes a
-per-view options snapshot at `createCalendar` construction time and silently re-applies it on every
-view switch, and `setOption("views", ...)` itself is an even more direct no-op post-construction (the
+`setCompact`) found that neither `buttonText` nor a per-view `duration` override survives a bare
+`calendar.setOption(...)` once the user next switches views — Event Calendar bakes a per-view
+options snapshot at `createCalendar` construction time and silently re-applies it on every view
+switch, and `setOption("views", ...)` itself is an even more direct no-op post-construction (the
 `views` key is deleted from the library's live options during construction and never consulted
 again). `EventCalendarRenderer#setCompact` therefore **destroys and recreates the whole widget**,
 capturing `calendar.getOption("date")` beforehand and feeding it back into the new instance so the
@@ -308,10 +336,14 @@ use-cases (never imported directly by `domain`).
   whether the move was persisted, so the adapter can revert an optimistic drag whose write failed.
   `compact` is a pane-width fact (too narrow for a 7-column grid), never "is mobile" — see the
   calendar render-path section above. The returned `CalendarHandle` is how a view drives an
-  already-mounted calendar without remounting it: `setEvents`, `setView`, `setFirstDay`,
-  `setCompact`, `goTo`, `next`, `prev`, `today`, `destroy`. `setCompact` is the one exception to
-  "without remounting" — the Event Calendar adapter destroys and recreates its widget to apply it
-  (see above for why). `CalendarEvent`/`CalendarViewKind` are domain types
+  already-mounted calendar without remounting it: `setEvents`, `setView`, `getView`, `setFirstDay`,
+  `setCompact`, `goTo`, `next`, `prev`, `today`, `destroy`. `getView` reads back whichever view Event
+  Calendar is ACTUALLY showing (via `calendar.getOption("view")`, mapped through
+  `event-calendar-mapping.ts#fromEventCalendarView`) rather than the last one this handle pushed —
+  the widget's own header buttons can switch views outside the port entirely, which is what compact
+  month's tap-to-Day-view navigation needs to detect correctly (see above). `setCompact` is the one
+  exception to "without remounting" — the Event Calendar adapter destroys and recreates its widget to
+  apply it (see above for why). `CalendarEvent`/`CalendarViewKind` are domain types
   (`domain/calendar-events.ts`, `domain/calendar-view-options.ts`), imported by the port rather than
   defined in it — they're derived data, not part of the widget-abstraction surface.
 - **PathResolver** — vault-path concerns kept out of `domain`. Methods: `exists(path: TaskPath):

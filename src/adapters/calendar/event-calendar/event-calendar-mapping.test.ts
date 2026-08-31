@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
 	fromEventCalendarDrop,
+	fromEventCalendarView,
 	isObtaskEventExtendedProps,
 	toEventCalendarEvent,
 	toEventCalendarFirstDay,
 	toEventCalendarView,
 } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
 import type { CalendarEvent } from "@/domain/calendar-events";
+import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import { parseTaskDate, toJsDate } from "@/domain/dates";
@@ -40,6 +42,27 @@ describe("toEventCalendarView", () => {
 		["month", "dayGridMonth"],
 	] as const satisfies readonly (readonly [CalendarViewKind, string])[])("maps %s to %s", (kind, expected) => {
 		expect(toEventCalendarView(kind)).toBe(expected);
+	});
+});
+
+describe("fromEventCalendarView", () => {
+	it.each([
+		["timeGridDay", "day"],
+		["timeGridWeek", "week"],
+		["dayGridMonth", "month"],
+	] as const satisfies readonly (readonly [string, CalendarViewKind])[])("maps %s to %s", (view, expected) => {
+		expect(fromEventCalendarView(view)).toBe(expected);
+	});
+
+	it.each([undefined, "", "bogus", "dayGridWeek"])("falls back to the default initial view for %p", (view) => {
+		expect(fromEventCalendarView(view)).toBe(DEFAULT_CALENDAR_VIEW_OPTIONS.initialView);
+	});
+
+	it("round-trips every CalendarViewKind through toEventCalendarView", () => {
+		const kinds: readonly CalendarViewKind[] = ["day", "week", "month"];
+		for (const kind of kinds) {
+			expect(fromEventCalendarView(toEventCalendarView(kind))).toBe(kind);
+		}
 	});
 });
 

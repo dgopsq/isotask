@@ -1,7 +1,13 @@
 import { createCalendar, DayGrid, destroyCalendar, Interaction, TimeGrid } from "@event-calendar/core";
 import type { Calendar } from "@event-calendar/core";
 
-import { fromEventCalendarDrop, toEventCalendarEvent, toEventCalendarFirstDay, toEventCalendarView } from "@/adapters/calendar/event-calendar/event-calendar-mapping";
+import {
+	fromEventCalendarDrop,
+	fromEventCalendarView,
+	toEventCalendarEvent,
+	toEventCalendarFirstDay,
+	toEventCalendarView,
+} from "@/adapters/calendar/event-calendar/event-calendar-mapping";
 import { eventContent } from "@/adapters/calendar/event-calendar/event-content";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { Weekday } from "@/domain/dates";
@@ -103,24 +109,30 @@ export class EventCalendarRenderer implements CalendarRenderer {
 
 		/**
 		 * Builds the full `createCalendar` options object for a given
-		 * compactness. Compactness changes three of Event Calendar's own
-		 * options -- `headerToolbar` (drops `dayGridMonth` from the view
-		 * switcher), `buttonText.timeGridWeek` ("3 days" instead of "Week"),
+		 * compactness. Two of Event Calendar's own per-view options change
+		 * with it -- `buttonText.timeGridWeek` ("3 days" instead of "Week")
 		 * and `views.timeGridWeek.duration` (a rolling 3-day window instead
-		 * of the default 7) -- and a live probe against the vendored
-		 * @event-calendar/core@5.12.0 found that NONE of the three survive a
-		 * bare `calendar.setOption(...)` once the user next switches views:
-		 * Event Calendar bakes a per-view options snapshot at
+		 * of the default 7) -- `headerToolbar` itself lists the same three
+		 * views (month/week-or-3-days/day) either way, since month is no
+		 * longer dropped on a narrow pane (`docs/DOMAIN-MODEL.md`'s
+		 * narrow-pane compaction section). A live probe against the vendored
+		 * @event-calendar/core@5.12.0 found that NEITHER of those two
+		 * survives a bare `calendar.setOption(...)` once the user next
+		 * switches views: Event Calendar bakes a per-view options snapshot at
 		 * `createCalendar` construction time and silently re-applies THAT
 		 * snapshot (via its internal `switchView` effect) over whatever was
 		 * `setOption`'d live, every time `view` changes. `setOption("views",
 		 * ...)` itself is an even more direct no-op post-construction -- the
 		 * `views` key is deleted from the library's live options object
 		 * during construction and never consulted again. So the only
-		 * reliable way to change any of these three post-mount is to
+		 * reliable way to change either of these two post-mount is to
 		 * destroy and recreate the calendar (`setCompact` below) -- see
 		 * `docs/ARCHITECTURE.md`'s calendar section for the probe that
-		 * confirmed this.
+		 * confirmed this. A handful of other options below (`slotLabelFormat`,
+		 * `allDayContent`, `dayMaxEvents`) are also conditioned on `isCompact`
+		 * for their own, simpler reasons documented at each -- they just ride
+		 * along on the same destroy/recreate cycle rather than needing one of
+		 * their own.
 		 */
 		function buildOptions(isCompact: boolean, date?: Calendar.Options["date"]): Calendar.Options {
 			// Compact-only: drop the minutes from the hour-axis labels ("13"
@@ -174,6 +186,25 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				? { allDayContent: () => ({ domNodes: [createSpan({ cls: cssClass("all-day-label"), text: "all-day" })] }) }
 				: {};
 
+			// Compact month only: caps how many events a day-grid cell stacks
+			// before it starts hiding the rest, so a busy day's dots can't grow
+			// the whole week-row taller (the default `false` lets a day's stack
+			// grow without limit, which is fine for wide-pane chips but would
+			// blow out a 390px-wide dot grid). Event Calendar's own hide()
+			// (day-grid/Event.svelte) does the per-day "does this one still fit"
+			// measurement itself — nothing here counts events per day. This
+			// also switches the day-grid to fixed-height ("uniform") rows,
+			// which `calendar.css` then caps at a small fixed px value (rather
+			// than the library's own default `1fr`, which fills whatever
+			// vertical room the pane happens to have and would let far more
+			// than a handful of tiny dots fit) so the visible-dot cap stays a
+			// small, predictable number regardless of pane height. The library
+			// also renders a "+N more" link for whatever a day hides —
+			// `calendar.css` hides that link entirely (`.ec-day-foot`):
+			// compact month is read-and-navigate only (tap the cell to see
+			// everything in Day view), not a place to reveal more chip text.
+			const dayMaxEventsOption: Pick<Calendar.Options, "dayMaxEvents"> = isCompact ? { dayMaxEvents: true } : {};
+
 			return {
 				view: toEventCalendarView(currentView),
 				firstDay: toEventCalendarFirstDay(currentFirstDay),
@@ -214,10 +245,14 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// `event-content.ts`'s doc comment for how that fallback was
 				// confirmed against the vendored source.
 				eventContent,
+				// Month is back on a narrow pane (rendered as a dot grid, see
+				// `calendar.css`), so the switcher lists the same three views
+				// compact or not -- only their LABEL differs (`buttonText`
+				// below: `timeGridWeek` reads "3 days" when compact).
 				headerToolbar: {
 					start: "title",
 					center: "",
-					end: isCompact ? "today prev,next timeGridWeek,timeGridDay" : "today prev,next dayGridMonth,timeGridWeek,timeGridDay",
+					end: "today prev,next dayGridMonth,timeGridWeek,timeGridDay",
 				},
 				// Event Calendar REPLACES its default `buttonText` map with the one
 				// given here (plugins only `assign()` their labels into the
@@ -253,6 +288,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				...dateClickOption,
 				...slotLabelFormatOption,
 				...allDayContentOption,
+				...dayMaxEventsOption,
 			};
 		}
 
@@ -317,6 +353,12 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				currentView = view;
 				calendar.setOption("view", toEventCalendarView(view));
 			},
+			// Reads back Event Calendar's OWN live option rather than
+			// `currentView`: the widget's header buttons can switch views
+			// directly, entirely outside `setView`, and a caller (compact
+			// month's `onSlotClick`) needs the view actually on screen, not
+			// the last one this handle happened to push.
+			getView: () => fromEventCalendarView(calendar.getOption("view")),
 			setFirstDay: (firstDay) => {
 				currentFirstDay = firstDay;
 				calendar.setOption("firstDay", toEventCalendarFirstDay(firstDay));

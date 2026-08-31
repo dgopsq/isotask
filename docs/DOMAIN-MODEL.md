@@ -277,24 +277,45 @@ presence is exactly its own `due`/`scheduled` values, with no future-occurrence 
 ### Narrow-pane compaction
 
 Below `COMPACT_CALENDAR_WIDTH` (640px, `domain/calendar-view-options.ts`) a 7-column week/month
-grid has no room left for a legible event chip — at a 390px phone viewport a month cell is ~53px
-wide, room for a priority dot and nothing else. `views/bases/calendar/calendar-view.ts` measures
+grid has no room left for a legible event CHIP — at a 390px phone viewport a month cell is ~53px
+wide, room for a small dot and nothing else. `views/bases/calendar/calendar-view.ts` measures
 the calendar **pane's own width** (`clientWidth`), not `is-mobile`: a narrow split pane on desktop
 gets the same treatment as a phone, and a full-width pane on a phone in landscape doesn't.
 
-Below the threshold, `domain/calendar-view-options.ts#effectiveCalendarView` maps `"month"` to
-`"week"` — which the Event Calendar adapter then draws not as the usual 7 days but as a **rolling
-3-day window** (`"3 days"` in the header, replacing "Week"; "Month" is dropped from the view
-switcher entirely). `"day"` and `"week"` already fit a narrow pane and pass through unchanged. The
-window is rolling from wherever the calendar is currently navigated to, not snapped to `firstDay` —
-confirmed against the vendored Event Calendar's own range derivation, which only snaps to
-`firstDay` for whole-week/month durations.
+**Month renders as a dot grid, not a fallback view.** There is no `effectiveCalendarView`/view
+remap any more — every `CalendarViewKind` (day/week/month) renders as itself at every pane width,
+and the header switcher always lists all three. Below the threshold, `styles/calendar.css`'s
+`.obtask-calendar--compact .ec-day-grid` rules turn month's chips into small dots instead: each
+event's title stays in the DOM (clip-to-1px visually hidden, the same treatment the compact
+time-axis gutter's "all-day" label already used, see below) so assistive tech still gets it, while
+on screen only the existing priority-coloured dot (`.ec-event-body::before`, drawn for the
+wide-pane "dot + title" chip too) remains. Every event keeps `pointer-events: none`, so a tap
+anywhere in a compact month cell — including directly on a dot — reaches the day cell's own click
+handler rather than the event's; `views/bases/calendar/calendar-view.ts#onSlotClick` uses that to
+navigate into **Day view** for the tapped date (`handle.goTo` + `handle.setView("day")`) instead of
+opening the create-task modal, since compact month is too small to reliably drag or read titles by.
+Creating a task from a narrow pane goes through the Bases toolbar's "+ New", or by drilling into
+Day view and tapping a time slot there — **mobile month view is read-and-navigate only, no
+drag/reschedule**.
 
-**Known wart**: Bases' own view-option dropdown still lists "Month" (Bases view options can't vary
-at runtime by pane width — they're static per-`.base`-file config), so a user (or a saved `.base`
-file) choosing "Month" on a narrow pane silently renders 3 days instead of a 7-column grid. This is
-accepted, not a bug to fix — the alternative (hiding "Month" from the dropdown itself) would need
-the dropdown's own options to vary by live pane width, which Bases doesn't support.
+A busy day is capped rather than left to grow the whole week row taller: `dayMaxEvents: true`
+(`event-calendar-renderer.ts`, compact month only) is Event Calendar's own per-day "does this one
+still fit" hide, and `calendar.css` fixes the day-grid's row height to a small px value (rather than
+the library's own height-filling default) so the visible cap stays a small, predictable number
+(around four) regardless of how tall the pane actually is — no per-day counting logic of our own;
+each task already renders its own DOM element, one dot per task, and Event Calendar decides which
+ones still fit. The "+N more" link the library would otherwise render for whatever a day hides is
+hidden entirely (`.ec-day-foot`) — compact month has no popover UI, only the drill-into-Day-view tap.
+
+Week still collapses to the renderer's rolling **3-day window** when compact (`"3 days"` replacing
+"Week" in the header) — that part is unchanged. `"day"` already fits a narrow pane and passes
+through unchanged too. The window is rolling from wherever the calendar is currently navigated to,
+not snapped to `firstDay` — confirmed against the vendored Event Calendar's own range derivation,
+which only snaps to `firstDay` for whole-week/month durations.
+
+Since there is no remap any more, Bases' own view-option dropdown listing "Month" is no longer a
+wart: choosing it on a narrow pane renders the same dot grid as the default, not a 3-day
+fallback — the dropdown and the render finally agree at every width.
 
 The compact time-axis gutter is narrowed from 72px to 28px. It was 48px of content plus 12px of
 padding each side, and the widest thing in it was not an hour label but the vendored "all-day"

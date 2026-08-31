@@ -1,6 +1,7 @@
 import type { Calendar } from "@event-calendar/core";
 
 import type { CalendarEvent } from "@/domain/calendar-events";
+import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import { formatTime, fromJsDate, fromJsDateTime, isDateTime, toJsDate, toSundayFirstWeekday, withDatePart } from "@/domain/dates";
@@ -27,6 +28,32 @@ export function toEventCalendarView(kind: CalendarViewKind): string {
 			const exhaustive: never = kind;
 			return exhaustive;
 		}
+	}
+}
+
+/**
+ * Event Calendar's own view name -> renderer-agnostic `CalendarViewKind` —
+ * the reverse of `toEventCalendarView`, backing `CalendarHandle.getView`
+ * (`event-calendar-renderer.ts` calls this on `calendar.getOption("view")`).
+ * Total: `calendar.getOption("view")` is typed as a bare `string | undefined`
+ * by the vendored library (nothing statically guarantees it's one of the
+ * three names this adapter ever sets), so an unrecognised or missing value
+ * falls back to `DEFAULT_CALENDAR_VIEW_OPTIONS.initialView` ("month") —
+ * the same default `domain/calendar-view-options.ts#parseCalendarViewOptions`
+ * uses for a malformed Bases config, so a value this function can't place
+ * degrades exactly the way the rest of the plugin already treats "unknown".
+ */
+export function fromEventCalendarView(view: string | undefined): CalendarViewKind {
+	switch (view) {
+		case "timeGridDay":
+			return "day";
+		case "timeGridWeek":
+			return "week";
+		case "dayGridMonth":
+			return "month";
+		case undefined:
+		default:
+			return DEFAULT_CALENDAR_VIEW_OPTIONS.initialView;
 	}
 }
 

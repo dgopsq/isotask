@@ -31,35 +31,26 @@ export const DEFAULT_CALENDAR_VIEW_OPTIONS: CalendarViewOptions = {
 
 /**
  * Below this pane width (px), a 7-column week/month grid has no room left
- * for a legible event chip — at a 390px phone viewport a month cell is
- * ~53px wide, just enough for a priority dot and no readable title. This is
- * a LAYOUT threshold on the calendar pane's own `clientWidth`
+ * for a legible event CHIP — at a 390px phone viewport a month cell is
+ * ~53px wide, just enough for a small dot and no readable title. This is a
+ * LAYOUT threshold on the calendar pane's own `clientWidth`
  * (`views/bases/calendar/calendar-view.ts`), never on `is-mobile`: a narrow
  * split pane on desktop crosses it too, and a full-width pane on a phone in
  * landscape doesn't. `styles/calendar.css`'s `obtask-calendar--compact`
  * class is toggled off the same computed value so the CSS breakpoint and
  * the JS one can't drift apart.
+ *
+ * Month itself is NOT remapped to another view below this width (there is
+ * no `effectiveCalendarView` any more — every `CalendarViewKind` renders as
+ * itself, compact or not): a compact month cell is too narrow for a chip's
+ * title, but plenty wide for a small dot, and dots are what
+ * `styles/calendar.css`'s `.obtask-calendar--compact .ec-day-grid` rules
+ * render instead — see `docs/DOMAIN-MODEL.md`'s narrow-pane compaction
+ * section. Week still collapses to a rolling 3-day window when compact
+ * (`event-calendar-renderer.ts`'s `views.timeGridWeek.duration`), which is a
+ * renderer-level chrome change, not a `CalendarViewKind` remap.
  */
 export const COMPACT_CALENDAR_WIDTH = 640;
-
-/**
- * Maps the Bases-configured view onto what actually gets drawn once the
- * pane is too narrow for a 7-column grid (`COMPACT_CALENDAR_WIDTH`). Only
- * `month` changes — the renderer draws it as a rolling 3-day view
- * (`event-calendar-renderer.ts` gives `timeGridWeek` a `duration: { days: 3
- * }` override when compact) — `week` and `day` already fit narrow panes and
- * pass through unchanged. Identity when `compact` is `false`.
- *
- * Known wart: Bases' own view-option dropdown still lists "Month" (Bases
- * view options can't vary at runtime by pane width), so choosing "Month" on
- * a narrow pane renders 3 days instead — see `docs/DOMAIN-MODEL.md`.
- */
-export function effectiveCalendarView(kind: CalendarViewKind, compact: boolean): CalendarViewKind {
-	if (!compact) {
-		return kind;
-	}
-	return kind === "month" ? "week" : kind;
-}
 
 /**
  * Duck-typed accessor for Bases' per-view config — not `BasesViewConfig`

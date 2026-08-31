@@ -57,6 +57,18 @@ export interface CalendarHandle {
 	readonly setEvents: (events: readonly CalendarEvent[]) => void;
 	readonly setView: (view: CalendarViewKind) => void;
 	/**
+	 * The view Event Calendar is CURRENTLY showing — not necessarily the one
+	 * this handle last called `setView` with: the widget's own header buttons
+	 * let the user switch views directly, entirely outside this port, so a
+	 * caller that needs to know "is month actually on screen right now" (the
+	 * calendar view's compact `onSlotClick`, deciding whether a tap should
+	 * navigate into Day view or open the create-task modal) must ask the
+	 * widget itself rather than trust whatever it last pushed. Total over
+	 * every value the adapter's underlying widget can report — see the
+	 * Event Calendar adapter's own mapping for its documented fallback.
+	 */
+	readonly getView: () => CalendarViewKind;
+	/**
 	 * Added in M3 Wave 3: the `obtask-calendar` view resolves `firstDay:
 	 * "default"` to `getWeekStart()` and re-applies it on every
 	 * `onDataUpdated` (a `firstDay` config change re-renders like any other

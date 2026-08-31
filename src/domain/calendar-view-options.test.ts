@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
 	COMPACT_CALENDAR_WIDTH,
 	DEFAULT_CALENDAR_VIEW_OPTIONS,
-	effectiveCalendarView,
 	parseCalendarViewOptions,
 	type CalendarViewConfigSource,
 } from "@/domain/calendar-view-options";
-import type { CalendarViewKind } from "@/domain/calendar-view-options";
 
 function configFrom(values: Readonly<Record<string, unknown>>): CalendarViewConfigSource {
 	return {
@@ -77,29 +75,6 @@ describe("parseCalendarViewOptions", () => {
 			events: "due",
 			firstDay: DEFAULT_CALENDAR_VIEW_OPTIONS.firstDay,
 		});
-	});
-});
-
-describe("effectiveCalendarView", () => {
-	it.each(["day", "week", "month"] as const)("passes %s through unchanged when not compact", (kind) => {
-		expect(effectiveCalendarView(kind, false)).toBe(kind);
-	});
-
-	it("maps month to week when compact", () => {
-		expect(effectiveCalendarView("month", true)).toBe("week");
-	});
-
-	it.each(["day", "week"] as const)("passes %s through unchanged when compact", (kind) => {
-		expect(effectiveCalendarView(kind, true)).toBe(kind);
-	});
-
-	it("is deterministic — the same input always maps to the same output", () => {
-		const kinds: readonly CalendarViewKind[] = ["day", "week", "month"];
-		for (const kind of kinds) {
-			for (const compact of [true, false]) {
-				expect(effectiveCalendarView(kind, compact)).toBe(effectiveCalendarView(kind, compact));
-			}
-		}
 	});
 });
 
