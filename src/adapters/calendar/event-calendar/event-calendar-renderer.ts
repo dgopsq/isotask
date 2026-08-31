@@ -6,6 +6,7 @@ import { eventContent } from "@/adapters/calendar/event-calendar/event-content";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { Weekday } from "@/domain/dates";
 import { fromJsDate, fromJsDateTime } from "@/domain/dates";
+import { cssClass } from "@/plugin-id";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer, CalendarViewKind } from "@/ports/calendar-renderer";
 
 /**
@@ -122,6 +123,57 @@ export class EventCalendarRenderer implements CalendarRenderer {
 		 * confirmed this.
 		 */
 		function buildOptions(isCompact: boolean, date?: Calendar.Options["date"]): Calendar.Options {
+			// Compact-only: drop the minutes from the hour-axis labels ("13"
+			// instead of "13:00", 16px vs. 39px at this font — measured live).
+			// `{ hour: "2-digit" }` ALONE would still be locale-dependent
+			// (`hour12` defaults per-locale, and an en-US-style locale renders
+			// "1 PM", which is WIDER, not narrower); `hour12: false` pins every
+			// locale to a bare zero-padded 24-hour number ("00".."23",
+			// confirmed against en-GB/en-US/it-IT and the no-locale default),
+			// matching the zero-padded `HH:mm` convention `domain/dates.ts#
+			// formatTime` already uses for the plugin's own chips. `exactOptionalPropertyTypes`
+			// forbids `slotLabelFormat: undefined` (the option's type has no
+			// `| undefined`), so wide panes get the key omitted entirely via
+			// the spread below rather than set to `undefined` — Event
+			// Calendar's own default (`{ hour: "numeric", minute: "2-digit" }`)
+			// then applies unchanged.
+			const slotLabelFormatOption: Pick<Calendar.Options, "slotLabelFormat"> = isCompact
+				? { slotLabelFormat: { hour: "2-digit", hour12: false } }
+				: {};
+
+			// Compact-only: the vendored "all-day" corner label (the row header
+			// sitting above the hour axis, sharing its column) is what actually
+			// holds the gutter open — at 47px it's wider than any hour label,
+			// so shortening the hour text alone (above) changes nothing; Event
+			// Calendar sizes the whole sidebar column to the widest content any
+			// row puts in it. The label can't be visually hidden with a plain
+			// CSS rule targeting a class: a live DOM probe against the vendored
+			// bundle (`createAllDayContent`/`contentFrom` in
+			// `@event-calendar/core@5.12.0/dist/index.js`) showed the default
+			// renders via `el.innerHTML = "all-day"` directly into `.ec-sidebar`
+			// — a bare text node, nothing CSS can select on its own. Supplying
+			// our own `domNodes` here (the same `Content` shape `eventContent`
+			// already returns, see `event-content.ts`) wraps the text in a
+			// `createSpan` carrying an `obtask-` class instead, which
+			// `calendar.css` then visually-hides (absolutely positioned, 1x1,
+			// clipped — NOT `display: none`/`visibility: hidden`, which would
+			// drop it from the accessibility tree and leave the all-day row
+			// unlabelled for screen reader users). An out-of-flow element
+			// contributes no width to the shared sidebar column, which is what
+			// actually shrinks the gutter. Same `undefined`-omission reasoning
+			// as `slotLabelFormat` above applies to the key itself; wide panes
+			// keep Event Calendar's own default "all-day" text at full size.
+			// A FUNCTION, not a fixed `{ domNodes }` value: Event Calendar
+			// resolves this inside a reactive `derived` (`createAllDayContent`)
+			// and `createContent` calls it when it is callable, so returning a
+			// freshly built span per call keeps every render with its own node.
+			// A single shared node would be re-parented on each re-render — and
+			// during a `setCompact` remount, when two calendars briefly exist,
+			// one of them would silently lose the label to the other.
+			const allDayContentOption: Pick<Calendar.Options, "allDayContent"> = isCompact
+				? { allDayContent: () => ({ domNodes: [createSpan({ cls: cssClass("all-day-label"), text: "all-day" })] }) }
+				: {};
+
 			return {
 				view: toEventCalendarView(currentView),
 				firstDay: toEventCalendarFirstDay(currentFirstDay),
@@ -199,6 +251,8 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				...eventDropOption,
 				...eventResizeOption,
 				...dateClickOption,
+				...slotLabelFormatOption,
+				...allDayContentOption,
 			};
 		}
 

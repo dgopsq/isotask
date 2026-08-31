@@ -822,3 +822,47 @@
 	flex-basis: 100%;
 	min-width: 0;
 }
+
+/*
+ * Compact-only gutter shrink. The vendored `.ec-sidebar` rule
+ * (`@event-calendar/core/dist/index.css`: `.ec-time-grid & { padding-inline:
+ * .75rem }`, i.e. 12px each side) is shared by every sidebar cell stacked in
+ * the same column — the "all-day" corner label above the hour axis AND the
+ * hour-axis labels themselves both carry the `ec-sidebar` class, and Event
+ * Calendar sizes that whole column to the widest content any row puts in
+ * it. Measured live at desktop width: 72px total (48px content + 12px
+ * padding each side), with the "all-day" label (47px) wider than any hour
+ * label ("13:00" 39px) — so it alone was holding the gutter open.
+ * `event-calendar-renderer.ts`'s compact `slotLabelFormat` drops the hour
+ * labels to a bare zero-padded 24-hour number ("13", 16px) and its compact
+ * `allDayContent` swaps the label for the `.obtask-all-day-label` span
+ * targeted below — between the two, the column shrinks to the hour label's
+ * width plus this tightened padding.
+ */
+.obtask-calendar.obtask-calendar--compact .ec-time-grid .ec-sidebar {
+	padding-inline: var(--size-4-1);
+}
+
+/*
+ * Visually hides the "all-day" corner label without removing it from the
+ * accessibility tree — `display: none`/`visibility: hidden` would do that,
+ * leaving the all-day row unlabelled for screen reader users. Standard
+ * clip-to-1px treatment: absolutely positioned (so it contributes no width
+ * to the shared sidebar column above — an in-flow bare text node is exactly
+ * what held the gutter open before), sized to 1x1px, and clipped so no
+ * visual trace remains. `.ec-sidebar` is `position: sticky` (the vendored
+ * stylesheet), which — like any non-`static` position — establishes the
+ * containing block this absolute span positions against, so it never
+ * escapes to the viewport corner.
+ */
+.obtask-calendar.obtask-calendar--compact .obtask-all-day-label {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

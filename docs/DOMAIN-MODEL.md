@@ -296,6 +296,21 @@ file) choosing "Month" on a narrow pane silently renders 3 days instead of a 7-c
 accepted, not a bug to fix — the alternative (hiding "Month" from the dropdown itself) would need
 the dropdown's own options to vary by live pane width, which Bases doesn't support.
 
+The compact time-axis gutter is narrowed from 72px to 28px. It was 48px of content plus 12px of
+padding each side, and the widest thing in it was not an hour label but the vendored "all-day"
+corner label (47px, against 39px for "13:00") — Event Calendar sizes that whole sidebar column to
+the widest content any row puts in it, so shortening the hour labels alone would have changed
+nothing. Three things shrink together: `slotLabelFormat` becomes `{ hour: "2-digit", hour12: false }`
+so hours render as a bare zero-padded 24-hour number ("13", 16px, matching `domain/dates.ts#formatTime`'s
+own convention — `hour12` must be pinned, since a 12-hour locale would render the wider "1 PM"); the
+"all-day" label is replaced via `allDayContent` with a span carrying an `obtask-` class, which
+`calendar.css` then visually hides; and the sidebar padding is tightened. The label is hidden with
+the clip-to-1px treatment rather than `display: none`, so it stays in the accessibility tree and the
+all-day row is still announced — an out-of-flow element contributes no width, which is what actually
+shrinks the column. `allDayContent` is passed as a FUNCTION, not a fixed value: Event Calendar
+resolves it inside a reactive `derived`, so each render must get its own node rather than re-parenting
+one shared span.
+
 At the compact 3-day view's ~86px column width, a timed all-day chip's time label and title no
 longer fit on one line (the title was squeezed out entirely — a chip read as bare "11:45" with no
 task name). `styles/calendar.css` stacks the two onto separate lines under
