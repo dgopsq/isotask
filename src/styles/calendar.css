@@ -700,6 +700,27 @@
 }
 
 /*
+ * Overlapping timed blocks split their column's width between them (Event
+ * Calendar's own overlap layout), and on a narrow pane a 2-3 way split
+ * leaves slivers a few characters wide — where the corner mark
+ * (`.obtask-event-marks`, absolutely positioned top-right) rendered ON TOP
+ * of the title's only visible character, and the 1.6em title clearance for
+ * it ate most of the remaining line. Below ~5em of block width (em resolves
+ * against the container's own `--font-ui-smaller` base) the mark loses its
+ * seat: the title — the identifying part — keeps every pixel, the pill bar
+ * still colors the sliver, and the mark is one tap away on the note itself.
+ */
+@container obtask-event (width < 5em) {
+	.obtask-calendar .ec-time-grid .ec-body .obtask-event-marks {
+		display: none;
+	}
+
+	.obtask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .obtask-event-marks) {
+		padding-inline-end: 0;
+	}
+}
+
+/*
  * The week view's columns are much narrower than the day view's single
  * column (7 days vs. 1 sharing the same width), so a block's time line
  * ("09:00–10:00") is far more likely to get clipped or crowd out the
