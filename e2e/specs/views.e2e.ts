@@ -7,7 +7,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { after, afterEach, before, describe, it } from "mocha";
 import { obsidianPage } from "wdio-obsidian-service";
 
-import { BUCKET_LABELS, buildFixtures } from "../fixtures.ts";
+import { BUCKET_LABELS, buildFixtures, noteContent } from "../fixtures.ts";
 import { BUCKET_ORDER } from "@/domain/buckets";
 import type { Bucket } from "@/domain/buckets";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
@@ -316,6 +316,48 @@ async function waitForSuggestionItem(text: string): Promise<WebdriverIO.Element>
 }
 
 /**
+ * `e2e/generate-fixtures.mts` only resets the vault ONCE, before `wdio`
+ * starts — never between tests — so any test that mutates a fixture note's
+ * frontmatter (a due-date/priority edit through the feed, a status change
+ * that spawns a recurrence occurrence) leaves that change in place for every
+ * later test in this file. Most such mutations are harmless (nothing else
+ * reads that field), but a due-date change can silently move a task into a
+ * different Feed bucket — including filling the one bucket a later test
+ * relies on being empty. Restores `path` to exactly the content
+ * `generate-fixtures.mts` would have written for it (via `noteContent`, the
+ * same helper it uses), so a mutating test leaves the vault as it found it.
+ */
+async function restoreFixtureNote(path: string, frontmatter: Readonly<Record<string, string>>, body: string): Promise<void> {
+	const content = noteContent(frontmatter, body);
+	await browser.executeObsidian(
+		async ({ app }, p: string, c: string) => {
+			const file = app.vault.getFileByPath(p);
+			if (file === null) {
+				throw new Error(`cannot restore ${p}: file not found`);
+			}
+			await app.vault.modify(file, c);
+		},
+		path,
+		content,
+	);
+}
+
+/**
+ * Deletes a note a test created or spawned (a recurrence occurrence, a
+ * converted plain note, a note made via the create-task modal), if it still
+ * exists — paired with `restoreFixtureNote` above for the same reason:
+ * nothing else resets the vault between tests in this file.
+ */
+async function deleteNoteIfExists(path: string): Promise<void> {
+	await browser.executeObsidian(async ({ app }, p: string) => {
+		const file = app.vault.getFileByPath(p);
+		if (file !== null) {
+			await app.fileManager.trashFile(file);
+		}
+	}, path);
+}
+
+/**
  * Feed and calendar are exercised in one spec file, sharing one Obsidian
  * session opened once in the top-level `before` below. wdio-obsidian-service
  * launches a fresh Obsidian instance per spec *file* — the dominant cost of
@@ -483,39 +525,49 @@ describe("Views", function () {
 			}
 			const path = `Tasks/${task.filename}`;
 
-			await clickFeedDateChip(task.title);
+			try {
+				await clickFeedDateChip(task.title);
 
-			const modalCls = cssClass("date-modal");
-			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+				const modalCls = cssClass("date-modal");
+				await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
 
-			const initialInputValue = await browser.execute((cls) => {
-				const input = document.querySelector(`.${cls} input[type="date"]`);
-				return input instanceof HTMLInputElement ? input.value : null;
-			}, modalCls);
-			expect(initialInputValue).toEqual(task.frontmatter["due"]);
-
-			// Same "set + dispatch input/change" technique as the "Create task
-			// modal" test below: wdio's character-by-character setValue is
-			// unreliable against input[type="date"] in this Electron build.
-			const newDue = format(addDays(parseISO(fixtures.today), 10), "yyyy-MM-dd");
-			await browser.execute(
-				(cls, value) => {
+				const initialInputValue = await browser.execute((cls) => {
 					const input = document.querySelector(`.${cls} input[type="date"]`);
-					if (input instanceof HTMLInputElement) {
-						input.value = value;
-						input.dispatchEvent(new Event("input", { bubbles: true }));
-						input.dispatchEvent(new Event("change", { bubbles: true }));
-					}
-				},
-				modalCls,
-				newDue,
-			);
+					return input instanceof HTMLInputElement ? input.value : null;
+				}, modalCls);
+				expect(initialInputValue).toEqual(task.frontmatter["due"]);
 
-			await browser.$(`.${modalCls} button.mod-cta`).click();
+				// Same "set + dispatch input/change" technique as the "Create task
+				// modal" test below: wdio's character-by-character setValue is
+				// unreliable against input[type="date"] in this Electron build.
+				const newDue = format(addDays(parseISO(fixtures.today), 10), "yyyy-MM-dd");
+				await browser.execute(
+					(cls, value) => {
+						const input = document.querySelector(`.${cls} input[type="date"]`);
+						if (input instanceof HTMLInputElement) {
+							input.value = value;
+							input.dispatchEvent(new Event("input", { bubbles: true }));
+							input.dispatchEvent(new Event("change", { bubbles: true }));
+						}
+					},
+					modalCls,
+					newDue,
+				);
 
-			await waitForFrontmatter(path, "due", (v) => v === newDue, `${path} due date never updated via the feed's date chip`);
-			const fm = await frontmatterOf(path);
-			expect(fm?.["due"]).toEqual(newDue);
+				await browser.$(`.${modalCls} button.mod-cta`).click();
+
+				await waitForFrontmatter(path, "due", (v) => v === newDue, `${path} due date never updated via the feed's date chip`);
+				const fm = await frontmatterOf(path);
+				expect(fm?.["due"]).toEqual(newDue);
+			} finally {
+				// `newDue` (today + 10 days) lands in a different Feed bucket
+				// than the pristine fixture's `due` — most likely "next-week",
+				// which "Feed view options" below relies on being genuinely
+				// empty. Restore before anything else in this file reads the
+				// Feed's bucket structure.
+				await restoreFixtureNote(path, task.frontmatter, task.body);
+				await waitForFrontmatter(path, "due", (v) => v === task.frontmatter["due"], `${path} due date never restored to its fixture value`);
+			}
 		});
 
 		it("priority control opens buildPriorityMenu and dispatches setPriority on pick", async function () {
@@ -527,48 +579,56 @@ describe("Views", function () {
 			}
 			const path = `Tasks/${task.filename}`;
 
-			await clickFeedPriorityControl(task.title);
+			try {
+				await clickFeedPriorityControl(task.title);
 
-			for (const label of ["Low", "Normal", "High", "Urgent"]) {
-				await browser.$(`.menu-item-title=${label}`).waitForDisplayed({ timeout: SELECT_TIMEOUT });
-			}
+				for (const label of ["Low", "Normal", "High", "Urgent"]) {
+					await browser.$(`.menu-item-title=${label}`).waitForDisplayed({ timeout: SELECT_TIMEOUT });
+				}
 
-			if (process.env["E2E_SCREENSHOT"] === "1") {
-				await saveScreenshot("feed-priority-menu");
-			}
+				if (process.env["E2E_SCREENSHOT"] === "1") {
+					await saveScreenshot("feed-priority-menu");
+				}
 
-			await browser.$(".menu-item-title=High").click();
+				await browser.$(".menu-item-title=High").click();
 
-			await waitForFrontmatter(path, "priority", (v) => v === "high", `${path} priority never updated via the feed's priority control`);
-			const fm = await frontmatterOf(path);
-			expect(fm?.["priority"]).toEqual("high");
+				await waitForFrontmatter(path, "priority", (v) => v === "high", `${path} priority never updated via the feed's priority control`);
+				const fm = await frontmatterOf(path);
+				expect(fm?.["priority"]).toEqual("high");
 
-			// The Bases view re-renders on the metadata cache's own "resolved"
-			// event, which can lag a tick behind `waitForFrontmatter`'s cache
-			// read above — poll the row's text rather than reading it once.
-			let rowPriorityText: string | null = null;
-			await browser.waitUntil(
-				async () => {
-					rowPriorityText = await browser.execute(
-						(rowCls, titleCls, priorityCls, wantedTitle) => {
-							for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
-								const titleEl = row.querySelector(`.${titleCls}`);
-								if (titleEl?.textContent === wantedTitle) {
-									return row.querySelector(`.${priorityCls}`)?.textContent ?? null;
+				// The Bases view re-renders on the metadata cache's own "resolved"
+				// event, which can lag a tick behind `waitForFrontmatter`'s cache
+				// read above — poll the row's text rather than reading it once.
+				let rowPriorityText: string | null = null;
+				await browser.waitUntil(
+					async () => {
+						rowPriorityText = await browser.execute(
+							(rowCls, titleCls, priorityCls, wantedTitle) => {
+								for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+									const titleEl = row.querySelector(`.${titleCls}`);
+									if (titleEl?.textContent === wantedTitle) {
+										return row.querySelector(`.${priorityCls}`)?.textContent ?? null;
+									}
 								}
-							}
-							return null;
-						},
-						cssClass("feed__row"),
-						cssClass("feed__title"),
-						cssClass("feed__priority"),
-						task.title,
-					);
-					return rowPriorityText === "High";
-				},
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "High"` },
-			);
-			expect(rowPriorityText).toEqual("High");
+								return null;
+							},
+							cssClass("feed__row"),
+							cssClass("feed__title"),
+							cssClass("feed__priority"),
+							task.title,
+						);
+						return rowPriorityText === "High";
+					},
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "High"` },
+				);
+				expect(rowPriorityText).toEqual("High");
+			} finally {
+				// This fixture has no `priority` in its pristine frontmatter
+				// (defaults to "normal") — restore it so nothing later in this
+				// file observes the "High" this test set.
+				await restoreFixtureNote(path, task.frontmatter, task.body);
+				await waitForFrontmatter(path, "priority", (v) => v === undefined, `${path} priority never restored to its fixture value`);
+			}
 		});
 
 		it("right-click on a row opens buildTaskEditMenu with a Project… entry", async function () {
@@ -2556,6 +2616,22 @@ describe("Actions", function () {
 			await openFile(originalPath);
 		});
 
+		after(async function () {
+			// Both tests above depend on the mutation/spawn persisting between
+			// them, so cleanup runs once here rather than in `afterEach` — undo
+			// the completion and remove the spawned occurrence so a "next-week"
+			// due date doesn't linger for whatever runs the suite next.
+			await restoreFixtureNote(originalPath, fixtures.recurring.frontmatter, fixtures.recurring.body);
+			await deleteNoteIfExists(spawnPath);
+
+			// Robustness check: prove the cleanup actually removed the spawned
+			// occurrence — its `due` (today + 7 days) lands in "next-week", the
+			// same Feed bucket a fresh vault has genuinely empty — rather than
+			// merely running without throwing.
+			const spawnStillExists = await browser.executeObsidian(({ app }, p: string) => app.vault.getFileByPath(p) !== null, spawnPath);
+			expect(spawnStillExists).toBe(false);
+		});
+
 		it("marks the original done and spawns the next occurrence", async function () {
 			await browser.executeObsidianCommand("obtask:complete-task");
 
@@ -2655,6 +2731,13 @@ describe("Actions", function () {
 			await openFile(path);
 		});
 
+		after(async function () {
+			// `path` isn't a fixture note — generate-fixtures.mts deletes any
+			// stray "Plain.md" before its NEXT run, but nothing removes it for
+			// the rest of *this* run otherwise.
+			await deleteNoteIfExists(path);
+		});
+
 		it("adds the task marker, an open status and a created date", async function () {
 			await browser.executeObsidianCommand("obtask:convert-note-to-task");
 
@@ -2670,6 +2753,13 @@ describe("Actions", function () {
 		const modalCls = cssClass("create-task-modal");
 		const dueDate = format(addDays(parseISO(fixtures.today), 1), "yyyy-MM-dd");
 		const createdPath = "Tasks/E2E created.md";
+
+		after(async function () {
+			// Only the first `it` below creates this note; deleting
+			// unconditionally after the describe block keeps it out of every
+			// later test's Feed/vault-file-count assertions.
+			await deleteNoteIfExists(createdPath);
+		});
 
 		it("creates a task from the modal and opens it", async function () {
 			await browser.executeObsidianCommand("obtask:create-task");
