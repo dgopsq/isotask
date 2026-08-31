@@ -1,0 +1,295 @@
+import type { TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, MarkdownView, Setting } from "obsidian";
+
+import type { RegisterTaskMenusDeps } from "@/adapters/obsidian/menus";
+import { parseTaskFileDetailed } from "@/adapters/obsidian/menus";
+import type { makeConvertNote } from "@/app/convert-note";
+import type { AppError } from "@/app/errors";
+import { describeAppError } from "@/app/errors";
+import type { DateField } from "@/app/set-date";
+import { describeRRule } from "@/domain/recurrence";
+import type { Result } from "@/domain/result";
+import type { Priority, StatusId, Task, TaskParseError, TaskPath } from "@/domain/task";
+import { describeTaskParseError, PRIORITIES, priorityLabel } from "@/domain/task";
+import { formatDurationMinutes } from "@/domain/task-display";
+import { cssClass, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
+import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+
+const TASK_PANEL_ICON = "square-check";
+const TASK_PANEL_DISPLAY_TEXT = "Task";
+
+/** Debounce window for a `metadataCache` `changed` re-render, matching the feed row's touch-and-hold pattern's use of a plain `window.setTimeout`. */
+const REFRESH_DEBOUNCE_MS = 100;
+
+export interface TaskPanelViewDeps extends RegisterTaskMenusDeps {
+	readonly convertNote: ReturnType<typeof makeConvertNote>;
+}
+
+/**
+ * Sidebar "Task" panel: a plain `ItemView` (not a Bases view) that follows
+ * whichever markdown note is currently active and renders its task fields
+ * as a form — one `Setting` row per property, editable in place through the
+ * same use-cases and modals every other surface uses. There is no local
+ * task state and no Save button (`plans/2026-08-31-task-page-editing.md`
+ * D1): every change writes through immediately, and the panel simply
+ * re-renders from the metadata cache afterwards.
+ */
+export class TaskPanelView extends ItemView {
+	private readonly deps: TaskPanelViewDeps;
+	private currentFile: TFile | null = null;
+	private refreshTimer: number | undefined;
+
+	constructor(leaf: WorkspaceLeaf, deps: TaskPanelViewDeps) {
+		super(leaf);
+		this.deps = deps;
+	}
+
+	override getViewType(): string {
+		return VIEW_TYPE_TASK_PANEL;
+	}
+
+	override getDisplayText(): string {
+		return TASK_PANEL_DISPLAY_TEXT;
+	}
+
+	override getIcon(): string {
+		return TASK_PANEL_ICON;
+	}
+
+	override async onOpen(): Promise<void> {
+		this.contentEl.addClass(cssClass("panel"));
+
+		this.registerEvent(
+			this.deps.app.workspace.on("active-leaf-change", (leaf) => {
+				// Only a markdown leaf changes what the panel follows: focus
+				// moving into a sidebar leaf (this panel included) must not
+				// tear down the form mid-interaction.
+				const view = leaf?.view;
+				if (view instanceof MarkdownView) {
+					this.followFile(view.file);
+				}
+			}),
+		);
+		this.registerEvent(
+			this.deps.app.workspace.on("file-open", (file) => {
+				this.followFile(file !== null && file.extension === "md" ? file : null);
+			}),
+		);
+		this.registerEvent(
+			this.deps.app.metadataCache.on("changed", (file) => {
+				if (this.currentFile !== null && file.path === this.currentFile.path) {
+					this.scheduleRender();
+				}
+			}),
+		);
+		this.register(() => {
+			this.clearRefreshTimer();
+		});
+
+		this.currentFile = this.activeMarkdownFile();
+		this.render();
+	}
+
+	/** Points the panel at `file`, re-rendering only when it actually changed — a leaf-change back to the note the panel already shows must not reset the form (open dropdowns, scroll). Content changes to the same file re-render via the `metadataCache` subscription instead. */
+	private followFile(file: TFile | null): void {
+		if (file?.path === this.currentFile?.path) {
+			return;
+		}
+		this.currentFile = file;
+		this.scheduleRender();
+	}
+
+	override async onClose(): Promise<void> {
+		this.clearRefreshTimer();
+	}
+
+	private clearRefreshTimer(): void {
+		if (this.refreshTimer !== undefined) {
+			window.clearTimeout(this.refreshTimer);
+			this.refreshTimer = undefined;
+		}
+	}
+
+	/** Debounces bursty `metadataCache` `changed` events (e.g. a multi-key `processFrontMatter` write) down to a single re-render, clearing any pending one on re-fire. */
+	private scheduleRender(): void {
+		this.clearRefreshTimer();
+		this.refreshTimer = window.setTimeout(() => {
+			this.refreshTimer = undefined;
+			this.render();
+		}, REFRESH_DEBOUNCE_MS);
+	}
+
+	/** The active file, only if it's a markdown note — `null` for anything else (a PDF, an image, no file at all). `getActiveFile` (rather than `getActiveViewOfType(MarkdownView)`) keeps the panel following the last-active note even while focus is on the panel itself, in the sidebar. */
+	private activeMarkdownFile(): TFile | null {
+		const file = this.deps.app.workspace.getActiveFile();
+		return file !== null && file.extension === "md" ? file : null;
+	}
+
+	private report(result: Result<unknown, AppError>): void {
+		if (!result.ok) {
+			this.deps.notifier.error(describeAppError(result.error));
+		}
+	}
+
+	private render(): void {
+		const file = this.currentFile;
+
+		const root = this.contentEl;
+		root.empty();
+
+		if (file === null) {
+			root.createDiv({ cls: cssClass("panel__empty"), text: "Open a note to see its task fields." });
+			return;
+		}
+
+		const result = parseTaskFileDetailed(this.deps, file);
+		if (result.ok) {
+			this.renderForm(root, result.value);
+			return;
+		}
+
+		const isNotATask = result.error.length === 1 && result.error[0]?.kind === "not-a-task";
+		if (isNotATask) {
+			this.renderConvertPrompt(root, file);
+			return;
+		}
+
+		this.renderParseErrors(root, file, result.error);
+	}
+
+	private renderConvertPrompt(root: HTMLElement, file: TFile): void {
+		root.createEl("h3", { text: file.basename, cls: cssClass("panel__title") });
+		root.createDiv({ cls: cssClass("panel__empty"), text: "Not a task note yet." });
+
+		new Setting(root).addButton((button) =>
+			button
+				.setButtonText("Convert to task")
+				.setCta()
+				.onClick(() => {
+					void this.deps.convertNote(file.path as TaskPath).then((result) => {
+						this.report(result);
+					});
+				}),
+		);
+	}
+
+	private renderParseErrors(root: HTMLElement, file: TFile, errors: readonly TaskParseError[]): void {
+		root.createEl("h3", { text: file.basename, cls: cssClass("panel__title") });
+		root.createDiv({ text: "This task note has errors:", cls: cssClass("panel__error-heading") });
+
+		const list = root.createEl("ul", { cls: cssClass("panel__error-list") });
+		for (const error of errors) {
+			list.createEl("li", { text: describeTaskParseError(error), cls: cssClass("panel__error") });
+		}
+	}
+
+	private renderForm(root: HTMLElement, task: Task): void {
+		root.createEl("h3", { text: task.title, cls: cssClass("panel__title") });
+
+		this.renderStatusField(root, task);
+		this.renderPriorityField(root, task);
+		this.renderDateField(root, task, "due", "Due");
+		this.renderDateField(root, task, "scheduled", "Scheduled");
+		this.renderDurationField(root, task);
+		this.renderRepeatField(root, task);
+		this.renderProjectField(root, task);
+		this.renderTagsField(root, task);
+	}
+
+	private renderStatusField(root: HTMLElement, task: Task): void {
+		const options: Record<string, string> = {};
+		for (const status of this.deps.getStatuses()) {
+			options[status.id] = status.label;
+		}
+
+		new Setting(root)
+			.setName("Status")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(task.status)
+					.onChange((value) => {
+						void this.deps.setStatus(task.path, value as StatusId).then((result) => {
+							this.report(result);
+						});
+					}),
+			);
+	}
+
+	private renderPriorityField(root: HTMLElement, task: Task): void {
+		const options: Record<string, string> = {};
+		for (const priority of PRIORITIES) {
+			options[priority] = priorityLabel(priority);
+		}
+
+		new Setting(root)
+			.setName("Priority")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(task.priority)
+					.onChange((value) => {
+						void this.deps.setPriority(task.path, value as Priority).then((result) => {
+							this.report(result);
+						});
+					}),
+			);
+	}
+
+	private renderDateField(root: HTMLElement, task: Task, field: DateField, label: string): void {
+		const value = field === "due" ? task.due : task.scheduled;
+
+		new Setting(root)
+			.setName(label)
+			.setDesc(value ?? "Not set")
+			.addButton((button) =>
+				button.setButtonText("Edit…").onClick(() => {
+					openDateModalFor(this.deps.app, task, field, this.deps.setDate, this.deps.notifier);
+				}),
+			);
+	}
+
+	private renderDurationField(root: HTMLElement, task: Task): void {
+		new Setting(root)
+			.setName("Duration")
+			.setDesc(task.duration !== undefined ? formatDurationMinutes(task.duration) : "Not set")
+			.addButton((button) =>
+				button.setButtonText("Edit…").onClick(() => {
+					openDurationModalFor(this.deps.app, task, this.deps.setDuration, this.deps.notifier);
+				}),
+			);
+	}
+
+	private renderRepeatField(root: HTMLElement, task: Task): void {
+		new Setting(root)
+			.setName("Repeat")
+			.setDesc(task.repeat !== undefined ? describeRRule(task.repeat) : "Not set")
+			.addButton((button) =>
+				button.setButtonText("Edit…").onClick(() => {
+					openRecurrenceModalFor(this.deps.app, task, this.deps.setRecurrence, this.deps.notifier);
+				}),
+			);
+	}
+
+	private renderProjectField(root: HTMLElement, task: Task): void {
+		new Setting(root)
+			.setName("Project")
+			.setDesc(task.project ?? "Not set")
+			.addButton((button) =>
+				button.setButtonText("Edit…").onClick(() => {
+					openProjectModalFor(this.deps.app, task, this.deps.setProject, this.deps.notifier);
+				}),
+			);
+	}
+
+	private renderTagsField(root: HTMLElement, task: Task): void {
+		new Setting(root)
+			.setName("Tags")
+			.setDesc(task.tags.length > 0 ? task.tags.map((tag) => `#${tag}`).join(", ") : "Not set")
+			.addButton((button) =>
+				button.setButtonText("Edit…").onClick(() => {
+					openTagsModalFor(this.deps.app, task, this.deps.setTags, this.deps.notifier);
+				}),
+			);
+	}
+}

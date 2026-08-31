@@ -25,11 +25,12 @@ const verbose = process.env["E2E_VERBOSE"] === "1";
 
 /**
  * Vault-root fixtures (outside `Tasks/`) that e2e "Actions" specs create
- * during a run (`e2e/specs/views.e2e.ts`'s convert-note-to-task test) and
- * mutate in place — unlike `Tasks/`, nothing here is desired at rest, so
- * every run starts by deleting them rather than diffing content.
+ * during a run (`e2e/specs/views.e2e.ts`'s convert-note-to-task test,
+ * `e2e/specs/task-panel.e2e.ts`'s non-task-note test) and mutate in place —
+ * unlike `Tasks/`, nothing here is desired at rest, so every run starts by
+ * deleting them rather than diffing content.
  */
-const staleVaultRootFiles = ["Plain.md"];
+const staleVaultRootFiles = ["Plain.md", "Task panel plain note.md"];
 
 async function main(): Promise<void> {
 	await mkdir(tasksDir, { recursive: true });

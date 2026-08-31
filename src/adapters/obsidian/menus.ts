@@ -8,10 +8,11 @@ import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
-import { isTaskNote, parseTask } from "@/domain/frontmatter";
+import { parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { Result } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
-import type { Task, TaskPath } from "@/domain/task";
+import type { Task, TaskParseError, TaskPath } from "@/domain/task";
 import type { Notifier } from "@/ports/notifier";
 import type { TaskEditMenuCtx } from "@/ui/task-edit-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
@@ -30,14 +31,26 @@ export interface RegisterTaskMenusDeps {
 	readonly notifier: Notifier;
 }
 
-/** Parses `file` into a `Task` if it's a task note (per the configured marker), reading the metadata cache directly — same synchronous approach as `commands/register-commands.ts#activeTaskFile`, since a `file-menu`/`editor-menu` handler must add its items before returning. `undefined` for anything else (not a task note, or one that fails to parse). Also reused by `adapters/obsidian/view-actions.ts` for the per-note header action. */
-export function parseTaskFile(deps: RegisterTaskMenusDeps, file: TFile): Task | undefined {
+/**
+ * Parses `file` via `domain/frontmatter.ts#parseTask`, reading the metadata
+ * cache directly — same synchronous approach as
+ * `commands/register-commands.ts#activeTaskFile`, since a
+ * `file-menu`/`editor-menu` handler must add its items before returning.
+ * Keeps the full `Result`, unlike `parseTaskFile` below, so a caller can
+ * tell "not a task note" (a single `not-a-task` error) apart from "a task
+ * note with invalid frontmatter" — the distinction the sidebar task panel
+ * (`views/task-panel/task-panel-view.ts`) needs to choose between its
+ * convert-prompt and parse-error states.
+ */
+export function parseTaskFileDetailed(deps: RegisterTaskMenusDeps, file: TFile): Result<Task, readonly TaskParseError[]> {
 	const keys = deps.getPropertyKeys();
-	const raw = deps.app.metadataCache.getFileCache(file)?.frontmatter;
-	if (raw === undefined || !isTaskNote(raw, keys)) {
-		return undefined;
-	}
-	const result = parseTask(file.path as TaskPath, file.basename, raw, keys, deps.getStatuses());
+	const raw = deps.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+	return parseTask(file.path as TaskPath, file.basename, raw, keys, deps.getStatuses());
+}
+
+/** `parseTaskFileDetailed`, collapsed to `undefined` for anything that isn't a valid task (not a task note, or one that fails to parse) — what the file/editor menu and the per-note header action need, since neither cares why. */
+export function parseTaskFile(deps: RegisterTaskMenusDeps, file: TFile): Task | undefined {
+	const result = parseTaskFileDetailed(deps, file);
 	return result.ok ? result.value : undefined;
 }
 

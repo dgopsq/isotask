@@ -14,6 +14,7 @@ export const PLUGIN_NAME: string = manifest.name;
 
 export const VIEW_TYPE_FEED = `${PLUGIN_ID}-feed`;
 export const VIEW_TYPE_CALENDAR = `${PLUGIN_ID}-calendar`;
+export const VIEW_TYPE_TASK_PANEL = `${PLUGIN_ID}-task-panel`;
 
 /** Prefix every plugin-defined CSS class must use (see `src/styles/obtask.css`). */
 export const CSS_PREFIX: string = PLUGIN_ID;

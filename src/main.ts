@@ -26,8 +26,10 @@ import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
 import { parseSettings } from "@/domain/settings";
 import type { ObtaskSettings } from "@/domain/settings";
+import { VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { ObtaskSettingTab } from "@/settings/settings-tab";
 import { registerViews } from "@/views/bases/register";
+import { TaskPanelView } from "@/views/task-panel/task-panel-view";
 
 /**
  * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads
@@ -137,6 +139,8 @@ export default class ObtaskPlugin extends Plugin {
 
 		registerTaskMenus(this, taskMenuDeps);
 		registerTaskViewActions(this, taskMenuDeps);
+
+		this.registerView(VIEW_TYPE_TASK_PANEL, (leaf) => new TaskPanelView(leaf, { ...taskMenuDeps, convertNote }));
 
 		this.addSettingTab(
 			new ObtaskSettingTab(this.app, this, {

@@ -277,3 +277,41 @@
 	color: var(--text-muted);
 	font-size: var(--font-smaller);
 }
+
+/*
+ * Sidebar task panel (`views/task-panel/task-panel-view.ts`). The form
+ * itself is a stack of Obsidian's own `Setting` rows, so this only styles
+ * the surrounding states — no custom control chrome to keep in sync with
+ * the theme.
+ */
+.obtask-panel {
+	padding: var(--size-4-2);
+}
+
+.obtask-panel__title {
+	margin: 0 0 var(--size-4-2) 0;
+	color: var(--text-normal);
+}
+
+.obtask-panel__empty {
+	color: var(--text-faint);
+	font-style: italic;
+	padding: var(--size-4-2) 0;
+}
+
+.obtask-panel__error-heading {
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+	margin-bottom: var(--size-4-1);
+}
+
+.obtask-panel__error-list {
+	margin: 0;
+	padding-left: var(--size-4-4);
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+}
+
+.obtask-panel__error {
+	margin-bottom: var(--size-4-1);
+}

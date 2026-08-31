@@ -5,7 +5,7 @@ import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
 import type { makeCycleStatus } from "@/app/cycle-status";
 import type { AppError } from "@/app/errors";
-import { describeAppError } from "@/app/errors";
+import { describeAppError, storeError } from "@/app/errors";
 import { renderTasksBase } from "@/app/generate-base";
 import type { DateField, makeSetDate } from "@/app/set-date";
 import type { makeSetDuration } from "@/app/set-duration";
@@ -18,20 +18,16 @@ import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import { isTaskNote } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Result } from "@/domain/result";
-import { fromNullable, none } from "@/domain/result";
+import { err } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
-import type { TaskPath } from "@/domain/task";
-import { VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
+import type { Task, TaskPath } from "@/domain/task";
+import { VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
-import { DateModal } from "@/ui/date-modal";
-import { DurationModal } from "@/ui/duration-modal";
+import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
 import { PrioritySuggestModal } from "@/ui/priority-suggest-modal";
-import { ProjectModal } from "@/ui/project-modal";
-import { RecurrenceModal } from "@/ui/recurrence-modal";
 import { StatusSuggestModal } from "@/ui/status-suggest-modal";
-import { TagsModal } from "@/ui/tags-modal";
 
 export interface RegisterCommandsDeps {
 	readonly app: App;
@@ -100,70 +96,50 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		}
 	}
 
-	async function openDateModal(file: TFile, field: DateField, title: string): Promise<void> {
-		const path = file.path as TaskPath;
-		const taskResult = await deps.store.read(path);
-		const initial = taskResult.ok ? fromNullable(field === "due" ? taskResult.value.due : taskResult.value.scheduled) : none();
+	/**
+	 * Reads and parses the task at `file`, then hands it to `action` — the
+	 * shared precondition of every command below that seeds a modal from the
+	 * task's current field values (`ui/edit-field-modals.ts`). Reports the
+	 * store error and skips `action` if the note doesn't parse, rather than
+	 * opening a modal seeded with nothing to edit.
+	 */
+	async function withTask(file: TFile, action: (task: Task) => void): Promise<void> {
+		const taskResult = await deps.store.read(file.path as TaskPath);
+		if (!taskResult.ok) {
+			report(err(storeError(taskResult.error)));
+			return;
+		}
+		action(taskResult.value);
+	}
 
-		new DateModal(deps.app, {
-			title,
-			initial,
-			onSave: async (value) => {
-				report(await deps.setDate(path, field, value));
-			},
-		}).open();
+	async function openDateModal(file: TFile, field: DateField): Promise<void> {
+		await withTask(file, (task) => {
+			openDateModalFor(deps.app, task, field, deps.setDate, deps.notifier);
+		});
 	}
 
 	async function openRecurrenceModal(file: TFile): Promise<void> {
-		const path = file.path as TaskPath;
-		const taskResult = await deps.store.read(path);
-		const initial = taskResult.ok ? fromNullable(taskResult.value.repeat) : none();
-
-		new RecurrenceModal(deps.app, {
-			initial,
-			onSave: async (rule) => {
-				report(await deps.setRecurrence(path, rule));
-			},
-		}).open();
+		await withTask(file, (task) => {
+			openRecurrenceModalFor(deps.app, task, deps.setRecurrence, deps.notifier);
+		});
 	}
 
 	async function openDurationModal(file: TFile): Promise<void> {
-		const path = file.path as TaskPath;
-		const taskResult = await deps.store.read(path);
-		const initial = taskResult.ok ? fromNullable(taskResult.value.duration) : none();
-
-		new DurationModal(deps.app, {
-			initial,
-			onSave: async (value) => {
-				report(await deps.setDuration(path, value));
-			},
-		}).open();
+		await withTask(file, (task) => {
+			openDurationModalFor(deps.app, task, deps.setDuration, deps.notifier);
+		});
 	}
 
 	async function openProjectModal(file: TFile): Promise<void> {
-		const path = file.path as TaskPath;
-		const taskResult = await deps.store.read(path);
-		const initial = taskResult.ok ? (taskResult.value.project ?? null) : null;
-
-		new ProjectModal(deps.app, {
-			initial,
-			onSave: async (project) => {
-				report(await deps.setProject(path, project));
-			},
-		}).open();
+		await withTask(file, (task) => {
+			openProjectModalFor(deps.app, task, deps.setProject, deps.notifier);
+		});
 	}
 
 	async function openTagsModal(file: TFile): Promise<void> {
-		const path = file.path as TaskPath;
-		const taskResult = await deps.store.read(path);
-		const initial = taskResult.ok ? taskResult.value.tags : [];
-
-		new TagsModal(deps.app, {
-			initial,
-			onSave: async (tags) => {
-				report(await deps.setTags(path, tags));
-			},
-		}).open();
+		await withTask(file, (task) => {
+			openTagsModalFor(deps.app, task, deps.setTags, deps.notifier);
+		});
 	}
 
 	async function createTasksBase(): Promise<void> {
@@ -194,6 +170,21 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			return;
 		}
 		await deps.app.workspace.getLeaf().openFile(file);
+	}
+
+	/** Reveals the sidebar task panel (`views/task-panel/task-panel-view.ts`), reusing an already-open leaf of that type if there is one, else opening a new one in the right sidebar. */
+	async function revealTaskPanel(): Promise<void> {
+		const existing = deps.app.workspace.getLeavesOfType(VIEW_TYPE_TASK_PANEL)[0];
+		if (existing !== undefined) {
+			await deps.app.workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = deps.app.workspace.getRightLeaf(false);
+		if (leaf === null) {
+			return;
+		}
+		await leaf.setViewState({ type: VIEW_TYPE_TASK_PANEL, active: true });
+		await deps.app.workspace.revealLeaf(leaf);
 	}
 
 	plugin.addCommand({
@@ -288,7 +279,7 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 				return false;
 			}
 			if (!checking) {
-				void openDateModal(file, "due", "Set due date");
+				void openDateModal(file, "due");
 			}
 			return true;
 		},
@@ -303,7 +294,7 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 				return false;
 			}
 			if (!checking) {
-				void openDateModal(file, "scheduled", "Set scheduled date");
+				void openDateModal(file, "scheduled");
 			}
 			return true;
 		},
@@ -400,6 +391,14 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		name: "Open tasks base",
 		callback: () => {
 			void openTasksBase();
+		},
+	});
+
+	plugin.addCommand({
+		id: "open-task-panel",
+		name: "Open task panel",
+		callback: () => {
+			void revealTaskPanel();
 		},
 	});
 
