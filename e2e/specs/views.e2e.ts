@@ -12,6 +12,7 @@ import { BUCKET_ORDER } from "@/domain/buckets";
 import type { Bucket } from "@/domain/buckets";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
 import type { ObtaskSettings } from "@/domain/settings";
+import { PALETTE, paletteColorClass } from "@/domain/project-color";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
 import { priorityChipClass } from "@/domain/task";
@@ -191,6 +192,46 @@ async function clickFeedPriorityControl(title: string): Promise<void> {
 	if (!clicked) {
 		throw new Error(`priority control for "${title}" not found in the feed`);
 	}
+}
+
+/**
+ * Reads a feed row's priority mark text and classes (`.obtask-feed__priority`
+ * — an inert, roleless, textless `feed__priority--empty` placeholder span
+ * for a `normal` task, see `feed-view.ts#renderPriorityControl`) and its
+ * leading project-color dot's class list (`.obtask-feed__dot`,
+ * `feed-view.ts#renderDot`), by the row's title text — same lookup
+ * technique as `clickFeedPriorityControl`.
+ */
+async function readFeedRowMarkers(title: string): Promise<{
+	readonly priorityText: string | null;
+	readonly priorityClasses: readonly string[];
+	readonly priorityRole: string | null;
+	readonly dotClasses: readonly string[];
+} | null> {
+	return browser.execute(
+		(rowCls, titleCls, priorityCls, dotCls, wantedTitle) => {
+			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+				const titleEl = row.querySelector(`.${titleCls}`);
+				if (titleEl?.textContent !== wantedTitle) {
+					continue;
+				}
+				const priorityEl = row.querySelector(`.${priorityCls}`);
+				const dotEl = row.querySelector(`.${dotCls}`);
+				return {
+					priorityText: priorityEl?.textContent ?? null,
+					priorityClasses: priorityEl === null ? [] : Array.from(priorityEl.classList),
+					priorityRole: priorityEl?.getAttribute("role") ?? null,
+					dotClasses: dotEl === null ? [] : Array.from(dotEl.classList),
+				};
+			}
+			return null;
+		},
+		cssClass("feed__row"),
+		cssClass("feed__title"),
+		cssClass("feed__priority"),
+		cssClass("feed__dot"),
+		title,
+	);
 }
 
 /** Reads the active Bases leaf's `FeedBasesView.config.getOrder()` — same internal `leaf.view.controller.view` path as the "Feed view options" probe (see that describe block's doc comment). */
@@ -603,6 +644,81 @@ describe("Views", function () {
 			expect(chipInfo?.tagTexts).toEqual(["#work", "#urgent"]);
 		});
 
+		/**
+		 * Apple Reminders-style priority marks (`domain/task.ts#priorityMarks`,
+		 * `feed-view.ts#renderPriorityControl`): `urgent` -> "!!", `high` ->
+		 * "!" (already covered above via the "Overdue task" fixture), `normal`
+		 * -> no visible mark at all — a rendered but textless/inert placeholder
+		 * span, not the old icon+label chip.
+		 */
+		it("renders \"!!\" for an urgent-priority row and no visible mark for a normal-priority row", async function () {
+			const urgentTask = fixtures.tasks[6];
+			if (urgentTask?.title !== "Team sync") {
+				throw new Error("expected fixtures.tasks[6] (Team sync, priority: urgent) to exist");
+			}
+			const normalTask = fixtures.tasks[2];
+			if (normalTask === undefined) {
+				throw new Error("expected fixtures.tasks[2] (This week or next week task, priority: normal) to exist");
+			}
+
+			const urgentMarkers = await readFeedRowMarkers(urgentTask.title);
+			expect(urgentMarkers?.priorityText).toEqual("!!");
+			expect(urgentMarkers?.priorityRole).toEqual("button");
+
+			const normalMarkers = await readFeedRowMarkers(normalTask.title);
+			// The element still exists — an empty `feed__priority--empty` grid
+			// cell (021bb59: keeps the row's later subgrid columns aligned with
+			// rows that do render a mark) — but carries no text, no
+			// priority-colour class, and no `role="button"`/click target: a
+			// `normal` task's priority is reachable only via the row's context
+			// menu or the task panel, not this control.
+			expect(normalMarkers?.priorityText).toEqual("");
+			expect(normalMarkers?.priorityClasses).toContain(cssClass("feed__priority--empty"));
+			expect(normalMarkers?.priorityRole).toBeNull();
+		});
+
+		/**
+		 * The leading project-color dot (`.obtask-feed__dot`,
+		 * `feed-view.ts#renderDot`) — every row gets one, coloured by
+		 * `domain/project-color.ts#resolveDotColor`:
+		 *
+		 * - "Overdue task" (`project: Q3 Launch`) resolves to
+		 *   `e2e/vault/Q3 Launch.md`, which sets `color: red` explicitly ->
+		 *   `obtask-color-red`.
+		 * - "Later task" (`project: Design Revamp`) resolves to
+		 *   `e2e/vault/Design Revamp.md`, which sets no `color` at all -> the
+		 *   hashed palette fallback (`hashPaletteColor`) — some
+		 *   `obtask-color-*` class, not a specific one (the hash is FROZEN
+		 *   but asserting the exact color here would just be re-deriving the
+		 *   algorithm rather than testing behaviour).
+		 * - "No date task" has no `project` frontmatter at all -> `neutral`,
+		 *   which gets no `obtask-color-*` class.
+		 */
+		it("colors the leading feed dot from the task's project, with a hash fallback and a neutral no-project case", async function () {
+			const explicitColorTask = fixtures.tasks[0];
+			const hashFallbackTask = fixtures.tasks[3];
+			const noProjectTask = fixtures.tasks[4];
+			if (explicitColorTask?.title !== "Overdue task") {
+				throw new Error("expected fixtures.tasks[0] (Overdue task) to exist");
+			}
+			if (hashFallbackTask?.title !== "Later task") {
+				throw new Error("expected fixtures.tasks[3] (Later task) to exist");
+			}
+			if (noProjectTask?.title !== "No date task") {
+				throw new Error("expected fixtures.tasks[4] (No date task) to exist");
+			}
+
+			const explicitMarkers = await readFeedRowMarkers(explicitColorTask.title);
+			expect(explicitMarkers?.dotClasses).toContain(cssClass(paletteColorClass("red")));
+
+			const hashMarkers = await readFeedRowMarkers(hashFallbackTask.title);
+			const paletteClasses = PALETTE.map((name) => cssClass(paletteColorClass(name)));
+			expect(hashMarkers?.dotClasses.some((cls) => paletteClasses.includes(cls))).toBe(true);
+
+			const noProjectMarkers = await readFeedRowMarkers(noProjectTask.title);
+			expect(noProjectMarkers?.dotClasses.some((cls) => paletteClasses.includes(cls))).toBe(false);
+		});
+
 		it("date chip opens DateModal pre-filled and dispatches setDate on save", async function () {
 			const task = fixtures.tasks[0];
 			if (task === undefined) {
@@ -656,11 +772,17 @@ describe("Views", function () {
 		});
 
 		it("priority control opens buildPriorityMenu and dispatches setPriority on pick", async function () {
-			// Defaults to "normal" (no explicit `priority` in its frontmatter,
-			// per `e2e/fixtures.ts`), so picking "High" is an observable change.
-			const task = fixtures.tasks[2];
+			// A `normal`-priority row renders no clickable control at all — an
+			// inert `.obtask-feed__priority--empty` placeholder span, per
+			// `feed-view.ts#renderPriorityControl` (Apple Reminders-style: only
+			// `high`/`urgent` render a mark to click) — so this has to start
+			// from a task whose fixture priority is already non-`normal`.
+			// `fixtures.tasks[5]` ("Write M1 plan") is `priority: high`; picking
+			// "Urgent" is an observable change to "!!" (rather than re-picking
+			// the same "High").
+			const task = fixtures.tasks[5];
 			if (task === undefined) {
-				throw new Error("expected fixtures.tasks[2] (This week or next week task) to exist");
+				throw new Error("expected fixtures.tasks[5] (Write M1 plan) to exist");
 			}
 			const path = `Tasks/${task.filename}`;
 
@@ -675,11 +797,11 @@ describe("Views", function () {
 					await saveScreenshot("feed-priority-menu");
 				}
 
-				await browser.$(".menu-item-title=High").click();
+				await browser.$(".menu-item-title=Urgent").click();
 
-				await waitForFrontmatter(path, "priority", (v) => v === "high", `${path} priority never updated via the feed's priority control`);
+				await waitForFrontmatter(path, "priority", (v) => v === "urgent", `${path} priority never updated via the feed's priority control`);
 				const fm = await frontmatterOf(path);
-				expect(fm?.["priority"]).toEqual("high");
+				expect(fm?.["priority"]).toEqual("urgent");
 
 				// The Bases view re-renders on the metadata cache's own "resolved"
 				// event, which can lag a tick behind `waitForFrontmatter`'s cache
@@ -702,17 +824,17 @@ describe("Views", function () {
 							cssClass("feed__priority"),
 							task.title,
 						);
-						return rowPriorityText === "!";
+						return rowPriorityText === "!!";
 					},
-					{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "!"` },
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "!!"` },
 				);
-				expect(rowPriorityText).toEqual("!");
+				expect(rowPriorityText).toEqual("!!");
 			} finally {
-				// This fixture has no `priority` in its pristine frontmatter
-				// (defaults to "normal") — restore it so nothing later in this
-				// file observes the "High" this test set.
+				// This fixture's pristine priority is "high" (not "normal") —
+				// restore it so nothing later in this file observes the
+				// "urgent" this test set.
 				await restoreFixtureNote(path, task.frontmatter, task.body);
-				await waitForFrontmatter(path, "priority", (v) => v === undefined, `${path} priority never restored to its fixture value`);
+				await waitForFrontmatter(path, "priority", (v) => v === "high", `${path} priority never restored to its fixture value`);
 			}
 		});
 
@@ -1380,6 +1502,30 @@ describe("Views", function () {
 
 				await saveScreenshot("calendar-hover");
 			}
+		});
+
+		/**
+		 * Calendar event colouring follows the task's project, not its
+		 * priority (2026-08-31 rework — see `domain/project-color.ts`). "Write
+		 * M1 plan" is `priority: high` (still colours its `!` mark
+		 * `obtask-priority-high`, `event-content.ts`) but its `project:
+		 * "Q3 Launch"` resolves to `e2e/vault/Q3 Launch.md` (`color: red`), so
+		 * the event's dot/pill gets `obtask-color-red` — a colour completely
+		 * independent of the `high` priority, proving the dot no longer
+		 * reads priority at all (the pre-rework CSS keyed a `high`-priority
+		 * event's dot to `--color-orange` directly; that mapping is gone).
+		 */
+		it("colors the calendar event dot from the task's project, independent of its priority", async function () {
+			await browser.waitUntil(
+				async () => (await readCalendarEvents()).some((e) => e.title === "Write M1 plan"),
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Write M1 plan event never appeared" },
+			);
+
+			const events = await readCalendarEvents();
+			const event = events.find((e) => e.title === "Write M1 plan");
+			expect(event).toBeDefined();
+			expect(event?.className).toContain(cssClass(paletteColorClass("red")));
+			expect(event?.className).toContain(cssClass(priorityChipClass("high")));
 		});
 
 		/**

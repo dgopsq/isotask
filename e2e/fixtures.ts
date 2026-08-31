@@ -135,7 +135,12 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 		{
 			filename: "Later task.md",
 			title: "Later task",
-			frontmatter: { type: "task", status: "todo", due: later.due },
+			// `project` (no explicit `color` on the "Design Revamp" project note,
+			// `e2e/vault/Design Revamp.md`) gives `views.e2e.ts`'s feed-dot
+			// assertions a hash-fallback-color case (`domain/project-color.ts
+			// #hashPaletteColor`), distinct from "Overdue task"'s explicit
+			// `color: red` project ("Q3 Launch", `e2e/vault/Q3 Launch.md`).
+			frontmatter: { type: "task", status: "todo", due: later.due, project: "Design Revamp" },
 			body: "Generated e2e fixture: due later.",
 			bucket: later.bucket,
 		},
@@ -150,12 +155,18 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			filename: "Write M1 plan.md",
 			title: "Write M1 plan",
 			// A second `priority: high` task, due yesterday (within the current
-			// month) — the calendar month view's dot colour reads urgent/high
-			// via `--color-red`/`--color-orange`, and every *other* fixture task
-			// is `priority: normal` (the interactive-accent dot), so nothing
-			// exercised those colours in a calendar screenshot without this one.
-			frontmatter: { type: "task", status: "todo", due: highPriorityOverdue.due, priority: "high" },
-			body: "Generated e2e fixture: high priority, due yesterday.",
+			// month, so it always renders in the calendar's default month
+			// view). `priority: high` gives its `!` mark
+			// (`domain/task.ts#priorityMarks`) the `obtask-priority-high`
+			// colour class — but as of the project-color rework (2026-08-31),
+			// the event's *dot* colour no longer comes from priority at all:
+			// `project: "Q3 Launch"` resolves to `e2e/vault/Q3 Launch.md`
+			// (`color: red`), so the dot renders `obtask-color-red` regardless
+			// of this task's `high` priority — the two colour sources
+			// (mark vs. dot) are independent, which
+			// `views.e2e.ts`'s calendar describe block asserts on this fixture.
+			frontmatter: { type: "task", status: "todo", due: highPriorityOverdue.due, priority: "high", project: "Q3 Launch" },
+			body: "Generated e2e fixture: high priority, due yesterday, with a colored project.",
 			bucket: highPriorityOverdue.bucket,
 		},
 		{
