@@ -101,6 +101,19 @@ export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEvent
 }
 
 /**
+ * The `hex` half of `event.dotColor`, or `undefined` for `palette`/`neutral`
+ * — factored out of `toEventCalendarEvent` so both it and
+ * `event-calendar-renderer.ts`'s `setEvents` repaint step (which needs the
+ * same "does THIS event carry a hex color" answer for an already-mounted
+ * element) share one place that knows the `DotColor` shape. Pure, so it's
+ * unit-tested directly rather than only indirectly through
+ * `toEventCalendarEvent`'s `extendedProps`.
+ */
+export function hexDotColorOf(event: CalendarEvent): string | undefined {
+	return event.dotColor.kind === "hex" ? event.dotColor.value : undefined;
+}
+
+/**
  * Domain `CalendarEvent` -> Event Calendar's `EventInput`. `end` is
  * mandatory on `EventInput` even though the domain type's `end` is
  * optional (a zero-duration `due`/`scheduled` point event, rendered as an
@@ -122,15 +135,17 @@ export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEvent
  * environment). A `hex` `DotColor` has no class of its own — Obsidian's
  * plugin guidelines forbid dynamically registering a stylesheet rule for an
  * arbitrary runtime value (`dotColorClasses`'s doc comment) — so it's
- * relayed instead through `extendedProps.hexDotColor`, a plain string
- * `event-calendar-renderer.ts`'s `eventDidMount` reads back to set
- * `--obtask-dot-color` directly on the mounted `.ec-event` element via
- * `setCssProps`.
+ * relayed instead through `extendedProps.hexDotColor` (`hexDotColorOf`), a
+ * plain string `event-calendar-renderer.ts`'s `eventDidMount` reads back to
+ * set `--obtask-dot-color` directly on the mounted `.ec-event` element via
+ * `setCssProps`, and its `setEvents` repaints on every later data update
+ * (see that file for how it keeps a mounted-element map for exactly this).
  */
 export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput {
 	const start = toJsDate(event.start);
 	const end = event.end === undefined ? start : toJsDate(event.end);
 	const timedAllDay = event.allDay && isDateTime(event.start);
+	const hexDotColor = hexDotColorOf(event);
 	// Typed as `Record<string, unknown>` (rather than `ObtaskEventExtendedProps`)
 	// to match `Calendar.EventInput["extendedProps"]`'s own type exactly —
 	// `ObtaskEventExtendedProps` is for the read side (`isObtaskEventExtendedProps`
@@ -138,7 +153,7 @@ export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput 
 	const extendedProps: Record<string, unknown> = {
 		...(timedAllDay ? { obtaskTime: formatTime(event.start) } : {}),
 		priority: event.priority,
-		...(event.dotColor.kind === "hex" ? { hexDotColor: event.dotColor.value } : {}),
+		...(hexDotColor === undefined ? {} : { hexDotColor }),
 	};
 	return {
 		id: event.id,

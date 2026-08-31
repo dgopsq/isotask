@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	fromEventCalendarDrop,
 	fromEventCalendarView,
+	hexDotColorOf,
 	isObtaskEventExtendedProps,
 	toEventCalendarEvent,
 	toEventCalendarFirstDay,
@@ -195,6 +196,27 @@ describe("toEventCalendarEvent", () => {
 		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.durationEditable).toBe(true);
+	});
+});
+
+describe("hexDotColorOf", () => {
+	// Backs `event-calendar-renderer.ts`'s stale-hex repaint fix: `setEvents`
+	// looks this up per mounted element on every data update, so a project's
+	// color changing hex -> hex, hex -> palette, or hex -> neutral all need
+	// the right answer here for that element to repaint correctly.
+	it("returns the hex value for a hex dotColor", () => {
+		const input = event({ start: date("2026-09-10"), dotColor: { kind: "hex", value: "#a1b2c3" } });
+		expect(hexDotColorOf(input)).toBe("#a1b2c3");
+	});
+
+	it("returns undefined for a palette dotColor", () => {
+		const input = event({ start: date("2026-09-10"), dotColor: { kind: "palette", name: "green" } });
+		expect(hexDotColorOf(input)).toBeUndefined();
+	});
+
+	it("returns undefined for a neutral dotColor", () => {
+		const input = event({ start: date("2026-09-10"), dotColor: { kind: "neutral" } });
+		expect(hexDotColorOf(input)).toBeUndefined();
 	});
 });
 

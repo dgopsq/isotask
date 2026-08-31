@@ -506,3 +506,13 @@
 	font-size: var(--font-ui-small);
 	margin: 0 0 var(--size-4-2) 0;
 }
+
+/*
+ * The error div is always mounted (`ui/project-color-modal.ts#render`) so a
+ * later error transition can update it in place instead of re-rendering the
+ * whole modal (which would drop focus out of the hex field mid-edit) — this
+ * hides it, rather than the div being absent, when there's nothing to show.
+ */
+.obtask-project-color-modal-error--hidden {
+	display: none;
+}

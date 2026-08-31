@@ -4,7 +4,7 @@ import type { Calendar } from "@event-calendar/core";
 import {
 	fromEventCalendarDrop,
 	fromEventCalendarView,
-	isObtaskEventExtendedProps,
+	hexDotColorOf,
 	toEventCalendarEvent,
 	toEventCalendarFirstDay,
 	toEventCalendarView,
@@ -15,6 +15,24 @@ import type { Weekday } from "@/domain/dates";
 import { fromJsDate, fromJsDateTime } from "@/domain/dates";
 import { cssClass } from "@/plugin-id";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer, CalendarViewKind } from "@/ports/calendar-renderer";
+
+/**
+ * Sets or clears `--obtask-dot-color` on a mounted `.ec-event` element to
+ * match `event`'s current `dotColor` — `undefined` (no event, or a
+ * `palette`/`neutral` `dotColor`) REMOVES the property rather than leaving a
+ * stale hex behind. Removing an inline custom property this way (rather than
+ * setting one) isn't a forbidden inline-style write — there's no value being
+ * authored, just an earlier one taken back off. Shared by `eventDidMount`
+ * (first paint) and `setEvents`'s repaint walk (every later one).
+ */
+function applyHexDotColor(el: HTMLElement, event: CalendarEvent | undefined): void {
+	const hex = event === undefined ? undefined : hexDotColorOf(event);
+	if (hex === undefined) {
+		el.style.removeProperty("--obtask-dot-color");
+	} else {
+		el.setCssProps({ "--obtask-dot-color": hex });
+	}
+}
 
 /**
  * The sole `@event-calendar/*` import site in the codebase (ESLint-enforced,
@@ -35,6 +53,14 @@ export class EventCalendarRenderer implements CalendarRenderer {
 		// port's callback back the original domain `CalendarEvent` supplied
 		// via `setEvents` — that's what carries `taskPath` and `source`.
 		let eventsById = new Map<string, CalendarEvent>();
+
+		// Every element `eventDidMount` has ever handed back, keyed by the
+		// same event id `eventsById` uses — lets `setEvents` (below) repaint
+		// `--obtask-dot-color` on an element Event Calendar decided to REUSE
+		// across a data update (see `eventDidMount`'s doc comment above) rather
+		// than only being able to set the property once, at mount. Cleared in
+		// `destroy()` so no detached element outlives the calendar.
+		const mountedElements = new Map<string, HTMLElement>();
 
 		const onEventClick = options.callbacks.onEventClick;
 
@@ -263,7 +289,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// `event-content.ts`'s doc comment for how that fallback was
 				// confirmed against the vendored source.
 				eventContent,
-				// Applies a `hex` `DotColor` (`extendedProps.hexDotColor`,
+				// Applies a `hex` `DotColor` (`hexDotColorOf`,
 				// `event-calendar-mapping.ts`) directly onto the mounted `.ec-event`
 				// element as a `--obtask-dot-color` custom property — see
 				// `domain/project-color.ts#dotColorClasses`'s doc comment for why a
@@ -279,20 +305,23 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// `.ec-event-body::before` the same way a `.obtask-color-*` class's
 				// value would, by inheritance.
 				//
-				// KNOWN LIMITATION: `eventDidMount` is a mount-only hook (Svelte's
-				// `onMount`) — Event Calendar reuses the same mounted element across
-				// a `setEvents` call for an event whose `id` didn't change, so
-				// editing a project's hex `color` while its events are already on
-				// screen won't repaint them until something forces a real remount
-				// (switching views, toggling compact, reopening the pane). A palette
-				// color repaints immediately (`classNames` is reactive to the
-				// `event` object Event Calendar's own `each` block already tracks) —
-				// only the hex path has this gap.
+				// `eventDidMount` is a mount-only hook (Svelte's `onMount`) — Event
+				// Calendar reuses the same mounted element across a `setEvents` call
+				// for an event whose `id` didn't change, so it never refires just
+				// because a project's `color` changed underneath an on-screen event.
+				// Every mounted element is therefore also stashed in
+				// `mountedElements` (below), keyed by event id, and `setEvents`
+				// (the handle returned further down) walks that map after every
+				// data update to set or REMOVE `--obtask-dot-color` directly —
+				// that's what makes hex->hex, hex->palette, and hex->neutral all
+				// repaint live instead of only on a real remount. A palette color
+				// needs none of this: `classNames` is reactive to the `event`
+				// object Event Calendar's own `each` block already tracks, so it
+				// repaints immediately on its own.
 				eventDidMount: (info) => {
-					const extendedProps: unknown = info.event.extendedProps;
-					if (isObtaskEventExtendedProps(extendedProps) && extendedProps.hexDotColor !== undefined) {
-						info.el.setCssProps({ "--obtask-dot-color": extendedProps.hexDotColor });
-					}
+					const id = String(info.event.id);
+					mountedElements.set(id, info.el);
+					applyHexDotColor(info.el, eventsById.get(id));
 				},
 				// Month is back on a narrow pane (rendered as a dot grid, see
 				// `calendar.css`), so the switcher lists the same three views
@@ -398,6 +427,19 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			setEvents: (events) => {
 				eventsById = new Map(events.map((event) => [event.id, event]));
 				calendar.setOption("events", events.map(toEventCalendarEvent));
+				// Repaints every still-mounted element against the event list
+				// just pushed — the fix for the hex-repaint gap documented on
+				// `eventDidMount` above. Prunes any entry whose element Event
+				// Calendar has since torn down (`isConnected === false`, e.g. the
+				// event was removed or the view changed) so `mountedElements`
+				// doesn't grow unbounded across a long-lived calendar.
+				for (const [id, el] of mountedElements) {
+					if (!el.isConnected) {
+						mountedElements.delete(id);
+						continue;
+					}
+					applyHexDotColor(el, eventsById.get(id));
+				}
 			},
 			setView: (view) => {
 				currentView = view;
@@ -433,6 +475,13 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					if (isDestroyed()) {
 						return;
 					}
+					// Every element in `mountedElements` belonged to the instance
+					// `unmountCurrent` just tore down — dropping them here (rather
+					// than waiting for the next `setEvents` to notice `isConnected
+					// === false`) keeps the map from accumulating detached elements
+					// across repeated compact toggles. The new instance's own
+					// `eventDidMount` repopulates it as it mounts.
+					mountedElements.clear();
 					calendar = createCalendar(container, [DayGrid, TimeGrid, Interaction], buildOptions(target, preservedDate));
 					calendarLive = true;
 				});
@@ -457,6 +506,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// it unmounts whichever instance a pending remount leaves behind,
 				// instead of racing it.
 				destroyed = true;
+				mountedElements.clear();
 				compactTransition = compactTransition.then(unmountCurrent);
 			},
 		};

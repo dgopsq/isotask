@@ -42,6 +42,15 @@ export class TaskPanelView extends ItemView {
 	private readonly deps: TaskPanelViewDeps;
 	private currentFile: TFile | null = null;
 	private refreshTimer: number | undefined;
+	// The project note path the last render's swatch resolved, so the
+	// `metadataCache` `changed` listener below can also catch a color edited
+	// from elsewhere (the feed's project-link menu, the "Set project color"
+	// command, or the note edited by hand) while this panel follows one of
+	// its tasks — the write lands on the *project* note, never `currentFile`
+	// itself. Set in `renderProjectColorSwatch`; cleared at the top of every
+	// `render()` so a render with no project (or no resolvable file) doesn't
+	// keep re-rendering for a project the panel no longer shows.
+	private lastProjectPath: string | undefined;
 
 	constructor(leaf: WorkspaceLeaf, deps: TaskPanelViewDeps) {
 		super(leaf);
@@ -82,6 +91,15 @@ export class TaskPanelView extends ItemView {
 		this.registerEvent(
 			this.deps.app.metadataCache.on("changed", (file) => {
 				if (this.currentFile !== null && file.path === this.currentFile.path) {
+					this.scheduleRender();
+					return;
+				}
+				// The followed task names a project whose own note just changed —
+				// most likely its `color`, edited from the feed/command/by hand
+				// rather than through this panel's own swatch (`onDone` already
+				// re-renders directly for that path). See `lastProjectPath`'s doc
+				// comment.
+				if (this.lastProjectPath !== undefined && file.path === this.lastProjectPath) {
 					this.scheduleRender();
 				}
 			}),
@@ -166,6 +184,10 @@ export class TaskPanelView extends ItemView {
 
 		const root = this.contentEl;
 		root.empty();
+		// Reset here, not just on the "no project" branches below: every path
+		// through `render()` either re-sets this from `renderProjectColorSwatch`
+		// or genuinely has no project note to track.
+		this.lastProjectPath = undefined;
 
 		if (file === null) {
 			root.createDiv({ cls: cssClass("panel__empty"), text: "Open a note to see its task fields." });
@@ -341,6 +363,7 @@ export class TaskPanelView extends ItemView {
 		if (projectFile === null) {
 			return;
 		}
+		this.lastProjectPath = projectFile.path;
 
 		const rawColor = projectRawColor(this.deps.app, project, task.path);
 		const dotColor = resolveDotColor(rawColor, project);

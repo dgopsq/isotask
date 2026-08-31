@@ -4,6 +4,31 @@ import { isObtaskEventExtendedProps } from "@/adapters/calendar/event-calendar/e
 import { priorityChipClass, priorityMarks } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
 
+/** `YYYY-MM-DDTHH:mm:ss` zero-padded from `date`'s LOCAL getters (no ms, no offset/`Z`) — width-2 unless `year` needs 4. */
+function pad(value: number, width = 2): string {
+	return String(value).padStart(width, "0");
+}
+
+/**
+ * Builds the `datetime` attribute value for a hand-built `<time>` element to
+ * match the one the vendored library's own default event content sets
+ * (`createTimeElement` in `@event-calendar/core@5.12.0/dist/index.js`:
+ * `[["datetime", toISOString(chunk.start)]]`, where `toISOString(date, len =
+ * 19)` is `date.toISOString().substring(0, 19)`). That helper calls
+ * `toISOString` on the library's own INTERNAL date representation, which
+ * stores wall-clock digits in UTC-named fields (a "faux UTC" trick used
+ * throughout the vendored source for DST-proof internal math) — so its
+ * output is the wall-clock time as plain digits, not a real UTC instant.
+ * `info.event.start` here is already a genuine local `Date` (Event Calendar
+ * converts back via its own `toLocalDate` before calling `eventContent`), so
+ * reading it with plain local getters (`getFullYear`/`getHours`/etc, never
+ * `.toISOString()`, which WOULD apply this machine's UTC offset) reproduces
+ * the exact same digit string for the same wall-clock moment.
+ */
+function toEventTimeDatetime(date: Date): string {
+	return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 /**
  * Event Calendar's `eventContent` option (5.12): backing
  * `event-calendar-renderer.ts`'s `createCalendar` call. Kept in its own
@@ -65,8 +90,10 @@ export function eventContent(info: Calendar.EventContentInfo): Calendar.Content 
 	} else if (!info.event.allDay) {
 		// Mirrors the library default's own non-all-day time element
 		// (`createTimeElement`) so a plain timed block or date-only all-day
-		// chip that only needs marks added doesn't lose its time label.
-		domNodes.push(createEl("time", { cls: "ec-event-time", text: info.timeText }));
+		// chip that only needs marks added doesn't lose its time label —
+		// `datetime` attribute included, see `toEventTimeDatetime`'s doc
+		// comment for how its value matches the vendored default's.
+		domNodes.push(createEl("time", { cls: "ec-event-time", text: info.timeText, attr: { datetime: toEventTimeDatetime(info.event.start) } }));
 	}
 
 	// Keeps Event Calendar's own `ec-event-title` class (not just an

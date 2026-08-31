@@ -53,6 +53,17 @@ Negative:
 - `hashPaletteColor` is frozen: any future change to it would silently recolor every project across
   every vault that sets no explicit `color` — locked in by exact-output tests.
 
+### Addendum, 2026-08-31
+
+The first negative consequence above (hex repaints only on remount) is fixed.
+`event-calendar-renderer.ts` now keeps a `Map<eventId, HTMLElement>` of every element
+`eventDidMount` has handed back; its `setEvents` walks that map on every later data update to set
+or remove `--obtask-dot-color` directly on each still-connected element (pruning any entry whose
+element Event Calendar has since torn down). A calendar event's hex color now repaints
+live — hex -> hex, hex -> palette, and hex -> neutral — the same as a palette class already did;
+no Event Calendar update hook turned out to be needed. `docs/DOMAIN-MODEL.md`'s "Project color"
+section has been updated to match this. The other two negative consequences are unaffected.
+
 ## Alternatives considered
 
 - **A settings-registered project → color map (like the status list).** Rejected: a project is

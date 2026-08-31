@@ -109,9 +109,13 @@ Palette colors apply as one of 8 pre-declared static CSS classes. A hex color ha
 Obsidian's plugin guidelines forbid a plugin registering stylesheet rules at runtime — so it's
 applied as a scoped `--obtask-dot-color` custom property directly on the element via Obsidian's
 `setCssProps`, at the one place each renderer (the feed row, the calendar's `eventDidMount`) holds
-the actual DOM node. A known limitation: an on-screen calendar event's hex color repaints only on
-remount (`eventDidMount` is mount-only), not live the way a palette class does; palette colors
-repaint live since they're plain CSS classes.
+the actual DOM node. The calendar's `eventDidMount` is mount-only (Svelte's `onMount`), so it alone
+can't repaint an already-mounted event when a project's hex color changes underneath it — the
+renderer (`adapters/calendar/event-calendar/event-calendar-renderer.ts`) additionally tracks every
+mounted event element in a `Map` keyed by event id, and its `setEvents` walks that map on every
+later data update to set or remove `--obtask-dot-color` directly, matching whatever the new event
+list says. That's what makes a calendar event's hex color repaint live the same way a palette
+class already does.
 
 Editing is via `ui/project-color-modal.ts` (palette swatches, "Automatic" to clear the property,
 or a custom hex field), writing through `processFrontMatter` on the *project* note — reachable
@@ -343,8 +347,8 @@ independent, smaller signals instead of the event background:
   `--obtask-dot-color`, which `domain/calendar-events.ts#CalendarEvent.dotColor` carries and
   `event-calendar-mapping.ts#toEventCalendarEvent` applies as a class
   (`domain/project-color.ts#dotColorClasses`) or, for a hex project color, a `setCssProps` custom
-  property set by the renderer's `eventDidMount` (see "Project color" above for the remount
-  limitation this implies).
+  property set by the renderer's `eventDidMount` and kept live by its `setEvents` repaint (see
+  "Project color" above).
 - **The trailing `!`/`!!` marks** (present only for `high`/`urgent`) follow the task's
   **priority**, reusing the same `obtask-priority-high`/`obtask-priority-urgent` color classes the
   feed's priority mark uses (`domain/task.ts#priorityChipClass`), attached by

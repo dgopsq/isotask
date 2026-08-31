@@ -1,5 +1,5 @@
 import type { App, TFile } from "obsidian";
-import { Modal, Setting, setTooltip } from "obsidian";
+import { Modal, Notice, Setting, setTooltip } from "obsidian";
 
 import type { PaletteName, ProjectColor } from "@/domain/project-color";
 import { PALETTE, parseProjectColor, paletteColorClass, serializeProjectColor } from "@/domain/project-color";
@@ -33,6 +33,12 @@ export class ProjectColorModal extends Modal {
 	private readonly current: ProjectColor | undefined;
 	private hexValue: string;
 	private hexError: string | null = null;
+	// Created once per `render()` pass and updated in place for every error
+	// transition afterwards (`setHexError`) — a `processFrontMatter` failure
+	// or a validation error must never trigger a second `render()`, which
+	// would drop focus out of the hex field mid-edit (`AGENTS.md`/finding on
+	// this modal). `undefined` only ever between constructions of `render()`.
+	private errorEl: HTMLElement | undefined;
 
 	constructor(app: App, projectFile: TFile, onDone?: () => void) {
 		super(app);
@@ -86,10 +92,7 @@ export class ProjectColorModal extends Modal {
 					.setValue(this.hexValue)
 					.onChange((value) => {
 						this.hexValue = value;
-						if (this.hexError !== null) {
-							this.hexError = null;
-							this.render();
-						}
+						this.setHexError(null);
 					}),
 			)
 			.addButton((button) =>
@@ -98,15 +101,35 @@ export class ProjectColorModal extends Modal {
 				}),
 			);
 
-		if (this.hexError !== null) {
-			contentEl.createDiv({ text: this.hexError, cls: cssClass("project-color-modal-error") });
-		}
+		// Persistent and always mounted (even with nothing to show) so a later
+		// error transition can update it in place via `setHexError` instead of
+		// calling `render()` again — see `errorEl`'s doc comment.
+		this.errorEl = contentEl.createDiv({ cls: cssClass("project-color-modal-error") });
+		this.syncErrorEl();
 
 		new Setting(contentEl).addButton((button) =>
 			button.setButtonText("Cancel").onClick(() => {
 				this.close();
 			}),
 		);
+	}
+
+	/** Reflects `this.hexError` onto the persistent `errorEl` — text plus a `--hidden` modifier class (`calendar.css`-style theme-only CSS, `obtask.css`) rather than an inline style. */
+	private syncErrorEl(): void {
+		if (this.errorEl === undefined) {
+			return;
+		}
+		this.errorEl.setText(this.hexError ?? "");
+		this.errorEl.toggleClass(cssClass("project-color-modal-error--hidden"), this.hexError === null);
+	}
+
+	/** Sets or clears the hex-field validation error without a full `render()` — see `errorEl`'s doc comment for why. */
+	private setHexError(message: string | null): void {
+		if (this.hexError === message) {
+			return;
+		}
+		this.hexError = message;
+		this.syncErrorEl();
 	}
 
 	private renderSwatch(row: HTMLElement, name: PaletteName): void {
@@ -125,31 +148,60 @@ export class ProjectColorModal extends Modal {
 	}
 
 	private async applyPalette(name: PaletteName): Promise<void> {
-		await this.app.fileManager.processFrontMatter(this.projectFile, (frontmatter: Record<string, unknown>) => {
-			frontmatter["color"] = name;
-		});
-		this.finish();
+		if (
+			await this.writeColor((frontmatter) => {
+				frontmatter["color"] = name;
+			})
+		) {
+			this.finish();
+		}
 	}
 
 	private async applyAutomatic(): Promise<void> {
-		await this.app.fileManager.processFrontMatter(this.projectFile, (frontmatter: Record<string, unknown>) => {
-			delete frontmatter["color"];
-		});
-		this.finish();
+		if (
+			await this.writeColor((frontmatter) => {
+				delete frontmatter["color"];
+			})
+		) {
+			this.finish();
+		}
 	}
 
 	private async applyCustom(): Promise<void> {
 		const parsed = parseProjectColor(this.hexValue);
 		if (parsed?.kind !== "hex") {
-			this.hexError = "Enter a valid hex color, e.g. #a1b2c3 or #abc.";
-			this.render();
+			this.setHexError("Enter a valid hex color, e.g. #a1b2c3 or #abc.");
 			return;
 		}
 		const value = serializeProjectColor(parsed);
-		await this.app.fileManager.processFrontMatter(this.projectFile, (frontmatter: Record<string, unknown>) => {
-			frontmatter["color"] = value;
-		});
-		this.finish();
+		if (
+			await this.writeColor((frontmatter) => {
+				frontmatter["color"] = value;
+			})
+		) {
+			this.finish();
+		}
+	}
+
+	/**
+	 * Runs `processFrontMatter` on the project note, returning whether it
+	 * succeeded. A deleted or otherwise unprocessable project note (the
+	 * user removed/moved it while this modal was open) would otherwise
+	 * reject unhandled and leave the modal stuck with no feedback — caught
+	 * here, surfaced as a `Notice` (mirrors `adapters/obsidian/task-store.ts`'s
+	 * `updateProperties`, which reports the same failure through the
+	 * `TaskStore` port instead, since this write has no use-case of its own
+	 * to go through), and the modal stays open so the user can retry or
+	 * cancel rather than the write silently vanishing.
+	 */
+	private async writeColor(mutate: (frontmatter: Record<string, unknown>) => void): Promise<boolean> {
+		try {
+			await this.app.fileManager.processFrontMatter(this.projectFile, mutate);
+			return true;
+		} catch {
+			new Notice("Could not update the project color.");
+			return false;
+		}
 	}
 
 	private finish(): void {
