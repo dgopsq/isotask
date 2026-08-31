@@ -6,10 +6,21 @@
  */
 
 .obtask-feed {
-	display: flex;
-	flex-direction: column;
-	gap: var(--size-4-2);
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
+	column-gap: var(--size-4-2);
 	padding: var(--size-4-2);
+}
+
+/* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. */
+.obtask-feed--no-meta {
+	grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.obtask-feed__group,
+.obtask-feed__bucket,
+.obtask-feed__bucket-empty {
+	grid-column: 1 / -1;
 }
 
 .obtask-feed__group {
@@ -25,19 +36,23 @@
 }
 
 .obtask-feed__row {
-	display: flex;
-	align-items: baseline;
-	gap: var(--size-4-2);
+	grid-column: 1 / -1;
+	display: grid;
+	grid-template-columns: subgrid;
+	align-items: center;
 	padding: var(--size-4-1) 0;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .obtask-feed__row--invalid {
+	display: flex;
+	gap: var(--size-4-2);
+	align-items: baseline;
 	color: var(--text-error);
 }
 
 .obtask-feed__title {
-	flex: 1 1 auto;
+	min-width: 0;
 	color: var(--text-accent);
 }
 

@@ -282,6 +282,10 @@ export class CalendarBasesView extends BasesView {
 	}
 
 	override onunload(): void {
+		// Bases reuses the same `containerEl` across view-type switches, so
+		// the class added in the constructor must come off here or the next
+		// view inherits it.
+		this.viewContainerEl.removeClass(cssClass("calendar-view"));
 		// A view can be destroyed while it still has focus (e.g. the pane is
 		// closed) — pop the pushed scope so it doesn't leak on `app.keymap`'s
 		// scope stack.

@@ -153,6 +153,18 @@ export class FeedBasesView extends BasesView {
 		return [{ name: "New task", icon: "plus", callback: () => void this.createFileForView() }];
 	}
 
+	/**
+	 * Bases reuses the same `containerEl` when the user switches a base
+	 * between view types, so everything this view put on the container —
+	 * class, grid CSS variable — must come off on unload or the next view
+	 * inherits the feed's grid layout.
+	 */
+	override onunload(): void {
+		this.viewContainerEl.removeClass(cssClass("feed"), cssClass("feed--no-meta"));
+		this.viewContainerEl.style.removeProperty("--obtask-feed-meta-columns");
+		super.onunload();
+	}
+
 	override onDataUpdated(): void {
 		this.removeChild(this.rows);
 		this.rows = this.addChild(new Component());
@@ -164,6 +176,8 @@ export class FeedBasesView extends BasesView {
 		const firstDay = this.deps.getWeekStart();
 		const options = parseFeedViewOptions(this.config);
 		const columns = feedRowColumns(this.config.getOrder(), keys);
+		this.viewContainerEl.setCssProps({ "--obtask-feed-meta-columns": String(columns.length) });
+		this.viewContainerEl.toggleClass(cssClass("feed--no-meta"), columns.length === 0);
 
 		for (const group of this.data.groupedData) {
 			if (group.hasKey() && group.key !== undefined) {
@@ -343,10 +357,17 @@ export class FeedBasesView extends BasesView {
 		});
 	}
 
-	/** Internal link to the project note, if `task.project` resolves to an existing file — same open pattern as the title link. Unresolved projects render as plain text (no dead-link click). */
+	/**
+	 * Internal link to the project note, if `task.project` resolves to an
+	 * existing file — same open pattern as the title link. Unresolved
+	 * projects render as plain text (no dead-link click). Always appends
+	 * exactly one top-level element (an empty placeholder span when there is
+	 * no project) so the grid's project column stays aligned across rows.
+	 */
 	private renderProjectLink(row: HTMLElement, task: Task): void {
 		const project = task.project;
 		if (project === undefined) {
+			row.createSpan({ cls: [cssClass("feed__project"), cssClass("feed__project--empty")] });
 			return;
 		}
 
@@ -367,8 +388,14 @@ export class FeedBasesView extends BasesView {
 		});
 	}
 
+	/**
+	 * Always appends exactly one top-level element (an empty placeholder
+	 * span when there are no tags) so the grid's tags column stays aligned
+	 * across rows.
+	 */
 	private renderTags(row: HTMLElement, task: Task): void {
 		if (task.tags.length === 0) {
+			row.createSpan({ cls: [cssClass("feed__tags"), cssClass("feed__tags--empty")] });
 			return;
 		}
 		const container = row.createSpan({ cls: cssClass("feed__tags") });
@@ -389,17 +416,21 @@ export class FeedBasesView extends BasesView {
 	 * control, not a chip. Renders nothing when the property is absent
 	 * (`getValue` returns `null` or Bases' `NullValue`) or prints as empty
 	 * text — deliberately not `isTruthy()`, which would also hide a
-	 * meaningful `false` or `0`.
+	 * meaningful `false` or `0`. Always appends exactly one top-level element
+	 * (an empty placeholder span when there is no value to show) so the
+	 * grid's generic column stays aligned across rows.
 	 */
 	private renderGenericChip(row: HTMLElement, entry: BasesEntry, propertyId: string): void {
 		const value = entry.getValue(propertyId as BasesPropertyId);
 		// `NullValue.toString()` is the literal "null", so it has to be
 		// recognised by type, not by its text.
 		if (value === null || value instanceof NullValue) {
+			row.createSpan({ cls: [cssClass("feed__generic"), cssClass("feed__generic--empty")] });
 			return;
 		}
 		const text = value.toString().trim();
 		if (text === "") {
+			row.createSpan({ cls: [cssClass("feed__generic"), cssClass("feed__generic--empty")] });
 			return;
 		}
 

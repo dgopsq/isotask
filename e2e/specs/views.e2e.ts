@@ -1504,7 +1504,11 @@ describe("Views", function () {
 		 */
 		async function reopenCalendarView(): Promise<void> {
 			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
-			await browser.$(`.${cssClass("feed")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			// Wait on the toolbar, not `.obtask-feed`: the base reopens on
+			// whichever view type it last showed (usually the calendar here),
+			// and views now remove their container class on unload, so the
+			// feed class is only present when the feed is actually mounted.
+			await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu").waitForExist({ timeout: SELECT_TIMEOUT });
 
 			// Retries the whole open-menu-then-pick-Calendar cycle until the
 			// calendar is ACTUALLY mounted, rather than until an intermediate
