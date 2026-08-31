@@ -230,6 +230,11 @@
 	border-radius: var(--radius-s);
 	padding: var(--size-4-1) var(--size-4-2);
 	font-size: var(--font-ui-smaller);
+	/* Tight, not the library's own 1.5 — the title/time/marks below already
+	 * carry their own smaller `em` sizes off this base, and a loose
+	 * line-height on top of that just adds dead vertical space, working
+	 * against the same "denser month rows" goal. */
+	line-height: var(--line-height-tight);
 	box-shadow: none;
 }
 
@@ -282,6 +287,36 @@
 .obtask-calendar .ec-day-grid .ec-event-body,
 .obtask-calendar .ec-all-day .ec-event-body {
 	align-items: center;
+	/*
+	 * Explicit, defensive nowrap: the vendored `.ec-event-body` rule already
+	 * defaults to `flex-direction: row` with no `flex-wrap` (initial value is
+	 * `nowrap`), but that default is easy to shadow accidentally (e.g. the
+	 * compact-only all-day wrap rule further down deliberately sets `wrap` on
+	 * a *different*, more specific selector) — spelling it out here means a
+	 * future rule can never silently let the dot/time/title/marks row break
+	 * across two lines, which is the one layout this event must never do.
+	 */
+	flex-wrap: nowrap;
+}
+
+/*
+ * Title is the one flexible item in the row: `flex: 1 1 auto` (grow to fill
+ * leftover space, shrink first) plus `min-width: 0` (overrides a flex
+ * item's default content-based minimum size, which would otherwise refuse
+ * to shrink smaller than the title's own text and push the row wider than
+ * its container) is what lets `overflow: hidden` + `text-overflow: ellipsis`
+ * actually engage instead of just sitting inert on an item that never gets
+ * small enough to need clipping. `white-space: nowrap` keeps the title's own
+ * text from wrapping onto a second line internally, which is a distinct
+ * failure mode from the row itself wrapping (`flex-wrap: nowrap` above).
+ */
+.obtask-calendar .ec-day-grid .ec-event-title,
+.obtask-calendar .ec-all-day .ec-event-title {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 .obtask-calendar .ec-day-grid .ec-event-body::before,
@@ -302,7 +337,18 @@
 	box-shadow: inset 0 0 0 2px var(--obtask-dot-color, var(--text-faint));
 }
 
+/*
+ * Title down to 0.85em of whatever base size its context sets on `.ec-event`
+ * (`--font-ui-smaller` in day-grid/all-day/time-grid, the library's own
+ * `.85em` default anywhere else) — applies unscoped to every `.ec-event-
+ * title` (month, week/day time-grid alike) so the whole calendar's event
+ * text scales down together, per the "too big overall" feedback. The time
+ * label and marks below are sized relative to THIS reduced size, not the
+ * unscaled base, so they stay proportionate to the title rather than
+ * suddenly towering over it.
+ */
 .obtask-calendar .ec-event-title {
+	font-size: 0.85em;
 	line-height: var(--line-height-tight);
 }
 
@@ -314,15 +360,17 @@
  * a secondary label, not the headline), `font-variant-numeric: tabular-nums` so
  * single/double-digit hours don't jiggle the title's start position as
  * chips re-render, `flex-shrink: 0` so a narrow chip compresses the
- * title's own ellipsis instead of clipping the time, and `font-size:
- * inherit` to explicitly match `.ec-event-title`'s size (both otherwise
- * inherit the same `.ec-event` font-size already, this just documents
- * that they're meant to). Hidden in month view (`.ec-day-grid`, above).
+ * title's own ellipsis instead of clipping the time. `font-size: 0.765em`
+ * (`.ec-event-title`'s own `0.85em` × 0.9) reads as a step smaller than the
+ * title next to it — a plain `inherit` would instead match the title's OLD,
+ * larger size, since both this and the title inherit from the same
+ * `.ec-event` base rather than from each other. Hidden in month view
+ * (`.ec-day-grid`, above).
  */
 .obtask-calendar .ec-all-day .obtask-event-time {
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
-	font-size: inherit;
+	font-size: 0.765em;
 	flex-shrink: 0;
 	margin-inline-end: var(--size-4-1);
 }
@@ -337,14 +385,17 @@
  * keeps it from ever getting squeezed by the title's own ellipsis. Colour
  * comes from the same `obtask-priority-high`/`obtask-priority-urgent`
  * classes `styles/obtask.css` already defines unscoped for the feed chip —
- * no separate colour rule needed here.
+ * no separate colour rule needed here. `font-size: 0.85em` matches the
+ * title's own reduced size (a plain `inherit` would instead be the
+ * unscaled `.ec-event` base, towering over the now-smaller title next to
+ * it).
  */
 .obtask-calendar .ec-day-grid .obtask-event-marks,
 .obtask-calendar .ec-all-day .obtask-event-marks {
 	margin-inline-start: auto;
 	padding-inline-start: var(--size-4-1);
 	flex-shrink: 0;
-	font-size: inherit;
+	font-size: 0.85em;
 	font-weight: var(--font-semibold);
 }
 
@@ -387,6 +438,11 @@
 	border-radius: var(--radius-s);
 	box-shadow: none;
 	overflow: hidden;
+	/* Tight (not the library's own 1.5) — see the day-grid/all-day `.ec-event`
+	 * rule above for the same change; this also shrinks the container-query
+	 * threshold below, since the time line's line-height is one of its
+	 * inputs. */
+	line-height: var(--line-height-tight);
 	/*
 	 * The compact hourly grid (`slotHeight: 32`, `event-calendar-renderer.ts`)
 	 * gives a 1-hour block ~32px and a 30-minute block ~16px, computed
@@ -542,6 +598,22 @@
 }
 
 /*
+ * The priority mark sits absolutely positioned in this box's own top-right
+ * corner (`.obtask-event-marks`, below) rather than in the title's own flex
+ * flow, so — unlike the day-grid/all-day row, where `margin-inline-start:
+ * auto` on a real flex sibling naturally reserves room for it — nothing
+ * here stops the title's own ellipsis from running text underneath the
+ * mark. `:has(~ .obtask-event-marks)` (a later sibling — `event-content.ts`
+ * pushes the title node before the marks node) only reserves this padding
+ * on events that actually render a mark, so a `normal`-priority block's
+ * title still gets the full width. 1.6em comfortably clears the widest mark
+ * ("!!" at the title's own font-size) plus a small gap before it.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .obtask-event-marks) {
+	padding-inline-end: 1.6em;
+}
+
+/*
  * Time-grid's priority marks (`!`/`!!`, event-content.ts's eventContent):
  * `.ec-event-body` here is a flex *column* (title then time, `order`-flipped
  * above), so the day-grid/all-day row's `margin-inline-start: auto` trick
@@ -554,6 +626,10 @@
 	position: absolute;
 	inset-block-start: 0;
 	inset-inline-end: 0;
+	/* Matches the title's own reduced size (see `.ec-event-title` above) —
+	 * a plain inherited size here would be the unscaled `.ec-event` base,
+	 * towering over the now-smaller title beside it. */
+	font-size: 0.85em;
 	font-weight: var(--font-semibold);
 }
 
@@ -570,7 +646,9 @@
 	order: 2;
 	flex-shrink: 0;
 	margin: var(--size-4-1) 0 0 0;
-	font-size: var(--font-ui-smaller);
+	/* 0.765em (0.85em title × 0.9), same "one step smaller than the title"
+	 * ratio as the all-day row's `.obtask-event-time` above. */
+	font-size: 0.765em;
 	color: var(--text-muted);
 	overflow: hidden;
 	white-space: nowrap;
@@ -590,18 +668,22 @@
  * Threshold arithmetic, both lines' contribution to `.ec-event`'s
  * block-size (confirmed via a live DOM probe against this build's actual
  * theme values — default Obsidian theme, `--font-ui-smaller: 12px`,
- * `--line-height-tight: 1.3`, body's inherited `--line-height-normal: 1.5`,
- * `--size-4-1: 4px`, `--size-4-2: 8px`):
- *   padding-top                     2px  (0.1667em)
- *   title line-height   12px * 1.3 = 15.6px (1.3em)   [line-height-tight]
- *   time margin-top     var(--size-4-1)  = 4px  (0.3333em)
- *   time line-height    12px * 1.5 = 18px (1.5em)   [inherited line-height-normal]
- *   padding-bottom                  2px  (0.1667em)
+ * `--line-height-tight: 1.3`, `--size-4-1: 4px`, `--size-4-2: 8px`; title
+ * and time are now sized in `em` off this same 12px base — 0.85em and
+ * 0.765em respectively, see `.ec-event-title`/this rule's `.ec-event-time`
+ * above — and `.ec-event` itself is `line-height: var(--line-height-tight)`
+ * now too, so both lines use the same 1.3 line-height, not title-tight vs.
+ * time-inherited-normal as before):
+ *   padding-top                             2px    (0.1667em)
+ *   title line-height   12*0.85*1.3       = 13.26px (1.105em)
+ *   time margin-top     var(--size-4-1)   = 4px    (0.3333em)
+ *   time line-height    12*0.765*1.3      = 11.93px (0.9945em)
+ *   padding-bottom                          2px    (0.1667em)
  *   -----------------------------------------------
- *   total                          41.6px (~3.47em)
+ *   total                                  33.2px (~2.77em)
  * `em` here is relative to `.ec-event`'s own `font-size: var(--font-ui-
  * smaller)` (set above), so the threshold tracks that variable if a theme
- * changes it. 3.5em (a hair over the 3.47em computed minimum, so rounding
+ * changes it. 2.8em (a hair over the 2.77em computed minimum, so rounding
  * doesn't accidentally hide the time line in a block that actually has room
  * for it) is comfortably between a 1-hour block (32px, must hide) and a
  * 2-hour block (64px, must show) either way.
@@ -611,7 +693,7 @@
  * Chromium's container-query launch) and Obsidian mobile (iOS 16.4+
  * WebKit, Android Chromium WebView).
  */
-@container obtask-event (height < 3.5em) {
+@container obtask-event (height < 2.8em) {
 	.obtask-calendar .ec-time-grid .ec-body .ec-event-time {
 		display: none;
 	}
@@ -924,56 +1006,84 @@
 }
 
 /*
- * Compact month: every task in a cell renders as a small dot instead of a
- * chip — restored from the "collapse to 3 days" treatment (see
+ * Compact month: every task in a cell renders as a small pill instead of a
+ * full chip — restored from the "collapse to 3 days" treatment (see
  * `domain/calendar-view-options.ts`'s doc comment: there is no
  * `effectiveCalendarView` any more, month renders as itself at every width).
  * The dot itself needs no new CSS: `.ec-day-grid .ec-event-body::before`
  * (above, unconditional) already draws a 7px priority-coloured circle before
  * the title for wide-pane month chips too — compact month keeps that exact
- * dot and just visually hides the title next to it (the shared rule above)
- * and strips the chip's own surface (background/padding/border-radius),
- * so what's left on screen is only the dot.
+ * dot and just visually hides the title next to it (the shared rule above).
+ *
+ * Unlike an earlier bare-dot version of this rule, the chip's own surface
+ * is kept (not stripped to `background: transparent`): a dot with a
+ * priority mark (`!`/`!!`) next to it and no container reads as two
+ * unrelated marks floating in the cell, not one event — see the reported
+ * bug this restores a container for. Same `--background-modifier-hover`
+ * fill the non-compact month/all-day pill uses (`.ec-day-grid .ec-event`,
+ * above), sized to its own content (`inline-size: max-content`, not a
+ * percentage of the column) so a dot-only pill stays small and a
+ * dot-plus-mark pill only grows as much as the mark needs.
  *
  * `pointer-events: none` on the whole event is what makes a tap anywhere in
- * the cell — including directly on a dot — reach the day cell's own
+ * the cell — including directly on a pill — reach the day cell's own
  * `dateClick` (wired in `calendar-view.ts#onSlotClick` to drill into Day
  * view for compact month) instead of the event's own `eventClick`; compact
  * month has no per-event tap target of its own.
  *
- * `block-size` is a small FIXED px value, not the library's own
+ * `block-size` is a small FIXED px value (border-box, so it already
+ * includes the pill's own block padding), not the library's own
  * `max-content` default — deliberately, so `event-calendar-renderer.ts`'s
  * `dayMaxEvents: true` (compact month only) has a small, PREDICTABLE
  * per-event height to measure a busy day's stack against; see the
  * `--ec-row-height` override below for the other half of that arithmetic.
- * `margin-block-end` is left at the browser default (not the wide-pane dot
- * chip's `var(--size-4-1)` margin below) so the vertical gap between two
- * stacked dots comes ONLY from Event Calendar's own `eventGap` option
- * (default `1`, untouched here) — that's the value `dayMaxEvents`'s
- * capacity math below already accounts for; adding a second, CSS-only gap
- * on top would silently let a cell hold fewer dots than that math expects.
+ *
+ * No CSS `margin` here for the gap between two stacked pills, on purpose:
+ * Event Calendar stacks day-grid events sharing a cell by measuring each
+ * mounted element's real `getBoundingClientRect().height` (excludes margin)
+ * and offsetting the next one by that plus its own `eventGap` *option*
+ * (confirmed against the vendored `@event-calendar/core@5.12.0/dist/
+ * index.js`'s `repositionEvent$1`) — a CSS-only margin on the event element
+ * is invisible to that placement math, so the pill after it would render
+ * overlapping it rather than below it. `event-calendar-renderer.ts` bumps
+ * the `eventGap` option itself (compact month only) to get a real, visible
+ * gap instead — see its comment, and the `--ec-row-height` arithmetic below
+ * for how that value folds into the capacity math.
  */
 .obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event {
 	pointer-events: none;
-	background-color: transparent;
+	background-color: var(--background-modifier-hover);
 	box-shadow: none;
-	border-radius: 0;
-	padding: 0;
+	border-radius: var(--radius-l);
+	padding: 2px 5px;
 	margin-inline: 2px;
-	margin-block-end: 0;
-	inline-size: auto;
-	block-size: 10px;
+	inline-size: max-content;
+	max-inline-size: 100%;
+	block-size: 14px;
+	overflow: hidden;
 }
 
+/*
+ * Dot and (optional) priority mark flow inline inside the pill, one small
+ * `gap` apart — `gap` (not a margin on the mark) so a dot-only pill doesn't
+ * carry a trailing gap with nothing after it. This overrides the mark's own
+ * `margin-inline-start: auto` (below), which — sized to the pill's own
+ * content width here, unlike the wide-pane chip's full-column width — would
+ * otherwise still try to push the mark to the pill's far edge instead of
+ * right next to the dot.
+ */
 .obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event-body {
 	padding: 0;
+	gap: var(--size-2-1);
 }
 
-/* The dot's own trailing gap (before the now-hidden title) would otherwise
- * leave a small dead strip to its right — harmless but pointless once the
- * title takes up no visible space. */
 .obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event-body::before {
 	margin-inline-end: 0;
+}
+
+.obtask-calendar.obtask-calendar--compact .ec-day-grid .obtask-event-marks {
+	margin-inline-start: 0;
+	padding-inline-start: 0;
 }
 
 /*
@@ -990,20 +1100,20 @@
  * this stylesheet, not of pane height.
  *
  * Arithmetic (measured live at the default Obsidian theme's `--font-ui-
- * small` day-number and this rule's own fixed dot geometry): a day cell's
+ * small` day-number and this rule's own fixed pill geometry): a day cell's
  * available stacking room starts right after its day-number head (~30px:
  * 6px padding each side, `.375rem` per the vendored `.ec-day-head` rule,
- * plus the number's own text line) and Event Calendar hides a dot once its
+ * plus the number's own text line) and Event Calendar hides a pill once its
  * bottom edge would exceed the row's total height (the "+more" link that
  * would normally also eat into this budget is hidden below, so nothing
- * reserves space for it). Each dot after the first adds its own 10px
- * `block-size` (above) plus Event Calendar's own 1px `eventGap`, i.e. 11px
- * per additional dot: dot 4's bottom sits at ~30 + 4*10 + 3*1 = 73px; dot
- * 5's at ~30 + 5*10 + 4*1 = 84px. 80px sits between the two, so four dots
- * show and a fifth or later is hidden.
+ * reserves space for it). Each pill after the first adds its own 14px
+ * `block-size` (above) plus `event-calendar-renderer.ts`'s compact-month
+ * `eventGap: 2`, i.e. 16px per additional pill: pill 4's bottom sits at
+ * ~30 + 4*14 + 3*2 = 92px; pill 5's at ~30 + 5*14 + 4*2 = 108px. 100px sits
+ * between the two, so four pills show and a fifth or later is hidden.
  */
 .obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-main.ec-uniform {
-	--ec-row-height: 80px;
+	--ec-row-height: 100px;
 }
 
 /*

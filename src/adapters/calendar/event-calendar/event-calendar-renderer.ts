@@ -206,6 +206,23 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// everything in Day view), not a place to reveal more chip text.
 			const dayMaxEventsOption: Pick<Calendar.Options, "dayMaxEvents"> = isCompact ? { dayMaxEvents: true } : {};
 
+			// Compact month's per-event pill (`calendar.css`'s
+			// `.obtask-calendar--compact .ec-day-grid .ec-event`) needs a
+			// visible gap between two stacked pills in the same day cell so
+			// each dot+mark reads as its own row rather than one fused block
+			// — but that gap can't be a plain CSS margin: Event Calendar
+			// stacks day-grid events within a cell by measuring each
+			// mounted element's real `getBoundingClientRect().height` (which
+			// excludes margin) and adding this `eventGap` option's value
+			// between them (confirmed against the vendored
+			// `@event-calendar/core@5.12.0/dist/index.js`'s
+			// `repositionEvent$1`), so a CSS-only margin on the event
+			// element is invisible to that placement math and gets
+			// overlapped rather than respected. `2` (vendored default `1`)
+			// is the only lever that actually produces a real gap here; the
+			// `--ec-row-height` cap below is derived assuming this value.
+			const eventGapOption: Pick<Calendar.Options, "eventGap"> = isCompact ? { eventGap: 2 } : {};
+
 			return {
 				view: toEventCalendarView(currentView),
 				firstDay: toEventCalendarFirstDay(currentFirstDay),
@@ -321,6 +338,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				...slotLabelFormatOption,
 				...allDayContentOption,
 				...dayMaxEventsOption,
+				...eventGapOption,
 			};
 		}
 

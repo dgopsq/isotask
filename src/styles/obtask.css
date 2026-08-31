@@ -110,8 +110,22 @@
 	background-color: var(--obtask-dot-color, var(--text-faint));
 }
 
+/*
+ * Truncates a long title to one line with an ellipsis instead of wrapping
+ * onto a second line — `min-width: 0` alone (which lets this grid item
+ * shrink below its text's own min-content width in the first place) doesn't
+ * truncate anything by itself, and a bare grid/subgrid cell with no
+ * `white-space`/`overflow` of its own just wraps overflowing text. Applies
+ * in both wide (subgrid cell, minmax(min(200px, 50%), 1fr) track) and
+ * compact (its own `minmax(0, 1fr)` column) layouts alike — neither
+ * `.obtask-feed--compact .obtask-feed__title` below overrides these three
+ * properties, only `grid-column`/`grid-row`.
+ */
 .obtask-feed__title {
 	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 	color: var(--text-accent);
 }
 
