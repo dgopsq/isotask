@@ -27,6 +27,7 @@ export const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	"next-week": "Next week",
 	later: "Later",
 	"no-date": "No date",
+	errors: "Errors",
 };
 
 export interface FixtureTask {

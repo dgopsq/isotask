@@ -120,10 +120,28 @@ configured week-start setting (Monday default).
 Buckets, in order: **Overdue** (date source < today) · **Today** (date source == today) ·
 **This week** (rest of the current week, i.e. after today through the last day of the current
 week) · **Next week** (the following full week) · **Later** (after next week) · **No date**
-(date source absent).
+(date source absent) · **Errors** (entries that failed to parse at all — see below).
 
 Terminal-kind tasks are not excluded from bucketing by the buckets function itself — whether they
 are visible at all is decided by the Bases filter on the underlying `.base` view.
+
+### Errors bucket
+
+`Errors` is a synthetic bucket, last in `BUCKET_ORDER`/`Bucket` (`domain/buckets.ts`), for entries
+Bases handed the feed that look like a task but fail `domain/frontmatter.ts#parseTask` (an unknown
+`status`, an unparseable `due`/`scheduled`, …; `TaskParseError`, described for display by
+`domain/task.ts#describeTaskParseError`). These entries never become a `Task`, so
+`groupIntoBuckets` never routes one there itself — it always comes back empty (there's no anchor
+date to bucket by). The feed view sizes it instead from
+`adapters/obsidian/bases-entries.ts#tasksFromBasesEntries`'s `invalid` count, which it also reports
+separately alongside the parsed `tasks` for the same set of entries.
+
+Ordering and visibility are otherwise identical to every other bucket, via
+`domain/buckets.ts#visibleBuckets`: `Errors` renders after `No date` (nothing sits after it — there
+is no separate "completed" bucket; `completedAtBottom` only reorders rows within each of the other
+buckets, see below) and, like any other bucket, is skipped entirely when it has nothing in it and
+`showEmptyBuckets` is off. Each row keeps the note's path (its title never parsed) and its
+error(s), joined; fixing the note is out of scope here — a task linter/fix flow is a later plan.
 
 Within a bucket, rows sort: (when `completedAtBottom` is on) terminal-kind tasks
 (`domain/status.ts#isTerminal`) last, then — on each side of that split — one of two orders,
@@ -393,9 +411,10 @@ each of them a consequence of the derivation above rather than a free choice:
 Frontmatter parsing never throws and never crashes a view. `domain/frontmatter.ts` returns
 `Result<Task, TaskParseError[]>`. On failure:
 
-- The feed view renders an "invalid task" row showing the reason(s), and the note is excluded
-  from bucket computation (it cannot be bucketed without valid data) but is not hidden by the
-  plugin — Bases' own filters still decide whether the row appears at all.
+- The feed view groups every such note under the synthetic **Errors** bucket (see "Errors bucket"
+  above), each row showing the reason(s); the note is excluded from date-bucket computation (it
+  cannot be bucketed without valid data) but is not hidden by the plugin — Bases' own filters
+  still decide whether the row appears at all.
 - The calendar view does not render an event for an unparseable task.
 - A `repeat` present without a usable anchor (`due`/`scheduled`) is treated as a parse *warning*,
   not a hard error: the task still renders and behaves normally, it simply never spawns on

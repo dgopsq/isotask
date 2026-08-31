@@ -41,10 +41,30 @@
 }
 
 .obtask-feed__bucket {
-	margin: var(--size-4-2) 0 0 0;
+	/*
+	 * Top margin is the gap between one bucket section and the next, so it
+	 * has to be generous enough to read as a section break rather than just
+	 * line spacing — bumped from --size-4-2 to --size-4-6 for that reason.
+	 * Zeroed below for a bucket heading that opens a group (or the whole
+	 * feed), which must not carry that gap before any content has rendered.
+	 */
+	margin: var(--size-4-6) 0 0 0;
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 	text-transform: uppercase;
+}
+
+/*
+ * A bucket heading is the first thing in its section — either the very
+ * first element the feed renders (no Bases grouping configured) or the
+ * first bucket right under a `.obtask-feed__group` header — so it must not
+ * carry the inter-bucket top margin above; that would double up with the
+ * group header's own spacing (or, with no group header at all, show up as
+ * a stray gap before anything has been drawn).
+ */
+.obtask-feed__bucket:first-child,
+.obtask-feed__group + .obtask-feed__bucket {
+	margin-top: 0;
 }
 
 .obtask-feed__row {

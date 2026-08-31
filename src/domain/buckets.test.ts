@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BUCKET_ORDER, bucketFor, groupIntoBuckets, taskAnchorDate, type Bucket } from "@/domain/buckets";
+import { BUCKET_ORDER, bucketFor, groupIntoBuckets, taskAnchorDate, visibleBuckets, type Bucket } from "@/domain/buckets";
 import type { IsoDate, TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
 import { DEFAULT_STATUSES } from "@/domain/status";
@@ -100,6 +100,47 @@ describe("groupIntoBuckets", () => {
 		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
 		const thisWeek = grouped.get("this-week") ?? [];
 		expect(thisWeek.map((t) => t.title)).toEqual(["A early", "B late high", "D late high alpha-first", "C late low"]);
+	});
+
+	it('"errors" is always present but never populated — it has no anchor date `bucketFor` can route a `Task` into', () => {
+		const tasks = [task({ title: "No date" }), task({ title: "Overdue", due: date("2026-08-28") })];
+		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		expect(grouped.get("errors")).toEqual([]);
+	});
+});
+
+describe("visibleBuckets", () => {
+	const emptyBuckets = new Map<Bucket, readonly ReturnType<typeof task>[]>(BUCKET_ORDER.map((bucket) => [bucket, []]));
+
+	it("with showEmptyBuckets off and nothing invalid, hides every bucket, including errors", () => {
+		expect(visibleBuckets(emptyBuckets, 0, false)).toEqual([]);
+	});
+
+	it("with showEmptyBuckets on, shows every bucket in BUCKET_ORDER, including an empty errors bucket", () => {
+		expect(visibleBuckets(emptyBuckets, 0, true)).toEqual(BUCKET_ORDER);
+	});
+
+	it('"errors" is sized off invalidCount, independently of the buckets map, and sorts after every other bucket', () => {
+		expect(visibleBuckets(emptyBuckets, 1, false)).toEqual(["errors"]);
+	});
+
+	it("a non-empty date bucket shows even with showEmptyBuckets off, while a still-empty errors bucket stays hidden", () => {
+		const tasks = [task({ title: "No date" })];
+		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		expect(visibleBuckets(grouped, 0, false)).toEqual(["no-date"]);
+	});
+
+	it("errors comes last even when every other bucket is also visible", () => {
+		const tasks = [
+			task({ title: "Overdue", due: date("2026-08-28") }),
+			task({ title: "Today", due: date("2026-09-02") }),
+			task({ title: "This week", due: date("2026-09-04") }),
+			task({ title: "Next week", due: date("2026-09-07") }),
+			task({ title: "Later", due: date("2026-12-25") }),
+			task({ title: "No date" }),
+		];
+		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		expect(visibleBuckets(grouped, 2, false)).toEqual(BUCKET_ORDER);
 	});
 });
 

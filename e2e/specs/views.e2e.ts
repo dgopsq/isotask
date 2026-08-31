@@ -358,6 +358,52 @@ async function deleteNoteIfExists(path: string): Promise<void> {
 }
 
 /**
+ * Re-opens Tasks.base and switches to the Feed view — used both to restore
+ * the feed after a test navigates away from it (`describe("Feed view")`
+ * below) and, at module scope, by the top-level `after` hook so its
+ * `E2E_SCREENSHOT=1` "feed" screenshot actually shows the feed: Bases
+ * reuses one `containerEl` across view switches, and the `describe("Calendar
+ * view")` suite runs after `describe("Feed view")` in this same file and
+ * leaves Calendar mounted, so without this the "feed" screenshot would
+ * capture whatever the last-run Calendar test left on screen instead.
+ * Mirrors the calendar suite's own `reopenCalendarView`
+ * (`describe("Calendar view")` below): same "reopen, then loop opening the
+ * views menu and picking the target view until it's actually mounted"
+ * technique, which absorbs the same click-races-the-toolbar-reattaching
+ * flake documented on that helper. The Tasks.base fixture names this view
+ * instance "Feed" (`e2e/vault/Tasks.base`), not the plugin's registered
+ * view-type name ("Obtask feed" — `views/bases/register.ts`).
+ */
+async function reopenFeedView(): Promise<void> {
+	await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
+	await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu").waitForExist({ timeout: SELECT_TIMEOUT });
+
+	const feedEl = browser.$(`.${cssClass("feed")}`);
+	const feedMenuItem = browser.$(".bases-toolbar-menu-item-name=Feed");
+	await browser.waitUntil(
+		async () => {
+			if (await feedEl.isExisting().catch(() => false)) {
+				return true;
+			}
+			// Every click is best-effort: the element it targets can go away
+			// mid-gesture (the menu can open and close again before the click
+			// lands), and a throw here would abort the retry meant to recover
+			// from it.
+			if (await feedMenuItem.isDisplayed().catch(() => false)) {
+				await feedMenuItem.click().catch(() => undefined);
+			} else {
+				await browser
+					.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button")
+					.click()
+					.catch(() => undefined);
+			}
+			return feedEl.isExisting().catch(() => false);
+		},
+		{ timeout: SELECT_TIMEOUT, timeoutMsg: "the feed view never mounted after picking it from the views menu" },
+	);
+}
+
+/**
  * Feed and calendar are exercised in one spec file, sharing one Obsidian
  * session opened once in the top-level `before` below. wdio-obsidian-service
  * launches a fresh Obsidian instance per spec *file* — the dominant cost of
@@ -382,13 +428,32 @@ describe("Views", function () {
 
 	after(async function () {
 		if (process.env["E2E_SCREENSHOT"] === "1") {
+			// This hook runs once, after every nested `describe` below —
+			// including `describe("Calendar view")`, which leaves Calendar
+			// mounted — so the feed has to be reopened here rather than
+			// assumed still current (see `reopenFeedView`'s doc comment).
+			await reopenFeedView();
+			// Bases renders asynchronously as the query resolves — the feed's
+			// own `containerEl` can exist (what `reopenFeedView` waits for)
+			// before `onDataUpdated` has actually populated it with bucket
+			// headers/rows, which would otherwise screenshot a blank pane.
+			await browser.$(`.${cssClass("feed__bucket")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			// The fixture set is long enough that the last bucket — "Errors",
+			// per `domain/buckets.ts`'s `BUCKET_ORDER` — starts below the fold;
+			// scroll its one row into view (aligned to the bottom) so the
+			// screenshot shows both the "Errors" heading and its row, with the
+			// tail end of "No date" right above — which is what actually
+			// demonstrates the new inter-bucket spacing.
+			await browser.execute((rowInvalidCls) => {
+				document.querySelector(`.${rowInvalidCls}`)?.scrollIntoView({ block: "end" });
+			}, cssClass("feed__row--invalid"));
 			await saveScreenshot("feed");
 		}
 	});
 
 	describe("Feed view", function () {
 		let structure: readonly FeedStructureEntry[] = [];
-		let invalidRowText: { readonly title: string; readonly errorText: string } | undefined;
+		let invalidRowText: { readonly title: string; readonly errorText: string; readonly groupLabel: string | null } | undefined;
 
 		before(async function () {
 			// Bases renders asynchronously as the query resolves; wait for at least
@@ -427,7 +492,7 @@ describe("Views", function () {
 			);
 
 			invalidRowText = await browser.execute(
-				(rowInvalidCls, titleCls, errorCls) => {
+				(bucketCls, rowInvalidCls, titleCls, errorCls) => {
 					const row = document.querySelector(`.${rowInvalidCls}`);
 					if (row === null) {
 						return undefined;
@@ -439,27 +504,46 @@ describe("Views", function () {
 					// command-level failure signal rather than plain data, turning this
 					// into a WebDriverError instead of a normal result.
 					const errorText = row.querySelector(`.${errorCls}`)?.textContent ?? "";
-					return { title, errorText };
+					// Walk backwards through the row's preceding siblings to find the
+					// bucket heading it's grouped under — asserts the invalid row
+					// actually renders inside the "Errors" section, not just that an
+					// "Errors" heading exists somewhere in the feed.
+					let groupLabel: string | null = null;
+					for (let sibling = row.previousElementSibling; sibling !== null; sibling = sibling.previousElementSibling) {
+						if (sibling.classList.contains(bucketCls)) {
+							groupLabel = sibling.textContent;
+							break;
+						}
+					}
+					return { title, errorText, groupLabel };
 				},
+				cssClass("feed__bucket"),
 				cssClass("feed__row--invalid"),
 				cssClass("feed__title"),
 				cssClass("feed__error"),
 			);
 		});
 
-		it("renders exactly the non-empty bucket headers, in bucket order", function () {
+		it("renders exactly the non-empty bucket headers, in bucket order, with Errors last", function () {
 			const byBucket = new Map<Bucket, string[]>();
 			for (const task of fixtures.tasks) {
 				const list = byBucket.get(task.bucket) ?? [];
 				list.push(task.title);
 				byBucket.set(task.bucket, list);
 			}
-			const expected: FeedStructureEntry[] = BUCKET_ORDER.filter((bucket) => byBucket.has(bucket)).map((bucket) => ({
-				bucketLabel: BUCKET_LABELS[bucket],
-				titles: byBucket.get(bucket) ?? [],
-			}));
+			// The "errors" bucket has no date to compute from `bucketFor`, so it's
+			// never in `byBucket` above — it's sized off the single `fixtures.invalid`
+			// note instead (`domain/buckets.ts#visibleBuckets`), which is always
+			// non-empty here, so it always renders, last (`BUCKET_ORDER`'s order).
+			const expected: FeedStructureEntry[] = [...BUCKET_ORDER.filter((bucket) => byBucket.has(bucket)), "errors" as const].map(
+				(bucket) => ({
+					bucketLabel: BUCKET_LABELS[bucket],
+					titles: byBucket.get(bucket) ?? [],
+				}),
+			);
 
 			expect(structure.map((entry) => entry.bucketLabel)).toEqual(expected.map((entry) => entry.bucketLabel));
+			expect(structure.at(-1)?.bucketLabel).toEqual("Errors");
 		});
 
 		it("places each generated task under its expected bucket", function () {
@@ -470,8 +554,9 @@ describe("Views", function () {
 			}
 		});
 
-		it("shows the invalid note with unknown-status and invalid-date errors", function () {
+		it('shows the invalid note under the "Errors" heading, with unknown-status and invalid-date errors', function () {
 			expect(invalidRowText).toBeDefined();
+			expect(invalidRowText?.groupLabel).toEqual("Errors");
 			expect(invalidRowText?.title).toEqual(`Tasks/${fixtures.invalid.filename}`);
 			expect(invalidRowText?.errorText).toEqual(
 				'Unknown status "banana" (allowed: todo, in-progress, done, cancelled), Invalid due "not-a-date"',
@@ -651,46 +736,6 @@ describe("Views", function () {
 			// later tests sharing this window.
 			await browser.keys("Escape");
 		});
-
-		/**
-		 * Re-opens Tasks.base and switches to the Feed view — used to restore
-		 * the feed after a test navigates away from it. Mirrors the calendar
-		 * suite's own `reopenCalendarView` (`describe("Calendar view")` below):
-		 * same "reopen, then loop opening the views menu and picking the
-		 * target view until it's actually mounted" technique, which absorbs
-		 * the same click-races-the-toolbar-reattaching flake documented on
-		 * that helper. The Tasks.base fixture names this view instance "Feed"
-		 * (`e2e/vault/Tasks.base`), not the plugin's registered view-type name
-		 * ("Obtask feed" — `views/bases/register.ts`).
-		 */
-		async function reopenFeedView(): Promise<void> {
-			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
-			await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu").waitForExist({ timeout: SELECT_TIMEOUT });
-
-			const feedEl = browser.$(`.${cssClass("feed")}`);
-			const feedMenuItem = browser.$(".bases-toolbar-menu-item-name=Feed");
-			await browser.waitUntil(
-				async () => {
-					if (await feedEl.isExisting().catch(() => false)) {
-						return true;
-					}
-					// Every click is best-effort: the element it targets can go away
-					// mid-gesture (the menu can open and close again before the click
-					// lands), and a throw here would abort the retry meant to recover
-					// from it.
-					if (await feedMenuItem.isDisplayed().catch(() => false)) {
-						await feedMenuItem.click().catch(() => undefined);
-					} else {
-						await browser
-							.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button")
-							.click()
-							.catch(() => undefined);
-					}
-					return feedEl.isExisting().catch(() => false);
-				},
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: "the feed view never mounted after picking it from the views menu" },
-			);
-		}
 
 		/**
 		 * The feed's narrow-pane compaction feature: below `COMPACT_FEED_WIDTH`

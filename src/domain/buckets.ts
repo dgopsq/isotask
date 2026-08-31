@@ -7,9 +7,18 @@ import { findStatus, isTerminal } from "@/domain/status";
 import type { Task } from "@/domain/task";
 import { priorityRank } from "@/domain/task";
 
-export type Bucket = "overdue" | "today" | "this-week" | "next-week" | "later" | "no-date";
+/**
+ * The six date-anchored buckets, plus the synthetic `"errors"` bucket: tasks
+ * that fail to parse at all (`domain/task.ts#TaskParseError`) have no anchor
+ * date to bucket by, so they can never come out of `bucketFor`/
+ * `groupIntoBuckets` — the feed view assigns them to `"errors"` itself, from
+ * the invalid-entry count `adapters/obsidian/bases-entries.ts` reports
+ * alongside its parsed tasks. `"errors"` sits last in `BUCKET_ORDER` (after
+ * `"no-date"`), so it always renders as the feed's final section.
+ */
+export type Bucket = "overdue" | "today" | "this-week" | "next-week" | "later" | "no-date" | "errors";
 
-export const BUCKET_ORDER: readonly Bucket[] = ["overdue", "today", "this-week", "next-week", "later", "no-date"];
+export const BUCKET_ORDER: readonly Bucket[] = ["overdue", "today", "this-week", "next-week", "later", "no-date", "errors"];
 
 export type DateSource = "due" | "scheduled" | "earliest";
 
@@ -145,4 +154,24 @@ export function groupIntoBuckets(tasks: readonly Task[], options: BucketOptions)
 		);
 	}
 	return result;
+}
+
+/**
+ * Which buckets the feed should actually render, in `BUCKET_ORDER` (so
+ * `"errors"` — see `Bucket`'s doc comment — always comes last), filtered by
+ * `showEmptyBuckets`: a bucket with nothing in it is dropped unless
+ * `showEmptyBuckets` is on, in which case every bucket renders (with a
+ * placeholder for the ones that are empty). `"errors"` is sized off
+ * `invalidCount` — the count of entries that failed to parse — rather than
+ * `buckets`, since `groupIntoBuckets` never puts a `Task` there itself (an
+ * unparseable entry never became one); every other bucket is sized off
+ * `buckets.get(bucket)`. This is the one rule for "is this bucket empty",
+ * applied uniformly — the errors bucket gets no special-casing beyond
+ * supplying its count differently.
+ */
+export function visibleBuckets(buckets: ReadonlyMap<Bucket, readonly Task[]>, invalidCount: number, showEmptyBuckets: boolean): readonly Bucket[] {
+	return BUCKET_ORDER.filter((bucket) => {
+		const count = bucket === "errors" ? invalidCount : (buckets.get(bucket)?.length ?? 0);
+		return count > 0 || showEmptyBuckets;
+	});
 }

@@ -14,7 +14,7 @@ import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
 import { describeAppError } from "@/app/errors";
 import type { Bucket, DateSource } from "@/domain/buckets";
-import { BUCKET_ORDER, groupIntoBuckets } from "@/domain/buckets";
+import { groupIntoBuckets, visibleBuckets } from "@/domain/buckets";
 import type { TaskDate } from "@/domain/dates";
 import { fromJsDate } from "@/domain/dates";
 import type { Weekday } from "@/domain/dates";
@@ -51,6 +51,7 @@ const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	"next-week": "Next week",
 	later: "Later",
 	"no-date": "No date",
+	errors: "Errors",
 };
 
 const DATE_FIELD_LABELS: Readonly<Record<FeedRowAnchor["field"], string>> = {
@@ -199,14 +200,25 @@ export class FeedBasesView extends BasesView {
 				},
 			);
 
-			for (const bucket of BUCKET_ORDER) {
-				const bucketTasks = buckets.get(bucket) ?? [];
-				if (bucketTasks.length === 0 && !options.showEmptyBuckets) {
+			for (const bucket of visibleBuckets(buckets, invalid.length, options.showEmptyBuckets)) {
+				this.viewContainerEl.createEl("h4", { text: BUCKET_LABELS[bucket], cls: cssClass("feed__bucket") });
+
+				if (bucket === "errors") {
+					if (invalid.length === 0) {
+						this.viewContainerEl.createDiv({ text: "No tasks", cls: cssClass("feed__bucket-empty") });
+						continue;
+					}
+					for (const entry of invalid) {
+						const row = this.viewContainerEl.createDiv({
+							cls: [cssClass("feed__row"), cssClass("feed__row--invalid")],
+						});
+						row.createSpan({ text: entry.path, cls: cssClass("feed__title") });
+						row.createSpan({ text: entry.errors.map((e) => describeTaskParseError(e)).join(", "), cls: cssClass("feed__error") });
+					}
 					continue;
 				}
 
-				this.viewContainerEl.createEl("h4", { text: BUCKET_LABELS[bucket], cls: cssClass("feed__bucket") });
-
+				const bucketTasks = buckets.get(bucket) ?? [];
 				if (bucketTasks.length === 0) {
 					this.viewContainerEl.createDiv({ text: "No tasks", cls: cssClass("feed__bucket-empty") });
 					continue;
@@ -223,14 +235,6 @@ export class FeedBasesView extends BasesView {
 					}
 					this.renderRow({ task, entry }, statuses, options.dateSource, columns);
 				}
-			}
-
-			for (const entry of invalid) {
-				const row = this.viewContainerEl.createDiv({
-					cls: [cssClass("feed__row"), cssClass("feed__row--invalid")],
-				});
-				row.createSpan({ text: entry.path, cls: cssClass("feed__title") });
-				row.createSpan({ text: entry.errors.map((e) => describeTaskParseError(e)).join(", "), cls: cssClass("feed__error") });
 			}
 		}
 	}
