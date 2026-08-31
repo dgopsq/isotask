@@ -957,6 +957,17 @@
 }
 
 /*
+ * Hour-axis labels and the "all-day" corner label — both are `.ec-sidebar`
+ * cells inside the time grid (see the compact gutter comment below for the
+ * shared-column mechanics) — one step smaller than the calendar's base
+ * text, matching the day-of-week header row's `--font-ui-smaller` above so
+ * every axis/legend label reads at the same quiet size.
+ */
+.obtask-calendar .ec-time-grid .ec-sidebar {
+	font-size: var(--font-ui-smaller);
+}
+
+/*
  * Compact-only gutter shrink. The vendored `.ec-sidebar` rule
  * (`@event-calendar/core/dist/index.css`: `.ec-time-grid & { padding-inline:
  * .75rem }`, i.e. 12px each side) is shared by every sidebar cell stacked in
