@@ -82,6 +82,32 @@ export class TaskPanelView extends ItemView {
 				}
 			}),
 		);
+		this.registerEvent(
+			this.deps.app.vault.on("rename", () => {
+				// `metadataCache` deliberately fires no `changed` on rename, and
+				// a rename mutates the followed `TFile` in place — so the
+				// rendered form's captured `task.path` is stale the instant this
+				// fires. Re-render immediately (no debounce) so no click can
+				// dispatch a use-case at the dead path. Unconditional on
+				// purpose: a parent-folder rename mutates the path too but
+				// reports only the folder.
+				if (this.currentFile !== null) {
+					this.clearRefreshTimer();
+					this.render();
+				}
+			}),
+		);
+		this.registerEvent(
+			this.deps.app.vault.on("delete", () => {
+				// Existence check rather than identity: deleting a parent
+				// folder reports only the folder, not the followed file.
+				if (this.currentFile !== null && this.deps.app.vault.getFileByPath(this.currentFile.path) === null) {
+					this.currentFile = null;
+					this.clearRefreshTimer();
+					this.render();
+				}
+			}),
+		);
 		this.register(() => {
 			this.clearRefreshTimer();
 		});
@@ -139,6 +165,15 @@ export class TaskPanelView extends ItemView {
 
 		if (file === null) {
 			root.createDiv({ cls: cssClass("panel__empty"), text: "Open a note to see its task fields." });
+			return;
+		}
+
+		// An unindexed cache (note just created, or startup) would be
+		// indistinguishable from "no frontmatter" below and flash the convert
+		// prompt at a real task; `metadataCache` fires `changed` for the path
+		// once indexed, which re-renders past this state.
+		if (this.deps.app.metadataCache.getFileCache(file) === null) {
+			root.createDiv({ cls: cssClass("panel__empty"), text: "Loading…" });
 			return;
 		}
 

@@ -53,6 +53,7 @@ src/
     calendar/event-calendar/  CalendarRenderer implementation (only importer of @event-calendar/*)
   views/bases/feed/      obtask-feed BasesView (thin: entries -> domain -> render -> dispatch)
   views/bases/calendar/  obtask-calendar BasesView
+  views/task-panel/      sidebar ItemView: task fields as a form for the active note
   ui/          DOM renderers + modals (TaskCreateModal, DateModal, RecurrencePicker, StatusMenu)
   commands/    registerCommands: wires every plugin command to an app/ use-case
   settings/    SettingsTab, settings type + defaults + migration

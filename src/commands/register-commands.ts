@@ -179,10 +179,9 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			await deps.app.workspace.revealLeaf(existing);
 			return;
 		}
-		const leaf = deps.app.workspace.getRightLeaf(false);
-		if (leaf === null) {
-			return;
-		}
+		// `getRightLeaf` can come back null (no right split available); fall
+		// back to a main-area tab so the command never silently no-ops.
+		const leaf = deps.app.workspace.getRightLeaf(false) ?? deps.app.workspace.getLeaf(true);
 		await leaf.setViewState({ type: VIEW_TYPE_TASK_PANEL, active: true });
 		await deps.app.workspace.revealLeaf(leaf);
 	}

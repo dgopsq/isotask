@@ -28,6 +28,9 @@ src/
                `@event-calendar/*`.
   views/bases/feed/, views/bases/calendar/   BasesView subclasses: thin, map entries -> domain,
                call renderers, dispatch actions to app use-cases.
+  views/task-panel/   plain workspace `ItemView` (not Bases): follows the active markdown note and
+               renders its task fields as a form — dropdowns for the enums, the shared modals for
+               the rest — dispatching the same app use-cases.
   ui/          small DOM renderers + modals: `CreateTaskModal`, `DateModal`, `RecurrenceModal`,
                `StatusSuggestModal` (`FuzzySuggestModal`), `status-menu.ts#buildStatusMenu`.
                createEl only; no innerHTML.
