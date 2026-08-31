@@ -651,6 +651,156 @@ describe("Views", function () {
 			// later tests sharing this window.
 			await browser.keys("Escape");
 		});
+
+		/**
+		 * Re-opens Tasks.base and switches to the Feed view — used to restore
+		 * the feed after a test navigates away from it. Mirrors the calendar
+		 * suite's own `reopenCalendarView` (`describe("Calendar view")` below):
+		 * same "reopen, then loop opening the views menu and picking the
+		 * target view until it's actually mounted" technique, which absorbs
+		 * the same click-races-the-toolbar-reattaching flake documented on
+		 * that helper. The Tasks.base fixture names this view instance "Feed"
+		 * (`e2e/vault/Tasks.base`), not the plugin's registered view-type name
+		 * ("Obtask feed" — `views/bases/register.ts`).
+		 */
+		async function reopenFeedView(): Promise<void> {
+			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
+			await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu").waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const feedEl = browser.$(`.${cssClass("feed")}`);
+			const feedMenuItem = browser.$(".bases-toolbar-menu-item-name=Feed");
+			await browser.waitUntil(
+				async () => {
+					if (await feedEl.isExisting().catch(() => false)) {
+						return true;
+					}
+					// Every click is best-effort: the element it targets can go away
+					// mid-gesture (the menu can open and close again before the click
+					// lands), and a throw here would abort the retry meant to recover
+					// from it.
+					if (await feedMenuItem.isDisplayed().catch(() => false)) {
+						await feedMenuItem.click().catch(() => undefined);
+					} else {
+						await browser
+							.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button")
+							.click()
+							.catch(() => undefined);
+					}
+					return feedEl.isExisting().catch(() => false);
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "the feed view never mounted after picking it from the views menu" },
+			);
+		}
+
+		/**
+		 * The feed's narrow-pane compaction feature: below `COMPACT_FEED_WIDTH`
+		 * (`domain/feed-view-options.ts`), `.obtask-feed__row` drops its subgrid
+		 * columns for a two-line layout — status + title on the first line, the
+		 * metadata chips (date/priority/project/tags/generic) wrapped onto a
+		 * second — instead of the wide layout's permanent horizontal scrollbar.
+		 * Same window-resize technique as the calendar's own compaction test
+		 * (`windowSize`/`setWindowSize`, both sidebars collapsed so a 390px
+		 * Electron window is a fair narrow PANE rather than a broken desktop
+		 * layout) — see that test's doc comment in `describe("Calendar view")`
+		 * below for the full rationale.
+		 */
+		it("collapses to a two-line layout with no horizontal overflow on a narrow pane", async function () {
+			const originalSize = await windowSize();
+			await setWindowSize(390, 844);
+			const wasLeftCollapsed = await browser.executeObsidian(({ app }) => app.workspace.leftSplit.collapsed);
+			const wasRightCollapsed = await browser.executeObsidian(({ app }) => app.workspace.rightSplit.collapsed);
+			await browser.executeObsidian(({ app }) => {
+				app.workspace.leftSplit.collapse();
+				app.workspace.rightSplit.collapse();
+			});
+
+			try {
+				// Navigate fully away and back (rather than re-opening Tasks.base
+				// while already on it, a no-op that wouldn't force a fresh mount)
+				// so the feed mounts fresh and measures the current 390px width.
+				await openFile("Tasks/Today task.md");
+				await reopenFeedView();
+
+				await browser.$(`.${cssClass("feed--compact")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+				const overflow = await browser.execute((cls) => {
+					const el = document.querySelector(`.${cls}`);
+					if (el === null) {
+						return null;
+					}
+					return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+				}, cssClass("feed"));
+				expect(overflow).not.toBeNull();
+				expect(overflow?.scrollWidth ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual((overflow?.clientWidth ?? 0) + 1);
+
+				await browser.waitUntil(
+					async () =>
+						browser.execute(
+							(rowCls, titleCls, wantedTitle) =>
+								Array.from(document.querySelectorAll(`.${rowCls}`)).some(
+									(row) => row.querySelector(`.${titleCls}`)?.textContent === wantedTitle,
+								),
+							cssClass("feed__row"),
+							cssClass("feed__title"),
+							"Write M1 plan",
+						),
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: "the 'Write M1 plan' row never rendered in the compact feed" },
+				);
+
+				const rowLayout = await browser.execute(
+					(rowCls, titleCls, metaCls, wantedTitle) => {
+						for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+							const titleEl = row.querySelector(`.${titleCls}`);
+							if (titleEl?.textContent !== wantedTitle) {
+								continue;
+							}
+							const metaEl = row.querySelector(`.${metaCls}`);
+							if (metaEl === null) {
+								return null;
+							}
+							const titleRect = titleEl.getBoundingClientRect();
+							const metaRect = metaEl.getBoundingClientRect();
+							return {
+								titleBottom: titleRect.bottom,
+								metaTop: metaRect.top,
+								metaText: metaEl.textContent,
+							};
+						}
+						return null;
+					},
+					cssClass("feed__row"),
+					cssClass("feed__title"),
+					cssClass("feed__meta"),
+					"Write M1 plan",
+				);
+
+				expect(rowLayout).not.toBeNull();
+				expect(rowLayout?.metaTop ?? -Infinity).toBeGreaterThanOrEqual(rowLayout?.titleBottom ?? Infinity);
+				expect(rowLayout?.metaText ?? "").toContain("Due:");
+
+				await saveScreenshotAt(join(screenshotDir, "feed-compact-390.png"));
+			} finally {
+				await setWindowSize(originalSize[0], originalSize[1]);
+				await browser.executeObsidian(
+					({ app }, leftCollapsed: boolean, rightCollapsed: boolean) => {
+						if (leftCollapsed) {
+							app.workspace.leftSplit.collapse();
+						} else {
+							app.workspace.leftSplit.expand();
+						}
+						if (rightCollapsed) {
+							app.workspace.rightSplit.collapse();
+						} else {
+							app.workspace.rightSplit.expand();
+						}
+					},
+					wasLeftCollapsed,
+					wasRightCollapsed,
+				);
+				await openFile("Tasks/Today task.md");
+				await reopenFeedView();
+			}
+		});
 	});
 
 	/**

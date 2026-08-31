@@ -193,6 +193,68 @@
 	color: var(--text-muted);
 }
 
+/*
+ * `display: contents` makes this wrapper transparent to the grid: in wide
+ * mode its children (date/priority/project/tags/generic chips) stay direct
+ * subgrid items of `.obtask-feed__row`, exactly as if `renderRow` had
+ * appended them to the row itself — nothing about the wide layout changes.
+ * `.obtask-feed--compact` below turns it back into a real box, which is what
+ * lets the chips wrap onto a second line as a unit instead of each staying
+ * pinned to its own grid column.
+ */
+.obtask-feed__meta {
+	display: contents;
+}
+
+/*
+ * Narrow-pane two-line compaction. `obtask-feed--compact` is toggled by
+ * `feed-view.ts` off the pane's own `clientWidth`
+ * (`domain/feed-view-options.ts`'s `COMPACT_FEED_WIDTH`) — a pane-width
+ * fact, not `is-mobile`, so a narrow split pane on desktop gets this too.
+ * Below the threshold the row's subgrid columns have no room left for a
+ * readable title, so this drops the grid down to two rows per task: status
+ * + title on the first line, the wrapped metadata chips on the second.
+ */
+.obtask-feed--compact {
+	display: block;
+}
+
+/*
+ * `:not(--invalid)`: an invalid row only ever holds a title and an error
+ * span (`feed-view.ts`'s `onDataUpdated`, not `renderRow`) — it never grows
+ * a `.obtask-feed__meta` wrapper, so it has no two-line shape to collapse
+ * into. Left on its own pre-existing `.obtask-feed__row--invalid` flex rule
+ * rather than picking up this grid.
+ */
+.obtask-feed--compact .obtask-feed__row:not(.obtask-feed__row--invalid) {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	column-gap: var(--size-4-2);
+	row-gap: var(--size-4-1);
+	align-items: center;
+}
+
+.obtask-feed--compact .obtask-feed__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-1) var(--size-4-2);
+	grid-column: 2;
+}
+
+/*
+ * The wide layout's alignment placeholders (empty project/tags/generic
+ * chips that keep every row's subgrid columns lined up) serve no purpose
+ * once the columns are gone — showing them here would only add stray gaps
+ * to the wrapped line. The empty date chip ("Set date") stays visible: it's
+ * a click affordance, not just alignment filler.
+ */
+.obtask-feed--compact .obtask-feed__project--empty,
+.obtask-feed--compact .obtask-feed__tags--empty,
+.obtask-feed--compact .obtask-feed__generic--empty {
+	display: none;
+}
+
 .obtask-calendar {
 	padding: var(--size-4-4);
 	color: var(--text-muted);

@@ -20,7 +20,7 @@ import { fromJsDate } from "@/domain/dates";
 import type { Weekday } from "@/domain/dates";
 import type { FeedColumn, FeedRowAnchor } from "@/domain/feed-row";
 import { feedRowAnchor, feedRowColumns, feedRowDefaultDateField } from "@/domain/feed-row";
-import { parseFeedViewOptions } from "@/domain/feed-view-options";
+import { COMPACT_FEED_WIDTH, parseFeedViewOptions } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
@@ -160,7 +160,7 @@ export class FeedBasesView extends BasesView {
 	 * inherits the feed's grid layout.
 	 */
 	override onunload(): void {
-		this.viewContainerEl.removeClass(cssClass("feed"), cssClass("feed--no-meta"));
+		this.viewContainerEl.removeClass(cssClass("feed"), cssClass("feed--no-meta"), cssClass("feed--compact"));
 		this.viewContainerEl.style.removeProperty("--obtask-feed-meta-columns");
 		super.onunload();
 	}
@@ -178,6 +178,7 @@ export class FeedBasesView extends BasesView {
 		const columns = feedRowColumns(this.config.getOrder(), keys);
 		this.viewContainerEl.setCssProps({ "--obtask-feed-meta-columns": String(columns.length) });
 		this.viewContainerEl.toggleClass(cssClass("feed--no-meta"), columns.length === 0);
+		this.applyCompact();
 
 		for (const group of this.data.groupedData) {
 			if (group.hasKey() && group.key !== undefined) {
@@ -250,22 +251,29 @@ export class FeedBasesView extends BasesView {
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
 
+		// `display: contents` in wide mode (`styles/obtask.css`), so its
+		// children stay direct subgrid items of `.obtask-feed__row` and
+		// nothing about the wide layout changes — it exists purely so
+		// compact mode has a single element to turn into the wrapped
+		// second line (`.obtask-feed--compact .obtask-feed__meta`).
+		const metaEl = rowEl.createDiv({ cls: cssClass("feed__meta") });
+
 		for (const column of columns) {
 			switch (column.kind) {
 				case "date":
-					this.renderDateChip(rowEl, task, dateSource);
+					this.renderDateChip(metaEl, task, dateSource);
 					break;
 				case "priority":
-					this.renderPriorityControl(rowEl, task);
+					this.renderPriorityControl(metaEl, task);
 					break;
 				case "project":
-					this.renderProjectLink(rowEl, task);
+					this.renderProjectLink(metaEl, task);
 					break;
 				case "tags":
-					this.renderTags(rowEl, task);
+					this.renderTags(metaEl, task);
 					break;
 				case "generic":
-					this.renderGenericChip(rowEl, entry, column.propertyId);
+					this.renderGenericChip(metaEl, entry, column.propertyId);
 					break;
 				default: {
 					const exhaustive: never = column;
@@ -278,6 +286,34 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/**
+	 * Toggles `obtask-feed--compact` (`styles/obtask.css`) off the pane's own
+	 * `clientWidth` — see `domain/feed-view-options.ts`'s `COMPACT_FEED_WIDTH`
+	 * doc comment. `clientWidth` is `0` before the container has ever been
+	 * laid out (e.g. a view created in a background/hidden tab), treated as
+	 * "not compact" rather than the false positive an unmeasured `0 <
+	 * COMPACT_FEED_WIDTH` would give. Mirrors `CalendarBasesView#isCompact`.
+	 */
+	private applyCompact(): void {
+		const width = this.viewContainerEl.clientWidth;
+		const compact = width > 0 && width < COMPACT_FEED_WIDTH;
+		this.viewContainerEl.toggleClass(cssClass("feed--compact"), compact);
+	}
+
+	/**
+	 * Undocumented-but-real Bases hook: called when the leaf's own size
+	 * changes — a pane resize, a split being dragged, the workspace layout
+	 * changing — without a corresponding `onDataUpdated`. See
+	 * `CalendarBasesView#onResize`'s doc comment for the full rationale
+	 * (same hook, not declared on `BasesView` in `obsidian.d.ts`, so this
+	 * stays a plain method rather than `override`). Without it the feed
+	 * would keep showing wide-mode columns (or vice versa) after a pane
+	 * resize until the next vault-driven `onDataUpdated`.
+	 */
+	onResize(): void {
+		this.applyCompact();
+	}
+
+	/**
 	 * Date chip: the field the configured date source resolved to
 	 * (`due`/`scheduled`), plus its value — see `domain/feed-row.ts#feedRowAnchor`.
 	 * A button-like span (same click/Enter/Space pattern as the status
@@ -286,12 +322,12 @@ export class FeedBasesView extends BasesView {
 	 * anchor date yet, renders a muted "Set date" chip that still opens the
 	 * modal, targeting `feedRowDefaultDateField(dateSource)`.
 	 */
-	private renderDateChip(row: HTMLElement, task: Task, dateSource: DateSource): void {
+	private renderDateChip(parent: HTMLElement, task: Task, dateSource: DateSource): void {
 		const anchor = feedRowAnchor(task, dateSource);
 		const field = anchor.some ? anchor.value.field : feedRowDefaultDateField(dateSource);
 		const initial: Option<TaskDate> = anchor.some ? some(anchor.value.value) : none();
 
-		const chip = row.createSpan({
+		const chip = parent.createSpan({
 			cls: [cssClass("feed__date"), "clickable-icon"],
 			attr: { role: "button", tabindex: "0" },
 		});
@@ -326,8 +362,8 @@ export class FeedBasesView extends BasesView {
 	 * status control — opens `buildPriorityMenu` on click/Enter/Space and
 	 * dispatches to `setPriority`.
 	 */
-	private renderPriorityControl(row: HTMLElement, task: Task): void {
-		const control = row.createSpan({
+	private renderPriorityControl(parent: HTMLElement, task: Task): void {
+		const control = parent.createSpan({
 			cls: [cssClass("feed__priority"), cssClass(priorityChipClass(task.priority)), "clickable-icon"],
 			attr: { role: "button", tabindex: "0" },
 		});
@@ -364,20 +400,20 @@ export class FeedBasesView extends BasesView {
 	 * exactly one top-level element (an empty placeholder span when there is
 	 * no project) so the grid's project column stays aligned across rows.
 	 */
-	private renderProjectLink(row: HTMLElement, task: Task): void {
+	private renderProjectLink(parent: HTMLElement, task: Task): void {
 		const project = task.project;
 		if (project === undefined) {
-			row.createSpan({ cls: [cssClass("feed__project"), cssClass("feed__project--empty")] });
+			parent.createSpan({ cls: [cssClass("feed__project"), cssClass("feed__project--empty")] });
 			return;
 		}
 
 		const dest = this.deps.app.metadataCache.getFirstLinkpathDest(project, task.path);
 		if (dest === null) {
-			row.createSpan({ text: project, cls: cssClass("feed__project") });
+			parent.createSpan({ text: project, cls: cssClass("feed__project") });
 			return;
 		}
 
-		const link = row.createEl("a", {
+		const link = parent.createEl("a", {
 			text: project,
 			cls: ["internal-link", cssClass("feed__project")],
 			href: project,
@@ -393,12 +429,12 @@ export class FeedBasesView extends BasesView {
 	 * span when there are no tags) so the grid's tags column stays aligned
 	 * across rows.
 	 */
-	private renderTags(row: HTMLElement, task: Task): void {
+	private renderTags(parent: HTMLElement, task: Task): void {
 		if (task.tags.length === 0) {
-			row.createSpan({ cls: [cssClass("feed__tags"), cssClass("feed__tags--empty")] });
+			parent.createSpan({ cls: [cssClass("feed__tags"), cssClass("feed__tags--empty")] });
 			return;
 		}
-		const container = row.createSpan({ cls: cssClass("feed__tags") });
+		const container = parent.createSpan({ cls: cssClass("feed__tags") });
 		for (const tag of task.tags) {
 			container.createSpan({ text: `#${tag}`, cls: cssClass("feed__tag") });
 		}
@@ -420,21 +456,21 @@ export class FeedBasesView extends BasesView {
 	 * (an empty placeholder span when there is no value to show) so the
 	 * grid's generic column stays aligned across rows.
 	 */
-	private renderGenericChip(row: HTMLElement, entry: BasesEntry, propertyId: string): void {
+	private renderGenericChip(parent: HTMLElement, entry: BasesEntry, propertyId: string): void {
 		const value = entry.getValue(propertyId as BasesPropertyId);
 		// `NullValue.toString()` is the literal "null", so it has to be
 		// recognised by type, not by its text.
 		if (value === null || value instanceof NullValue) {
-			row.createSpan({ cls: [cssClass("feed__generic"), cssClass("feed__generic--empty")] });
+			parent.createSpan({ cls: [cssClass("feed__generic"), cssClass("feed__generic--empty")] });
 			return;
 		}
 		const text = value.toString().trim();
 		if (text === "") {
-			row.createSpan({ cls: [cssClass("feed__generic"), cssClass("feed__generic--empty")] });
+			parent.createSpan({ cls: [cssClass("feed__generic"), cssClass("feed__generic--empty")] });
 			return;
 		}
 
-		const chip = row.createSpan({ cls: cssClass("feed__generic") });
+		const chip = parent.createSpan({ cls: cssClass("feed__generic") });
 		chip.createSpan({ text: this.config.getDisplayName(propertyId as BasesPropertyId), cls: cssClass("feed__generic-label") });
 		chip.createSpan({ text, cls: cssClass("feed__generic-value") });
 	}
