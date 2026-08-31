@@ -228,12 +228,7 @@
 	color: var(--text-normal);
 	border-inline-start: none;
 	border-radius: var(--radius-s);
-	/* Inline-start gets 2px over the symmetric 8px: the leading dot is a
-	 * small round shape with far less visual weight than the trailing `!`
-	 * text glyph, so a mathematically equal inset reads tighter on the
-	 * left — optical compensation, not a layout requirement. */
-	padding: var(--size-4-1) var(--size-4-2) var(--size-4-1)
-		calc(var(--size-4-2) + var(--size-2-1));
+	padding: var(--size-4-1) var(--size-4-2);
 	font-size: var(--font-ui-smaller);
 	/* Tight, not the library's own 1.5 — the title/time/marks below already
 	 * carry their own smaller `em` sizes off this base, and a loose
@@ -1077,9 +1072,7 @@
 	background-color: var(--background-modifier-hover);
 	box-shadow: none;
 	border-radius: var(--radius-l);
-	/* Same +2px inline-start optical compensation as the wide-pane chip
-	 * (`.ec-day-grid .ec-event`, above): round dot left, text glyph right. */
-	padding: 2px 5px 2px 7px;
+	padding: 2px 5px;
 	margin-inline: 2px;
 	inline-size: auto;
 	max-inline-size: 100%;
