@@ -5,7 +5,10 @@ import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
 import type { CalendarEventsSource } from "@/domain/calendar-view-options";
 import type { TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
+import type { DotColor } from "@/domain/project-color";
 import type { Minutes, RRuleString, Task, TaskPath } from "@/domain/task";
+
+const NEUTRAL: DotColor = { kind: "neutral" };
 
 function date(value: string): TaskDate {
 	const result = parseTaskDate(value);
@@ -29,9 +32,9 @@ function task(overrides: Partial<Task> & { readonly title: string }): Task {
 	};
 }
 
-function eventsFor(t: Task, source: CalendarEventsSource): readonly CalendarEvent[] {
+function eventsFor(t: Task, source: CalendarEventsSource, dotColor: DotColor = NEUTRAL): readonly CalendarEvent[] {
 	const options: CalendarEventsOptions = { source };
-	return eventsForTask(t, options);
+	return eventsForTask(t, options, dotColor);
 }
 
 describe("eventsForTask", () => {
@@ -144,6 +147,23 @@ describe("eventsForTask", () => {
 		});
 		expect(eventsFor(t, "due")).toHaveLength(1);
 	});
+
+	describe("dotColor", () => {
+		it("stamps the caller-supplied dotColor onto every event a task produces", () => {
+			const dotColor: DotColor = { kind: "palette", name: "green" };
+			const t = task({ title: "Both", due: date("2026-09-10"), scheduled: date("2026-09-05") });
+			const events = eventsFor(t, "both", dotColor);
+			expect(events).toHaveLength(2);
+			for (const event of events) {
+				expect(event.dotColor).toEqual(dotColor);
+			}
+		});
+
+		it("defaults to neutral in this test file's eventsFor helper", () => {
+			const [event] = eventsFor(task({ title: "T", due: date("2026-09-10") }), "due");
+			expect(event?.dotColor).toEqual(NEUTRAL);
+		});
+	});
 });
 
 function calendarEvent(overrides: Partial<CalendarEvent> & { readonly id: string; readonly start: TaskDate }): CalendarEvent {
@@ -153,6 +173,7 @@ function calendarEvent(overrides: Partial<CalendarEvent> & { readonly id: string
 		allDay: true,
 		source: "due",
 		priority: "normal",
+		dotColor: NEUTRAL,
 		...overrides,
 	};
 }

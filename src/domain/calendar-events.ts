@@ -1,6 +1,7 @@
 import type { CalendarEventsSource } from "@/domain/calendar-view-options";
 import { addMinutes, isDateTime } from "@/domain/dates";
 import type { TaskDate } from "@/domain/dates";
+import type { DotColor } from "@/domain/project-color";
 import type { Priority, Task, TaskPath } from "@/domain/task";
 
 /**
@@ -19,13 +20,24 @@ export interface CalendarEvent {
 	readonly allDay: boolean;
 	readonly source: "due" | "scheduled";
 	readonly priority: Priority;
+	/**
+	 * The color the task's project resolves to (or `neutral` with no
+	 * project) — resolved by the shell (`views/bases/calendar/calendar-view.ts`,
+	 * via `adapters/obsidian/project-color-lookup.ts#projectRawColor` +
+	 * `domain/project-color.ts#resolveDotColor`) and handed in as a plain
+	 * value, since this module never touches the metadata cache. Consumed
+	 * by `event-calendar-mapping.ts#toEventCalendarEvent`
+	 * (`domain/project-color.ts#dotColorClasses`) to pick the CSS class
+	 * that sets `--obtask-dot-color` on the rendered event.
+	 */
+	readonly dotColor: DotColor;
 }
 
 export interface CalendarEventsOptions {
 	readonly source: CalendarEventsSource;
 }
 
-function scheduledEvent(task: Task): CalendarEvent | undefined {
+function scheduledEvent(task: Task, dotColor: DotColor): CalendarEvent | undefined {
 	if (task.scheduled === undefined) {
 		return undefined;
 	}
@@ -47,6 +59,7 @@ function scheduledEvent(task: Task): CalendarEvent | undefined {
 			allDay: false,
 			source: "scheduled",
 			priority: task.priority,
+			dotColor,
 		};
 	}
 	return {
@@ -57,10 +70,11 @@ function scheduledEvent(task: Task): CalendarEvent | undefined {
 		allDay: true,
 		source: "scheduled",
 		priority: task.priority,
+		dotColor,
 	};
 }
 
-function dueEvent(task: Task): CalendarEvent | undefined {
+function dueEvent(task: Task, dotColor: DotColor): CalendarEvent | undefined {
 	if (task.due === undefined) {
 		return undefined;
 	}
@@ -77,6 +91,7 @@ function dueEvent(task: Task): CalendarEvent | undefined {
 		allDay: true,
 		source: "due",
 		priority: task.priority,
+		dotColor,
 	};
 }
 
@@ -85,19 +100,26 @@ function dueEvent(task: Task): CalendarEvent | undefined {
  * values, per `docs/DOMAIN-MODEL.md#calendar-event-derivation`. Pure and
  * ignores `repeat` entirely — one note is one occurrence (ADR 0005); there
  * is no RRULE expansion into future occurrences.
+ *
+ * `dotColor` is resolved by the caller (the task's project's color, or
+ * `neutral` — `adapters/obsidian/project-color-lookup.ts` +
+ * `domain/project-color.ts#resolveDotColor`) rather than looked up here:
+ * this module stays free of the metadata cache. One task has one project,
+ * so the same `dotColor` is stamped onto both the `due` and `scheduled`
+ * event it may produce.
  */
-export function eventsForTask(task: Task, options: CalendarEventsOptions): readonly CalendarEvent[] {
+export function eventsForTask(task: Task, options: CalendarEventsOptions, dotColor: DotColor): readonly CalendarEvent[] {
 	const events: CalendarEvent[] = [];
 
 	if (options.source === "scheduled" || options.source === "both") {
-		const event = scheduledEvent(task);
+		const event = scheduledEvent(task, dotColor);
 		if (event !== undefined) {
 			events.push(event);
 		}
 	}
 
 	if (options.source === "due" || options.source === "both") {
-		const event = dueEvent(task);
+		const event = dueEvent(task, dotColor);
 		if (event !== undefined) {
 			events.push(event);
 		}

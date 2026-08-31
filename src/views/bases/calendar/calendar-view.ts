@@ -2,6 +2,7 @@ import type { App, QueryController } from "obsidian";
 import { BasesView, Scope, TFile } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
+import { projectFilePath, projectRawColor } from "@/adapters/obsidian/project-color-lookup";
 import type { makeCreateTask, TaskDraft } from "@/app/create-task";
 import { describeAppError } from "@/app/errors";
 import type { RescheduleTask } from "@/app/reschedule-task";
@@ -12,9 +13,12 @@ import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import { COMPACT_CALENDAR_WIDTH, parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import { toDateOnly } from "@/domain/dates";
+import type { DotColor } from "@/domain/project-color";
+import { resolveDotColor } from "@/domain/project-color";
 import type { PropertyKeys } from "@/domain/property-keys";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
+import type { Task } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
@@ -97,6 +101,16 @@ export class CalendarBasesView extends BasesView {
 	/** Whether `scope` is currently pushed onto `app.keymap`'s scope stack — see the `focusin`/`focusout` handlers below. */
 	private scopePushed = false;
 	private readonly scope: Scope;
+	/**
+	 * Vault-relative paths of every project note the last render's events
+	 * resolved a dot color against — rebuilt from scratch at the top of
+	 * every `onDataUpdated` (`resolveTaskDotColor` repopulates it per task).
+	 * Backs the `metadataCache` `changed` listener below, mirroring the
+	 * feed's own `lastProjectPaths` (`feed-view.ts`): a project note's
+	 * `color` changing touches no task note, so nothing else re-triggers
+	 * `onDataUpdated`.
+	 */
+	private lastProjectPaths = new Set<string>();
 
 	constructor(controller: QueryController, containerEl: HTMLElement, deps: CalendarBasesViewDeps) {
 		super(controller);
@@ -148,6 +162,19 @@ export class CalendarBasesView extends BasesView {
 		});
 
 		refreshAfterMetadataResolved(this, this.deps.app);
+
+		// See `lastProjectPaths`'s doc comment, and the identical listener on
+		// `FeedBasesView` — no rename handling for the same reason given
+		// there: `metadataCache` fires no `changed` on rename, and the
+		// hashed-fallback color simply follows a renamed project on whatever
+		// render happens to touch this view next.
+		this.registerEvent(
+			this.deps.app.metadataCache.on("changed", (file) => {
+				if (this.lastProjectPaths.has(file.path)) {
+					this.onDataUpdated();
+				}
+			}),
+		);
 	}
 
 	/**
@@ -176,11 +203,15 @@ export class CalendarBasesView extends BasesView {
 		// the same calendar.
 		const events: CalendarEvent[] = [];
 		let invalidCount = 0;
+		// Rebuilt below as `resolveTaskDotColor` runs per task — see the
+		// field's doc comment for why this can't just be computed once up
+		// front.
+		this.lastProjectPaths = new Set<string>();
 		for (const group of this.data.groupedData) {
 			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
 			invalidCount += invalid.length;
 			for (const { task } of tasks) {
-				events.push(...eventsForTask(task, { source: options.events }));
+				events.push(...eventsForTask(task, { source: options.events }, this.resolveTaskDotColor(task)));
 			}
 		}
 
@@ -396,6 +427,30 @@ export class CalendarBasesView extends BasesView {
 	 */
 	private prefillForSlot(date: TaskDate): Partial<TaskDraft> {
 		return parseCalendarViewOptions(this.config).events === "due" ? { due: date } : { scheduled: date };
+	}
+
+	/**
+	 * The `DotColor` a task's events should carry — the task's project's own
+	 * color, or `neutral` with no project (`domain/project-color.ts
+	 * #resolveDotColor`). A project-less task skips the metadata-cache
+	 * lookup entirely rather than resolving against `undefined`. Also the
+	 * one place `lastProjectPaths` gets populated. A `hex` result needs no
+	 * further action here — `event-calendar-mapping.ts#toEventCalendarEvent`
+	 * relays it through `extendedProps.hexDotColor`, and
+	 * `event-calendar-renderer.ts`'s `eventDidMount` is what actually
+	 * applies it to the mounted DOM element once one exists.
+	 */
+	private resolveTaskDotColor(task: Task): DotColor {
+		const project = task.project;
+		const rawColor = project === undefined ? undefined : projectRawColor(this.deps.app, project, task.path);
+		const dotColor = resolveDotColor(rawColor, project);
+		if (project !== undefined) {
+			const projectPath = projectFilePath(this.deps.app, project, task.path);
+			if (projectPath !== undefined) {
+				this.lastProjectPaths.add(projectPath);
+			}
+		}
+		return dotColor;
 	}
 
 	/** Shared by the Bases "New" flow (`createFileForView`) and the click-an-empty-slot flow, which differ only in what they pre-fill. */

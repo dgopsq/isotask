@@ -4,6 +4,7 @@ import type { Calendar } from "@event-calendar/core";
 import {
 	fromEventCalendarDrop,
 	fromEventCalendarView,
+	isObtaskEventExtendedProps,
 	toEventCalendarEvent,
 	toEventCalendarFirstDay,
 	toEventCalendarView,
@@ -245,6 +246,37 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// `event-content.ts`'s doc comment for how that fallback was
 				// confirmed against the vendored source.
 				eventContent,
+				// Applies a `hex` `DotColor` (`extendedProps.hexDotColor`,
+				// `event-calendar-mapping.ts`) directly onto the mounted `.ec-event`
+				// element as a `--obtask-dot-color` custom property — see
+				// `domain/project-color.ts#dotColorClasses`'s doc comment for why a
+				// hex value can't just be a static class the way a palette color is
+				// (Obsidian's plugin guidelines forbid a plugin registering its own
+				// stylesheet rules at runtime). `setCssProps` (Obsidian's own
+				// per-element custom-property helper, not a raw `style=` write) is
+				// the same mechanism `feed-view.ts#renderDot` uses for the feed's
+				// own hex dots. `info.el` is Event Calendar's own event root — the
+				// same element `classNames` above is applied to (confirmed against
+				// the vendored `@event-calendar/core@5.12.0/dist/index.js`'s
+				// `BaseEvent` component) — so `--obtask-dot-color` reaches
+				// `.ec-event-body::before` the same way a `.obtask-color-*` class's
+				// value would, by inheritance.
+				//
+				// KNOWN LIMITATION: `eventDidMount` is a mount-only hook (Svelte's
+				// `onMount`) — Event Calendar reuses the same mounted element across
+				// a `setEvents` call for an event whose `id` didn't change, so
+				// editing a project's hex `color` while its events are already on
+				// screen won't repaint them until something forces a real remount
+				// (switching views, toggling compact, reopening the pane). A palette
+				// color repaints immediately (`classNames` is reactive to the
+				// `event` object Event Calendar's own `each` block already tracks) —
+				// only the hex path has this gap.
+				eventDidMount: (info) => {
+					const extendedProps: unknown = info.event.extendedProps;
+					if (isObtaskEventExtendedProps(extendedProps) && extendedProps.hexDotColor !== undefined) {
+						info.el.setCssProps({ "--obtask-dot-color": extendedProps.hexDotColor });
+					}
+				},
 				// Month is back on a narrow pane (rendered as a dot grid, see
 				// `calendar.css`), so the switcher lists the same three views
 				// compact or not -- only their LABEL differs (`buttonText`

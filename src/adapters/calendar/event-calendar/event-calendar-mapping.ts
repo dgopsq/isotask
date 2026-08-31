@@ -5,6 +5,7 @@ import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import { formatTime, fromJsDate, fromJsDateTime, isDateTime, toJsDate, toSundayFirstWeekday, withDatePart } from "@/domain/dates";
+import { dotColorClasses } from "@/domain/project-color";
 import type { Priority } from "@/domain/task";
 import { PRIORITIES, priorityChipClass } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
@@ -73,11 +74,15 @@ export function toEventCalendarFirstDay(firstDay: Weekday): 0 | 1 | 2 | 3 | 4 | 
  * itself isn't otherwise available inside `eventContent`
  * (`Calendar.EventContentInfo` only carries Event Calendar's own `Event`
  * shape). `priority` backs the trailing `!`/`!!` marks span; `obtaskTime`
- * backs the timed-all-day-chip time label.
+ * backs the timed-all-day-chip time label; `hexDotColor` backs
+ * `event-calendar-renderer.ts`'s `eventDidMount` (see `toEventCalendarEvent`'s
+ * doc comment for why a hex `DotColor` is relayed this way rather than as a
+ * class).
  */
 export interface ObtaskEventExtendedProps {
 	readonly obtaskTime?: string;
 	readonly priority?: Priority;
+	readonly hexDotColor?: string;
 }
 
 /** Type guard for reading `Calendar.Event["extendedProps"]` (`Record<string, unknown>`) back out as `ObtaskEventExtendedProps`. */
@@ -87,9 +92,11 @@ export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEvent
 	}
 	const obtaskTime: unknown = (value as Record<string, unknown>)["obtaskTime"];
 	const priority: unknown = (value as Record<string, unknown>)["priority"];
+	const hexDotColor: unknown = (value as Record<string, unknown>)["hexDotColor"];
 	return (
 		(obtaskTime === undefined || typeof obtaskTime === "string") &&
-		(priority === undefined || (typeof priority === "string" && (PRIORITIES as readonly string[]).includes(priority)))
+		(priority === undefined || (typeof priority === "string" && (PRIORITIES as readonly string[]).includes(priority))) &&
+		(hexDotColor === undefined || typeof hexDotColor === "string")
 	);
 }
 
@@ -108,6 +115,17 @@ export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEvent
  * (a plain `IsoDate` `start`) carries no `obtaskTime`. `extendedProps.priority`
  * is always set (regardless of `allDay`/timed) — `eventContent` reads it to
  * decide whether to append a trailing `!`/`!!` marks span.
+ *
+ * `event.dotColor` maps to `classNames` for `palette`/`neutral`
+ * (`domain/project-color.ts#dotColorClasses`, pure — no DOM access, which is
+ * what keeps this whole function safe to unit-test under vitest's `node`
+ * environment). A `hex` `DotColor` has no class of its own — Obsidian's
+ * plugin guidelines forbid dynamically registering a stylesheet rule for an
+ * arbitrary runtime value (`dotColorClasses`'s doc comment) — so it's
+ * relayed instead through `extendedProps.hexDotColor`, a plain string
+ * `event-calendar-renderer.ts`'s `eventDidMount` reads back to set
+ * `--obtask-dot-color` directly on the mounted `.ec-event` element via
+ * `setCssProps`.
  */
 export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput {
 	const start = toJsDate(event.start);
@@ -120,6 +138,7 @@ export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput 
 	const extendedProps: Record<string, unknown> = {
 		...(timedAllDay ? { obtaskTime: formatTime(event.start) } : {}),
 		priority: event.priority,
+		...(event.dotColor.kind === "hex" ? { hexDotColor: event.dotColor.value } : {}),
 	};
 	return {
 		id: event.id,
@@ -128,7 +147,12 @@ export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput 
 		end,
 		allDay: event.allDay,
 		extendedProps,
-		classNames: [cssClass("event"), cssClass(`event--${event.source}`), cssClass(priorityChipClass(event.priority))],
+		classNames: [
+			cssClass("event"),
+			cssClass(`event--${event.source}`),
+			cssClass(priorityChipClass(event.priority)),
+			...dotColorClasses(event.dotColor),
+		],
 		// Resizing an all-day chip would ask the user to give the task an end
 		// *date*, and the data model has no property for one — `duration` is
 		// minutes and only meaningful against a timed `scheduled`. All-day

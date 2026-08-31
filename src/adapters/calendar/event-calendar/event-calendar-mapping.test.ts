@@ -13,6 +13,7 @@ import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import { parseTaskDate, toJsDate } from "@/domain/dates";
+import type { DotColor } from "@/domain/project-color";
 import type { TaskPath } from "@/domain/task";
 
 function date(value: string): TaskDate {
@@ -23,6 +24,8 @@ function date(value: string): TaskDate {
 	return result.value;
 }
 
+const NEUTRAL: DotColor = { kind: "neutral" };
+
 function event(overrides: Partial<CalendarEvent> & { readonly start: TaskDate }): CalendarEvent {
 	return {
 		id: "Task.md#due",
@@ -31,6 +34,7 @@ function event(overrides: Partial<CalendarEvent> & { readonly start: TaskDate })
 		allDay: true,
 		source: "due",
 		priority: "normal",
+		dotColor: NEUTRAL,
 		...overrides,
 	};
 }
@@ -112,6 +116,46 @@ describe("toEventCalendarEvent", () => {
 		const input = event({ start: date("2026-09-10"), source: "due" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.classNames).toContain("obtask-event--due");
+	});
+
+	describe("dotColor classNames", () => {
+		it("appends no class for a neutral dotColor", () => {
+			const input = event({ start: date("2026-09-10"), dotColor: { kind: "neutral" } });
+			const mapped = toEventCalendarEvent(input);
+			expect(mapped.classNames).toEqual(["obtask-event", "obtask-event--due", "obtask-priority-normal"]);
+		});
+
+		it("appends an obtask-color-<name> class for a palette dotColor", () => {
+			const input = event({ start: date("2026-09-10"), dotColor: { kind: "palette", name: "green" } });
+			const mapped = toEventCalendarEvent(input);
+			expect(mapped.classNames).toContain("obtask-color-green");
+		});
+
+		it("appends no class for a hex dotColor — relayed via extendedProps.hexDotColor instead (see the doc comment)", () => {
+			const input = event({ start: date("2026-09-10"), dotColor: { kind: "hex", value: "#a1b2c3" } });
+			const mapped = toEventCalendarEvent(input);
+			expect(mapped.classNames).toEqual(["obtask-event", "obtask-event--due", "obtask-priority-normal"]);
+		});
+	});
+
+	describe("extendedProps.hexDotColor", () => {
+		it("is set to the hex value for a hex dotColor", () => {
+			const input = event({ start: date("2026-09-10"), dotColor: { kind: "hex", value: "#a1b2c3" } });
+			const mapped = toEventCalendarEvent(input);
+			expect(mapped.extendedProps).toMatchObject({ hexDotColor: "#a1b2c3" });
+		});
+
+		it("is absent for a palette dotColor", () => {
+			const input = event({ start: date("2026-09-10"), dotColor: { kind: "palette", name: "green" } });
+			const mapped = toEventCalendarEvent(input);
+			expect(mapped.extendedProps).toEqual({ priority: "normal" });
+		});
+
+		it("is absent for a neutral dotColor", () => {
+			const input = event({ start: date("2026-09-10"), dotColor: { kind: "neutral" } });
+			const mapped = toEventCalendarEvent(input);
+			expect(mapped.extendedProps).toEqual({ priority: "normal" });
+		});
 	});
 
 	it("keeps the title unprefixed and sets obtaskTime for a timed all-day point event", () => {
@@ -272,5 +316,13 @@ describe("isObtaskEventExtendedProps", () => {
 		expect(isObtaskEventExtendedProps(null)).toBe(false);
 		expect(isObtaskEventExtendedProps("09:00")).toBe(false);
 		expect(isObtaskEventExtendedProps(undefined)).toBe(false);
+	});
+
+	it("accepts an object with a string hexDotColor", () => {
+		expect(isObtaskEventExtendedProps({ hexDotColor: "#a1b2c3" })).toBe(true);
+	});
+
+	it("rejects an object with a non-string hexDotColor", () => {
+		expect(isObtaskEventExtendedProps({ hexDotColor: 123 })).toBe(false);
 	});
 });
