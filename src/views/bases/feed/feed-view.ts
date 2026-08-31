@@ -36,6 +36,7 @@ import type { Notifier } from "@/ports/notifier";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
 import { buildPriorityMenu } from "@/ui/priority-menu";
+import { ProjectColorModal } from "@/ui/project-color-modal";
 import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
@@ -463,6 +464,23 @@ export class FeedBasesView extends BasesView {
 		this.rows.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();
 			void this.deps.app.workspace.openLinkText(project, task.path, false);
+		});
+		this.rows.registerDomEvent(link, "contextmenu", (evt) => {
+			// Own handler, not the row's `buildTaskEditMenu` one
+			// (`registerRowContextMenu`) — stopped from bubbling so the two
+			// menus never both open for one right-click.
+			evt.preventDefault();
+			evt.stopPropagation();
+			const menu = newMenu();
+			menu.addItem((item) =>
+				item
+					.setTitle("Set project color")
+					.setIcon("palette")
+					.onClick(() => {
+						new ProjectColorModal(this.deps.app, dest).open();
+					}),
+			);
+			menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
 		});
 	}
 

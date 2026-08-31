@@ -26,7 +26,9 @@ import type { Notifier } from "@/ports/notifier";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+import { NoteSuggestModal } from "@/ui/note-suggest-modal";
 import { PrioritySuggestModal } from "@/ui/priority-suggest-modal";
+import { ProjectColorModal } from "@/ui/project-color-modal";
 import { StatusSuggestModal } from "@/ui/status-suggest-modal";
 import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
 
@@ -361,6 +363,16 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 				void openTagsModal(file);
 			}
 			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "set-project-color",
+		name: "Set project color…",
+		callback: () => {
+			new NoteSuggestModal(deps.app, (file) => {
+				new ProjectColorModal(deps.app, file).open();
+			}).open();
 		},
 	});
 

@@ -431,3 +431,64 @@
 .obtask-panel__error {
 	margin-bottom: var(--size-4-1);
 }
+
+/*
+ * Project color picker (`ui/project-color-modal.ts`). The swatch row is
+ * shared by the modal's own palette grid and the compact swatch button the
+ * feed/task panel/command entry points sit next to; both key their actual
+ * color off one of the `.obtask-color-*` custom-property classes above (or
+ * a scoped `--obtask-dot-color` set directly, for a hex project color —
+ * same as every other dot/pill surface).
+ */
+.obtask-swatch-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+	padding: var(--size-4-1) 0 var(--size-4-3) 0;
+}
+
+.obtask-swatch {
+	/*
+	 * ~24px colored circle (`background-clip: content-box` confines the fill
+	 * to the box-sizing: content-box "content" square), padded out to a
+	 * >=32px tap target — same "small dot, generous hit area" shape as
+	 * every other touch-friendly control in this plugin.
+	 */
+	inline-size: var(--size-4-6);
+	block-size: var(--size-4-6);
+	padding: var(--size-4-1);
+	box-sizing: content-box;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 50%;
+	background-color: var(--obtask-dot-color, var(--text-faint));
+	background-clip: content-box;
+	cursor: pointer;
+}
+
+.obtask-swatch:hover {
+	border-color: var(--text-faint);
+}
+
+.obtask-swatch--selected {
+	border-color: transparent;
+	box-shadow:
+		0 0 0 2px var(--background-primary),
+		0 0 0 4px var(--obtask-dot-color, var(--text-faint));
+}
+
+/*
+ * Compact variant next to the task panel's Project field and the feed
+ * project link — same swatch, sized down to sit inline with a button/link
+ * rather than in the modal's own grid.
+ */
+.obtask-swatch--compact {
+	inline-size: var(--size-4-3);
+	block-size: var(--size-4-3);
+	padding: var(--size-4-2);
+}
+
+.obtask-project-color-modal-error {
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+	margin: 0 0 var(--size-4-2) 0;
+}

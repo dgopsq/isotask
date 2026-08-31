@@ -151,3 +151,23 @@ export function dotColorClasses(dotColor: DotColor): readonly string[] {
 		}
 	}
 }
+
+/**
+ * Inverse of `parseProjectColor`: a `ProjectColor` -> the string a project
+ * note's `color` frontmatter should hold for it — a palette name, or the
+ * already-normalised (lowercase) hex value. Used by
+ * `ui/project-color-modal.ts` when writing a palette pick or a validated
+ * custom-hex value back through `processFrontMatter`.
+ */
+export function serializeProjectColor(color: ProjectColor): string {
+	switch (color.kind) {
+		case "palette":
+			return color.name;
+		case "hex":
+			return color.value;
+		default: {
+			const exhaustive: never = color;
+			return exhaustive;
+		}
+	}
+}

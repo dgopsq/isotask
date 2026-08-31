@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DotColor, PaletteName } from "@/domain/project-color";
-import { dotColorClasses, hashPaletteColor, paletteColorClass, parseProjectColor, resolveDotColor } from "@/domain/project-color";
+import { dotColorClasses, hashPaletteColor, paletteColorClass, parseProjectColor, resolveDotColor, serializeProjectColor } from "@/domain/project-color";
 
 describe("parseProjectColor", () => {
 	it.each(["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"] as const)(
@@ -134,5 +134,23 @@ describe("dotColorClasses", () => {
 	it("maps neutral to no classes", () => {
 		const dotColor: DotColor = { kind: "neutral" };
 		expect(dotColorClasses(dotColor)).toEqual([]);
+	});
+});
+
+describe("serializeProjectColor", () => {
+	it("serializes a palette color to its bare name", () => {
+		expect(serializeProjectColor({ kind: "palette", name: "cyan" })).toBe("cyan");
+	});
+
+	it("serializes a hex color to its (already-normalised) value", () => {
+		expect(serializeProjectColor({ kind: "hex", value: "#a1b2c3" })).toBe("#a1b2c3");
+	});
+
+	it("round-trips through parseProjectColor", () => {
+		const parsed = parseProjectColor("#ABC");
+		expect(parsed).not.toBeUndefined();
+		if (parsed !== undefined) {
+			expect(serializeProjectColor(parsed)).toBe("#abc");
+		}
 	});
 });

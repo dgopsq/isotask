@@ -1,12 +1,14 @@
 import type { TFile, WorkspaceLeaf } from "obsidian";
-import { ItemView, MarkdownView, Setting } from "obsidian";
+import { ItemView, MarkdownView, Setting, setTooltip } from "obsidian";
 
 import type { RegisterTaskMenusDeps } from "@/adapters/obsidian/menus";
 import { parseTaskFileDetailed } from "@/adapters/obsidian/menus";
+import { projectRawColor } from "@/adapters/obsidian/project-color-lookup";
 import type { makeConvertNote } from "@/app/convert-note";
 import type { AppError } from "@/app/errors";
 import { describeAppError } from "@/app/errors";
 import type { DateField } from "@/app/set-date";
+import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import { describeRRule } from "@/domain/recurrence";
 import type { Result } from "@/domain/result";
 import type { Priority, StatusId, Task, TaskParseError, TaskPath } from "@/domain/task";
@@ -14,6 +16,7 @@ import { describeTaskParseError, PRIORITIES, priorityLabel } from "@/domain/task
 import { formatDurationMinutes } from "@/domain/task-display";
 import { cssClass, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+import { ProjectColorModal } from "@/ui/project-color-modal";
 
 /** Shared with the ribbon icon (`main.ts`) so the two never drift apart. */
 export const TASK_PANEL_ICON = "square-check";
@@ -308,7 +311,7 @@ export class TaskPanelView extends ItemView {
 	}
 
 	private renderProjectField(root: HTMLElement, task: Task): void {
-		new Setting(root)
+		const setting = new Setting(root)
 			.setName("Project")
 			.setDesc(task.project ?? "Not set")
 			.addButton((button) =>
@@ -316,6 +319,45 @@ export class TaskPanelView extends ItemView {
 					openProjectModalFor(this.deps.app, task, this.deps.setProject, this.deps.notifier);
 				}),
 			);
+
+		this.renderProjectColorSwatch(setting, task);
+	}
+
+	/**
+	 * A compact color swatch next to the Project field, only once the
+	 * project resolves to an actual note — there's nothing to set a color
+	 * on otherwise. Opens `ProjectColorModal` for that note; since the
+	 * write lands on the *project* note rather than the followed task note,
+	 * the panel's own `metadataCache` `changed` subscription (scoped to
+	 * `currentFile`) never fires for it, so the modal's `onDone` re-renders
+	 * directly instead.
+	 */
+	private renderProjectColorSwatch(setting: Setting, task: Task): void {
+		const project = task.project;
+		if (project === undefined) {
+			return;
+		}
+		const projectFile = this.deps.app.metadataCache.getFirstLinkpathDest(project, task.path);
+		if (projectFile === null) {
+			return;
+		}
+
+		const rawColor = projectRawColor(this.deps.app, project, task.path);
+		const dotColor = resolveDotColor(rawColor, project);
+
+		const swatch = setting.controlEl.createEl("button", {
+			cls: [cssClass("swatch"), cssClass("swatch--compact"), ...dotColorClasses(dotColor)],
+			attr: { type: "button", "aria-label": "Set project color" },
+		});
+		setTooltip(swatch, "Set project color");
+		if (dotColor.kind === "hex") {
+			swatch.setCssProps({ "--obtask-dot-color": dotColor.value });
+		}
+		swatch.addEventListener("click", () => {
+			new ProjectColorModal(this.deps.app, projectFile, () => {
+				this.render();
+			}).open();
+		});
 	}
 
 	private renderTagsField(root: HTMLElement, task: Task): void {
