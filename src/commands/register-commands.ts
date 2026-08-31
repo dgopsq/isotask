@@ -8,8 +8,12 @@ import type { AppError } from "@/app/errors";
 import { describeAppError } from "@/app/errors";
 import { renderTasksBase } from "@/app/generate-base";
 import type { DateField, makeSetDate } from "@/app/set-date";
+import type { makeSetDuration } from "@/app/set-duration";
+import type { makeSetPriority } from "@/app/set-priority";
+import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
 import type { makeSetStatus } from "@/app/set-status";
+import type { makeSetTags } from "@/app/set-tags";
 import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import { isTaskNote } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
@@ -22,8 +26,12 @@ import type { Notifier } from "@/ports/notifier";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
+import { DurationModal } from "@/ui/duration-modal";
+import { PrioritySuggestModal } from "@/ui/priority-suggest-modal";
+import { ProjectModal } from "@/ui/project-modal";
 import { RecurrenceModal } from "@/ui/recurrence-modal";
 import { StatusSuggestModal } from "@/ui/status-suggest-modal";
+import { TagsModal } from "@/ui/tags-modal";
 
 export interface RegisterCommandsDeps {
 	readonly app: App;
@@ -38,7 +46,11 @@ export interface RegisterCommandsDeps {
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly cycleStatus: ReturnType<typeof makeCycleStatus>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
+	readonly setPriority: ReturnType<typeof makeSetPriority>;
+	readonly setDuration: ReturnType<typeof makeSetDuration>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setProject: ReturnType<typeof makeSetProject>;
+	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly undoReschedule: UndoReschedule;
 	readonly redoReschedule: RedoReschedule;
 }
@@ -111,6 +123,45 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			initial,
 			onSave: async (rule) => {
 				report(await deps.setRecurrence(path, rule));
+			},
+		}).open();
+	}
+
+	async function openDurationModal(file: TFile): Promise<void> {
+		const path = file.path as TaskPath;
+		const taskResult = await deps.store.read(path);
+		const initial = taskResult.ok ? fromNullable(taskResult.value.duration) : none();
+
+		new DurationModal(deps.app, {
+			initial,
+			onSave: async (value) => {
+				report(await deps.setDuration(path, value));
+			},
+		}).open();
+	}
+
+	async function openProjectModal(file: TFile): Promise<void> {
+		const path = file.path as TaskPath;
+		const taskResult = await deps.store.read(path);
+		const initial = taskResult.ok ? (taskResult.value.project ?? null) : null;
+
+		new ProjectModal(deps.app, {
+			initial,
+			onSave: async (project) => {
+				report(await deps.setProject(path, project));
+			},
+		}).open();
+	}
+
+	async function openTagsModal(file: TFile): Promise<void> {
+		const path = file.path as TaskPath;
+		const taskResult = await deps.store.read(path);
+		const initial = taskResult.ok ? taskResult.value.tags : [];
+
+		new TagsModal(deps.app, {
+			initial,
+			onSave: async (tags) => {
+				report(await deps.setTags(path, tags));
 			},
 		}).open();
 	}
@@ -268,6 +319,69 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			}
 			if (!checking) {
 				void openRecurrenceModal(file);
+			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "set-priority",
+		name: "Set priority…",
+		checkCallback: (checking) => {
+			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
+			if (file === null) {
+				return false;
+			}
+			if (!checking) {
+				const path = file.path as TaskPath;
+				new PrioritySuggestModal(deps.app, (priority) => {
+					void deps.setPriority(path, priority).then(report);
+				}).open();
+			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "set-duration",
+		name: "Set duration…",
+		checkCallback: (checking) => {
+			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
+			if (file === null) {
+				return false;
+			}
+			if (!checking) {
+				void openDurationModal(file);
+			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "set-project",
+		name: "Set project…",
+		checkCallback: (checking) => {
+			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
+			if (file === null) {
+				return false;
+			}
+			if (!checking) {
+				void openProjectModal(file);
+			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "set-tags",
+		name: "Set tags…",
+		checkCallback: (checking) => {
+			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
+			if (file === null) {
+				return false;
+			}
+			if (!checking) {
+				void openTagsModal(file);
 			}
 			return true;
 		},

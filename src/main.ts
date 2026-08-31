@@ -9,6 +9,7 @@ import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
 import { VaultTaskStore } from "@/adapters/obsidian/task-store";
+import { registerTaskViewActions } from "@/adapters/obsidian/view-actions";
 import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import { makeCycleStatus } from "@/app/cycle-status";
@@ -111,12 +112,16 @@ export default class ObtaskPlugin extends Plugin {
 			setStatus,
 			cycleStatus,
 			setDate,
+			setPriority,
+			setDuration,
 			setRecurrence,
+			setProject,
+			setTags,
 			undoReschedule,
 			redoReschedule,
 		});
 
-		registerTaskMenus(this, {
+		const taskMenuDeps = {
 			app: this.app,
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
@@ -128,7 +133,10 @@ export default class ObtaskPlugin extends Plugin {
 			setProject,
 			setTags,
 			notifier,
-		});
+		};
+
+		registerTaskMenus(this, taskMenuDeps);
+		registerTaskViewActions(this, taskMenuDeps);
 
 		this.addSettingTab(
 			new ObtaskSettingTab(this.app, this, {

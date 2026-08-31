@@ -13,6 +13,7 @@ import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
 import type { Notifier } from "@/ports/notifier";
+import type { TaskEditMenuCtx } from "@/ui/task-edit-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
 export interface RegisterTaskMenusDeps {
@@ -29,8 +30,8 @@ export interface RegisterTaskMenusDeps {
 	readonly notifier: Notifier;
 }
 
-/** Parses `file` into a `Task` if it's a task note (per the configured marker), reading the metadata cache directly — same synchronous approach as `commands/register-commands.ts#activeTaskFile`, since a `file-menu`/`editor-menu` handler must add its items before returning. `undefined` for anything else (not a task note, or one that fails to parse). */
-function parseTaskFile(deps: RegisterTaskMenusDeps, file: TFile): Task | undefined {
+/** Parses `file` into a `Task` if it's a task note (per the configured marker), reading the metadata cache directly — same synchronous approach as `commands/register-commands.ts#activeTaskFile`, since a `file-menu`/`editor-menu` handler must add its items before returning. `undefined` for anything else (not a task note, or one that fails to parse). Also reused by `adapters/obsidian/view-actions.ts` for the per-note header action. */
+export function parseTaskFile(deps: RegisterTaskMenusDeps, file: TFile): Task | undefined {
 	const keys = deps.getPropertyKeys();
 	const raw = deps.app.metadataCache.getFileCache(file)?.frontmatter;
 	if (raw === undefined || !isTaskNote(raw, keys)) {
@@ -40,11 +41,9 @@ function parseTaskFile(deps: RegisterTaskMenusDeps, file: TFile): Task | undefin
 	return result.ok ? result.value : undefined;
 }
 
-/** Appends a separated, labelled "Obtask" section (`ui/task-edit-menu.ts#buildTaskEditMenu`'s full property list) to an already-open file/editor menu. */
-function addObtaskSection(menu: Menu, task: Task, deps: RegisterTaskMenusDeps): void {
-	menu.addSeparator();
-	menu.addItem((item) => item.setTitle("Obtask").setIsLabel(true));
-	buildTaskEditMenu(menu, task, {
+/** Builds the `ui/task-edit-menu.ts#buildTaskEditMenu` context from `RegisterTaskMenusDeps` — shared by the file/editor menu section below and `adapters/obsidian/view-actions.ts`'s header action, so both open the exact same menu. */
+export function taskEditMenuCtx(deps: RegisterTaskMenusDeps): TaskEditMenuCtx {
+	return {
 		app: deps.app,
 		statuses: deps.getStatuses(),
 		setStatus: deps.setStatus,
@@ -55,7 +54,14 @@ function addObtaskSection(menu: Menu, task: Task, deps: RegisterTaskMenusDeps): 
 		setProject: deps.setProject,
 		setTags: deps.setTags,
 		notifier: deps.notifier,
-	});
+	};
+}
+
+/** Appends a separated, labelled "Obtask" section (`ui/task-edit-menu.ts#buildTaskEditMenu`'s full property list) to an already-open file/editor menu. */
+function addObtaskSection(menu: Menu, task: Task, deps: RegisterTaskMenusDeps): void {
+	menu.addSeparator();
+	menu.addItem((item) => item.setTitle("Obtask").setIsLabel(true));
+	buildTaskEditMenu(menu, task, taskEditMenuCtx(deps));
 }
 
 /**
