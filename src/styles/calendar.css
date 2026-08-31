@@ -779,8 +779,27 @@
 	padding: var(--size-2-2) var(--size-2-2);
 }
 
+/*
+ * Block (vertical) padding is deliberately ZERO here, not the `--size-4-1`
+ * the wide-pane version of this rule uses — measured live: the plain
+ * `.ec-button`s beside this group (Today, prev/next) are top-aligned with
+ * it in the toolbar row, and this group's own active-tab child already
+ * renders at the SAME height as those buttons at compact's shared
+ * `--font-ui-smaller` size (30px, confirmed via getBoundingClientRect; the
+ * tab's `line-height: 1` vs. the plain buttons' inherited line-height land
+ * on the same box height by coincidence of this font size, not by design,
+ * so re-check this if either line-height or font-size changes here). Any
+ * extra block padding on the GROUP wraps around that already-matching tab
+ * without a compensating change anywhere else, pushing the visible pill
+ * down and making it visibly shorter/offset from Today's pill even though
+ * the row's tops start flush (`align-items` here is effectively
+ * flex-start, not center) — exactly the "buttons aren't aligned vertically"
+ * regression a compact-month screenshot review caught. Inline padding is
+ * kept, unchanged, purely for the horizontal "track" reveal around Day/3
+ * days' unselected labels.
+ */
 .obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) {
-	padding: var(--size-4-1) var(--size-2-1);
+	padding: 0 var(--size-2-1);
 }
 
 .obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button,
