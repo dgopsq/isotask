@@ -1249,18 +1249,18 @@ describe("Views", function () {
 	}
 
 	/**
-	 * Geometry (not just text) of every TIMED all-day chip's time/title pair —
-	 * used by the narrow-pane compaction test to prove the compact-mode CSS
-	 * fix (`calendar.css`'s `.obtask-calendar--compact .ec-all-day
-	 * .ec-event-body { flex-wrap: wrap }` + the title's `flex-basis: 100%`)
-	 * actually stacks the two onto separate lines instead of squeezing the
-	 * title out entirely, the bug this was written against (a 390px-wide
-	 * column left no room for both on one line — the chip rendered only its
-	 * time). A date-only chip (no `.obtask-event-time` node) is skipped, not
-	 * asserted on — it never had this problem and the fix doesn't touch it.
+	 * Rendered geometry (not just text) of every TIMED all-day chip's
+	 * time/title pair — used by the narrow-pane compaction test to prove the
+	 * compact single-line contract: the time label hidden (zero rendered
+	 * width) and the title genuinely visible, guarding both historical
+	 * failure modes: the title squeezed out entirely (a 390px-wide column
+	 * once rendered only the time, e.g. "11:45"), and the later wrap
+	 * regression that put the title on a line under the leading project dot.
+	 * A date-only chip (no `.obtask-event-time` node) is skipped, not
+	 * asserted on — it never had either problem.
 	 */
 	async function readTimedAllDayChipLayouts(): Promise<
-		{ readonly title: string; readonly titleWidth: number; readonly stackedBelowTime: boolean }[]
+		{ readonly title: string; readonly titleWidth: number; readonly timeWidth: number }[]
 	> {
 		return browser.execute(
 			(eventCls, timeCls) =>
@@ -1276,10 +1276,7 @@ describe("Views", function () {
 						return {
 							title: titleEl.textContent,
 							titleWidth: titleRect.width,
-							// The title's own top sits at or below the time's bottom
-							// edge — i.e. a genuinely separate line, not merely a CSS
-							// property asserted in isolation.
-							stackedBelowTime: titleRect.top >= timeRect.bottom - 1,
+							timeWidth: timeRect.width,
 						};
 					})
 					.filter((chip): chip is NonNullable<typeof chip> => chip !== null),
@@ -3005,18 +3002,18 @@ describe("Views", function () {
 				expect(activeInWeek).toHaveLength(1);
 				expect(activeInWeek[0]?.text.trim()).toEqual("3 days");
 
-				// The narrow (~86px) compact column has no room for a timed
-				// all-day chip's time and title on one line — at this width the
-				// title used to be squeezed out entirely (the chip showed only its
-				// time, e.g. "11:45", nothing else). `calendar.css`'s compact-only
-				// `flex-wrap` fix stacks them onto two lines instead; asserting on
-				// rendered geometry (not just a CSS property) is what actually
-				// proves the title is both present AND visible, not merely
-				// present-but-zero-width in the DOM.
+				// A timed all-day chip keeps ONE line at the narrow (~86px)
+				// compact column by hiding its TIME label (`calendar.css`'s
+				// compact all-day comment): an earlier `flex-wrap` fix stacked
+				// time above title instead, but with the leading project dot that
+				// wrap put the title on a line UNDER the dot. The title — the
+				// part that identifies the task — must be genuinely visible
+				// (rendered width, not just present in the DOM), and the time
+				// label genuinely gone, not merely narrow.
 				const timedChips = await readTimedAllDayChipLayouts();
 				expect(timedChips.length).toBeGreaterThan(0);
 				for (const chip of timedChips) {
-					expect(chip.stackedBelowTime).toBe(true);
+					expect(chip.timeWidth).toBeLessThanOrEqual(1);
 					expect(chip.title.trim().length).toBeGreaterThan(0);
 					expect(chip.titleWidth).toBeGreaterThan(20);
 				}
