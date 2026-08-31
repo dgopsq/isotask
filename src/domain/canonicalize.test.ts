@@ -90,6 +90,18 @@ describe("canonicalizeFrontmatter", () => {
 			expect(result.frontmatter['priority']).toBe("asap");
 			expect(result.fixes).toEqual([]);
 		});
+
+		it("aliases the retired 'low' priority to normal (4-to-3 collapse)", () => {
+			const result = canonicalizeFrontmatter({ priority: "low" }, keys, statuses);
+			expect(result.frontmatter['priority']).toBe("normal");
+			expect(result.fixes).toEqual([{ key: "priority", from: "low", to: "normal", reason: "priority-alias" }]);
+		});
+
+		it("aliases 'low' case-insensitively, with surrounding whitespace, to normal", () => {
+			const result = canonicalizeFrontmatter({ priority: " LOW " }, keys, statuses);
+			expect(result.frontmatter['priority']).toBe("normal");
+			expect(result.fixes).toEqual([{ key: "priority", from: " LOW ", to: "normal", reason: "priority-alias" }]);
+		});
 	});
 
 	describe("duration", () => {

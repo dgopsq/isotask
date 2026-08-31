@@ -93,7 +93,7 @@ describe("parseTask", () => {
 			expect(result.error).toContainEqual({
 				kind: "invalid-priority",
 				value: "asap",
-				allowed: ["low", "normal", "high", "urgent"],
+				allowed: ["normal", "high", "urgent"],
 			});
 		}
 	});
@@ -207,6 +207,22 @@ describe("parseTask — lenient parse, canonical write", () => {
 				value: "someday",
 				allowed: statuses.map((status) => status.id),
 			});
+		}
+	});
+
+	it("parses the retired 'low' priority as normal, with no error (ADR 0010 alias)", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", priority: "low" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.priority).toBe("normal");
+		}
+	});
+
+	it("parses 'low' case-insensitively as normal too", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", priority: "LOW" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.priority).toBe("normal");
 		}
 	});
 

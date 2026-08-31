@@ -27,13 +27,13 @@ import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
 import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
-import { describeTaskParseError, priorityChipClass, priorityLabel } from "@/domain/task";
+import { describeTaskParseError, priorityChipClass, priorityMarks } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
-import { buildPriorityMenu, priorityIcon } from "@/ui/priority-menu";
+import { buildPriorityMenu } from "@/ui/priority-menu";
 import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
@@ -360,20 +360,26 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/**
-	 * Priority control: base layout class plus one `obtask-priority-<value>`
-	 * class per `domain/task.ts#priorityChipClass` (mapped to a theme colour
-	 * in `styles/obtask.css`), same clickable-icon/button-like pattern as the
-	 * status control — opens `buildPriorityMenu` on click/Enter/Space and
-	 * dispatches to `setPriority`.
+	 * Priority control: Apple Reminders-style — `normal` renders nothing at
+	 * all (no chip, no click target; a `normal` task's priority is still
+	 * reachable via the row's context menu or the task panel), `high`/
+	 * `urgent` render a small `!`/`!!` mark (`domain/task.ts#priorityMarks`)
+	 * coloured by one `obtask-priority-<value>` class per
+	 * `domain/task.ts#priorityChipClass` (`styles/obtask.css`). Same
+	 * clickable-icon/button-like pattern as the status control — opens
+	 * `buildPriorityMenu` on click/Enter/Space and dispatches to
+	 * `setPriority`.
 	 */
 	private renderPriorityControl(parent: HTMLElement, task: Task): void {
+		if (task.priority === "normal") {
+			return;
+		}
+
 		const control = parent.createSpan({
 			cls: [cssClass("feed__priority"), cssClass(priorityChipClass(task.priority)), "clickable-icon"],
 			attr: { role: "button", tabindex: "0" },
+			text: priorityMarks(task.priority),
 		});
-
-		setIcon(control.createSpan({ cls: cssClass("feed__priority-icon") }), priorityIcon(task.priority));
-		control.createSpan({ text: priorityLabel(task.priority), cls: cssClass("feed__priority-label") });
 
 		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
 			const menu = newMenu();

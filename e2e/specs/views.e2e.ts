@@ -597,7 +597,7 @@ describe("Views", function () {
 			);
 
 			expect(chipInfo).not.toBeNull();
-			expect(chipInfo?.priorityText).toEqual("High");
+			expect(chipInfo?.priorityText).toEqual("!");
 			expect(chipInfo?.priorityClasses).toContain(cssClass(priorityChipClass("high")));
 			expect(chipInfo?.projectText).toEqual("Q3 Launch");
 			expect(chipInfo?.tagTexts).toEqual(["#work", "#urgent"]);
@@ -667,7 +667,7 @@ describe("Views", function () {
 			try {
 				await clickFeedPriorityControl(task.title);
 
-				for (const label of ["Low", "Normal", "High", "Urgent"]) {
+				for (const label of ["Normal", "High", "Urgent"]) {
 					await browser.$(`.menu-item-title=${label}`).waitForDisplayed({ timeout: SELECT_TIMEOUT });
 				}
 
@@ -702,11 +702,11 @@ describe("Views", function () {
 							cssClass("feed__priority"),
 							task.title,
 						);
-						return rowPriorityText === "High";
+						return rowPriorityText === "!";
 					},
-					{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "High"` },
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: `${task.title}'s priority chip never re-rendered as "!"` },
 				);
-				expect(rowPriorityText).toEqual("High");
+				expect(rowPriorityText).toEqual("!");
 			} finally {
 				// This fixture has no `priority` in its pristine frontmatter
 				// (defaults to "normal") — restore it so nothing later in this

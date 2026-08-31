@@ -118,21 +118,27 @@ describe("toEventCalendarEvent", () => {
 		const input = event({ start: date("2026-09-10T09:00"), allDay: true, title: "Budget report" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Budget report");
-		expect(mapped.extendedProps).toEqual({ obtaskTime: "09:00" });
+		expect(mapped.extendedProps).toEqual({ obtaskTime: "09:00", priority: "normal" });
 	});
 
 	it("does not set obtaskTime for a date-only all-day event", () => {
 		const input = event({ start: date("2026-09-10"), allDay: true, title: "Budget report" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Budget report");
-		expect(mapped.extendedProps).toEqual({});
+		expect(mapped.extendedProps).toEqual({ priority: "normal" });
 	});
 
 	it("does not set obtaskTime for a timed block (not all-day)", () => {
 		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false, title: "Team sync" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Team sync");
-		expect(mapped.extendedProps).toEqual({});
+		expect(mapped.extendedProps).toEqual({ priority: "normal" });
+	});
+
+	it("always sets extendedProps.priority, regardless of allDay/timed shape", () => {
+		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false, priority: "urgent" });
+		const mapped = toEventCalendarEvent(input);
+		expect(mapped.extendedProps).toEqual({ priority: "urgent" });
 	});
 
 	it("marks an all-day chip's duration as not editable (no end-date property to resize into)", () => {
@@ -248,6 +254,18 @@ describe("isObtaskEventExtendedProps", () => {
 
 	it("rejects an object with a non-string obtaskTime", () => {
 		expect(isObtaskEventExtendedProps({ obtaskTime: 900 })).toBe(false);
+	});
+
+	it("accepts an object with a valid priority", () => {
+		expect(isObtaskEventExtendedProps({ priority: "urgent" })).toBe(true);
+	});
+
+	it("rejects an object with an unrecognized priority string", () => {
+		expect(isObtaskEventExtendedProps({ priority: "low" })).toBe(false);
+	});
+
+	it("rejects an object with a non-string priority", () => {
+		expect(isObtaskEventExtendedProps({ priority: 1 })).toBe(false);
 	});
 
 	it("rejects non-object values", () => {

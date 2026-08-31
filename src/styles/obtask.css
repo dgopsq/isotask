@@ -123,23 +123,26 @@
 	padding: var(--size-4-1) 0;
 }
 
+/*
+ * Apple Reminders-style priority mark (`!`/`!!`, domain/task.ts#priorityMarks)
+ * at the right of a feed row's meta line. `normal` renders no element at
+ * all (feed-view.ts#renderPriorityControl), so this is only ever a compact
+ * one/two-character chip, not a full chip-with-icon like the other feed
+ * controls.
+ */
 .obtask-feed__priority {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--size-4-1);
 	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
 	cursor: pointer;
 }
 
-.obtask-feed__priority-icon {
-	display: inline-flex;
-	align-items: center;
-}
-
 /*
- * Priority -> theme colour mapping (domain/task.ts#priorityChipClass). Not
- * scoped under .obtask-feed so the M3 calendar view can reuse the same
- * classes for event colouring.
+ * Priority -> theme colour mapping (domain/task.ts#priorityChipClass).
+ * `normal` has no rule — it never renders a mark, so there's nothing to
+ * colour. Not scoped under .obtask-feed so the calendar view can reuse the
+ * same classes for its own event marks (event-content.ts).
  */
 .obtask-priority-urgent {
 	color: var(--color-red);
@@ -147,14 +150,6 @@
 
 .obtask-priority-high {
 	color: var(--color-orange);
-}
-
-.obtask-priority-normal {
-	color: var(--text-muted);
-}
-
-.obtask-priority-low {
-	color: var(--text-faint);
 }
 
 /*

@@ -187,33 +187,22 @@
  * (classNames: obtask-event, obtask-event--<source>,
  * obtask-priority-<priority>). obtask-priority-* is domain/task.ts's
  * existing priorityChipClass mapping, already used unscoped by the feed
- * chip (styles/obtask.css) — scoped here under .obtask-calendar so the
- * calendar's stronger override doesn't affect the feed.
+ * chip (styles/obtask.css).
+ *
+ * `--obtask-dot-color` no longer gets a per-priority value here — priority
+ * stopped driving the dot/pill colour (Apple Reminders-style `!`/`!!` marks
+ * replaced it, event-content.ts's eventContent) — so every event falls back
+ * to the `::before` rule's own `var(--text-faint)` default below. A later
+ * wave re-keys `--obtask-dot-color` to the task's project instead.
  *
  * A bordered slab (even a thin one) reads as a UI chrome element, not a
  * line of text — Obsidian's own lists mark things with a leading dot/icon,
  * not a box. So month/all-day events go "dot + title" instead: no border,
- * no fill, just a small priority-coloured dot before the title (set via
- * --obtask-dot-color below, consumed by the ::before rule further down).
- * Only the week/day *timed* grid (an actual time block, not a marker) keeps
- * a bordered surface — see the ".ec-time-grid .ec-body" rules at the end of
- * this section.
+ * no fill, just a small dot before the title (--obtask-dot-color, consumed
+ * by the ::before rule further down). Only the week/day *timed* grid (an
+ * actual time block, not a marker) keeps a bordered surface — see the
+ * ".ec-time-grid .ec-body" rules at the end of this section.
  */
-.obtask-calendar .obtask-priority-urgent.obtask-event {
-	--obtask-dot-color: var(--color-red);
-}
-
-.obtask-calendar .obtask-priority-high.obtask-event {
-	--obtask-dot-color: var(--color-orange);
-}
-
-.obtask-calendar .obtask-priority-normal.obtask-event {
-	--obtask-dot-color: var(--interactive-accent);
-}
-
-.obtask-calendar .obtask-priority-low.obtask-event {
-	--obtask-dot-color: var(--text-faint);
-}
 
 /*
  * Month view + the week/day all-day row (both are `.ec-day-grid`-style
@@ -322,8 +311,7 @@
  * `eventContent`, e.g. "12:00" in front of "Deadline at noon") — a genuine
  * flex item of `.ec-event-body`, sitting between the dot (`::before`,
  * above) and `.ec-event-title` in DOM order. Muted and unaccented (this is
- * a secondary label, not the headline — the title still carries the
- * priority-coloured dot), `font-variant-numeric: tabular-nums` so
+ * a secondary label, not the headline), `font-variant-numeric: tabular-nums` so
  * single/double-digit hours don't jiggle the title's start position as
  * chips re-render, `flex-shrink: 0` so a narrow chip compresses the
  * title's own ellipsis instead of clipping the time, and `font-size:
@@ -337,6 +325,27 @@
 	font-size: inherit;
 	flex-shrink: 0;
 	margin-inline-end: var(--size-4-1);
+}
+
+/*
+ * Apple Reminders-style priority marks (`!`/`!!`, event-content.ts's
+ * eventContent, only present for a non-`normal`-priority event) — the last
+ * flex item of `.ec-event-body` in day-grid/month and the week/day all-day
+ * row, both `display: flex; flex-direction: row` (see the dot comment
+ * above). `margin-inline-start: auto` pushes it to the row's own end
+ * without disturbing the dot/time/title items before it; `flex-shrink: 0`
+ * keeps it from ever getting squeezed by the title's own ellipsis. Colour
+ * comes from the same `obtask-priority-high`/`obtask-priority-urgent`
+ * classes `styles/obtask.css` already defines unscoped for the feed chip —
+ * no separate colour rule needed here.
+ */
+.obtask-calendar .ec-day-grid .obtask-event-marks,
+.obtask-calendar .ec-all-day .obtask-event-marks {
+	margin-inline-start: auto;
+	padding-inline-start: var(--size-4-1);
+	flex-shrink: 0;
+	font-size: inherit;
+	font-weight: var(--font-semibold);
 }
 
 /*
@@ -514,6 +523,13 @@
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event-body {
 	overflow: hidden;
+	/* Containing block for `.obtask-event-marks` below — this box already
+	 * fills `.ec-event`'s own padded area exactly (`.ec-event-body`'s
+	 * vendored `inline-size: 100%` plus `.ec-event`'s default flex
+	 * `align-items: stretch`), so positioning against it rather than
+	 * `.ec-event` needs no extra inset arithmetic to land in this box's own
+	 * corner. */
+	position: relative;
 }
 
 .obtask-calendar .ec-time-grid .ec-body .ec-event-title {
@@ -523,6 +539,22 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
+}
+
+/*
+ * Time-grid's priority marks (`!`/`!!`, event-content.ts's eventContent):
+ * `.ec-event-body` here is a flex *column* (title then time, `order`-flipped
+ * above), so the day-grid/all-day row's `margin-inline-start: auto` trick
+ * would push the mark to the bottom, not the right. Absolutely positioned
+ * into the body's own top-right corner instead — same "escape the flex
+ * flow" pattern the priority pill (`.ec-event::before`, above) already
+ * uses for this view.
+ */
+.obtask-calendar .ec-time-grid .ec-body .obtask-event-marks {
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-end: 0;
+	font-weight: var(--font-semibold);
 }
 
 /*

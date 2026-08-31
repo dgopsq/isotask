@@ -5,7 +5,8 @@ import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
 import { formatTime, fromJsDate, fromJsDateTime, isDateTime, toJsDate, toSundayFirstWeekday, withDatePart } from "@/domain/dates";
-import { priorityChipClass } from "@/domain/task";
+import type { Priority } from "@/domain/task";
+import { PRIORITIES, priorityChipClass } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
 
 /**
@@ -68,14 +69,15 @@ export function toEventCalendarFirstDay(firstDay: Weekday): 0 | 1 | 2 | 3 | 4 | 
 
 /**
  * Extended props this adapter attaches to every Event Calendar event, read
- * back by `event-content.ts`'s `eventContent` function. Kept to a single
- * optional field (rather than reusing `CalendarEvent` wholesale) since
- * that's all the custom rendering needs — the domain event itself isn't
- * otherwise available inside `eventContent` (`Calendar.EventContentInfo`
- * only carries Event Calendar's own `Event` shape).
+ * back by `event-content.ts`'s `eventContent` function — the domain event
+ * itself isn't otherwise available inside `eventContent`
+ * (`Calendar.EventContentInfo` only carries Event Calendar's own `Event`
+ * shape). `priority` backs the trailing `!`/`!!` marks span; `obtaskTime`
+ * backs the timed-all-day-chip time label.
  */
 export interface ObtaskEventExtendedProps {
 	readonly obtaskTime?: string;
+	readonly priority?: Priority;
 }
 
 /** Type guard for reading `Calendar.Event["extendedProps"]` (`Record<string, unknown>`) back out as `ObtaskEventExtendedProps`. */
@@ -84,7 +86,11 @@ export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEvent
 		return false;
 	}
 	const obtaskTime: unknown = (value as Record<string, unknown>)["obtaskTime"];
-	return obtaskTime === undefined || typeof obtaskTime === "string";
+	const priority: unknown = (value as Record<string, unknown>)["priority"];
+	return (
+		(obtaskTime === undefined || typeof obtaskTime === "string") &&
+		(priority === undefined || (typeof priority === "string" && (PRIORITIES as readonly string[]).includes(priority)))
+	);
 }
 
 /**
@@ -99,7 +105,9 @@ export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEvent
  * the grid — its time is passed through `extendedProps.obtaskTime` instead,
  * rendered as a separate muted label in front of the title by
  * `event-content.ts`'s `eventContent`. A genuinely date-only all-day event
- * (a plain `IsoDate` `start`) carries no `obtaskTime`.
+ * (a plain `IsoDate` `start`) carries no `obtaskTime`. `extendedProps.priority`
+ * is always set (regardless of `allDay`/timed) — `eventContent` reads it to
+ * decide whether to append a trailing `!`/`!!` marks span.
  */
 export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput {
 	const start = toJsDate(event.start);
@@ -109,7 +117,10 @@ export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput 
 	// to match `Calendar.EventInput["extendedProps"]`'s own type exactly —
 	// `ObtaskEventExtendedProps` is for the read side (`isObtaskEventExtendedProps`
 	// below), which narrows the untyped `unknown` Event Calendar hands back.
-	const extendedProps: Record<string, unknown> = timedAllDay ? { obtaskTime: formatTime(event.start) } : {};
+	const extendedProps: Record<string, unknown> = {
+		...(timedAllDay ? { obtaskTime: formatTime(event.start) } : {}),
+		priority: event.priority,
+	};
 	return {
 		id: event.id,
 		title: event.title,

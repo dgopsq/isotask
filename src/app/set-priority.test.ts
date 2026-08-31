@@ -33,7 +33,7 @@ describe("makeSetPriority", () => {
 
 	it("fails when the task note does not exist", async () => {
 		const { deps } = makeDeps();
-		const result = await makeSetPriority(deps)(path("Tasks/Missing.md"), "low");
+		const result = await makeSetPriority(deps)(path("Tasks/Missing.md"), "high");
 		expect(result.ok).toBe(false);
 	});
 });

@@ -7,21 +7,19 @@ export type TaskPath = Brand<string, "TaskPath">;
 /** The id of a configured status (see `domain/status.ts`), e.g. `todo`. */
 export type StatusId = Brand<string, "StatusId">;
 
-export type Priority = "low" | "normal" | "high" | "urgent";
+export type Priority = "normal" | "high" | "urgent";
 
-export const PRIORITIES: readonly Priority[] = ["low", "normal", "high", "urgent"];
+export const PRIORITIES: readonly Priority[] = ["normal", "high", "urgent"];
 
 /** Ordering helper: higher rank sorts later/more-urgent. Used to sort buckets priority-desc. */
 export function priorityRank(priority: Priority): number {
 	switch (priority) {
-		case "low":
-			return 0;
 		case "normal":
-			return 1;
+			return 0;
 		case "high":
-			return 2;
+			return 1;
 		case "urgent":
-			return 3;
+			return 2;
 		default: {
 			const exhaustive: never = priority;
 			return exhaustive;
@@ -41,15 +39,37 @@ export function priorityChipClass(priority: Priority): string {
 }
 
 const PRIORITY_LABELS: Readonly<Record<Priority, string>> = {
-	low: "Low",
 	normal: "Normal",
 	high: "High",
 	urgent: "Urgent",
 };
 
-/** Human-readable label for a priority, e.g. `"high"` -> `"High"`. Shared by the create-task modal, the feed row's priority control and `ui/priority-menu.ts`. */
+/** Human-readable label for a priority, e.g. `"high"` -> `"High"`. Shared by the create-task modal, the task panel's dropdown and `ui/priority-menu.ts`. */
 export function priorityLabel(priority: Priority): string {
 	return PRIORITY_LABELS[priority];
+}
+
+/**
+ * Apple Reminders-style text mark for a priority: `""` for `normal` (no
+ * mark at all — the common case stays silent), `"!"` for `high`, `"!!"` for
+ * `urgent`. Rendered at the right edge of a feed row (`views/bases/feed/feed-view.ts`)
+ * and, for a non-normal event, appended to a calendar event's content
+ * (`adapters/calendar/event-calendar/event-content.ts`) — colour comes from
+ * `priorityChipClass` (`styles/obtask.css`), this only supplies the text.
+ */
+export function priorityMarks(priority: Priority): string {
+	switch (priority) {
+		case "normal":
+			return "";
+		case "high":
+			return "!";
+		case "urgent":
+			return "!!";
+		default: {
+			const exhaustive: never = priority;
+			return exhaustive;
+		}
+	}
 }
 
 export type Minutes = Brand<number, "Minutes">;

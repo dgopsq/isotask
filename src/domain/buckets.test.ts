@@ -93,13 +93,13 @@ describe("groupIntoBuckets", () => {
 	it("sorts within a bucket by date asc, then priority desc, then title asc", () => {
 		const tasks = [
 			task({ title: "B late high", due: date("2026-09-04"), priority: "high" }),
-			task({ title: "A early", due: date("2026-09-03"), priority: "low" }),
-			task({ title: "C late low", due: date("2026-09-04"), priority: "low" }),
+			task({ title: "A early", due: date("2026-09-03"), priority: "normal" }),
+			task({ title: "C late normal", due: date("2026-09-04"), priority: "normal" }),
 			task({ title: "D late high alpha-first", due: date("2026-09-04"), priority: "high" }),
 		];
 		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["A early", "B late high", "D late high alpha-first", "C late low"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["A early", "B late high", "D late high alpha-first", "C late normal"]);
 	});
 
 	it('"errors" is always present but never populated — it has no anchor date `bucketFor` can route a `Task` into', () => {
@@ -192,13 +192,13 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 describe("groupIntoBuckets — order", () => {
 	it('"preserve" keeps the incoming order, ignoring date/priority/title', () => {
 		const tasks = [
-			task({ title: "Z late low", due: date("2026-09-04"), priority: "low" }),
+			task({ title: "Z late normal", due: date("2026-09-04"), priority: "normal" }),
 			task({ title: "A early high", due: date("2026-09-03"), priority: "high" }),
 			task({ title: "M mid normal", due: date("2026-09-03"), priority: "normal" }),
 		];
 		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due", order: "preserve" });
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["Z late low", "A early high", "M mid normal"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["Z late normal", "A early high", "M mid normal"]);
 	});
 
 	it('"preserve" + completedAtBottom still moves terminal tasks last, keeping relative order on each side', () => {
@@ -223,10 +223,10 @@ describe("groupIntoBuckets — order", () => {
 	it('omitting `order` (or passing "smart") is unchanged from the pre-existing date/priority/title behavior', () => {
 		const tasks = [
 			task({ title: "B late high", due: date("2026-09-04"), priority: "high" }),
-			task({ title: "A early", due: date("2026-09-03"), priority: "low" }),
-			task({ title: "C late low", due: date("2026-09-04"), priority: "low" }),
+			task({ title: "A early", due: date("2026-09-03"), priority: "normal" }),
+			task({ title: "C late normal", due: date("2026-09-04"), priority: "normal" }),
 		];
-		const expected = ["A early", "B late high", "C late low"];
+		const expected = ["A early", "B late high", "C late normal"];
 
 		const omitted = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
 		expect((omitted.get("this-week") ?? []).map((t) => t.title)).toEqual(expected);

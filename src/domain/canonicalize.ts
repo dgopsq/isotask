@@ -18,6 +18,7 @@ export type CanonicalFixReason =
 	| "status-case"
 	| "status-label"
 	| "priority-case"
+	| "priority-alias"
 	| "duration-string"
 	| "tags-scalar"
 	| "date-format";
@@ -65,10 +66,24 @@ function canonicalizeStatusValue(raw: string, statuses: readonly StatusConfig[])
 	return undefined;
 }
 
-/** `priority`: trims, lower-cases, and accepts the result only if it's then a known priority. */
+/**
+ * Retired priorities aliased onto the current three-level `Priority` set —
+ * currently just `"low"` -> `"normal"` (the 4-to-3 collapse). Checked
+ * before `isPriority` so an existing note's `priority: low` (or `Low`,
+ * `LOW`, etc.) keeps parsing instead of becoming an `invalid-priority`.
+ */
+const PRIORITY_ALIASES: Readonly<Record<string, Priority>> = {
+	low: "normal",
+};
+
+/** `priority`: trims, lower-cases, and accepts the result only if it's then a known priority or one of `PRIORITY_ALIASES`. */
 function canonicalizePriorityValue(raw: string): FieldFix<Priority> | undefined {
 	const trimmed = raw.trim();
 	const candidate = trimmed.toLowerCase();
+	const aliased = PRIORITY_ALIASES[candidate];
+	if (aliased !== undefined) {
+		return { value: aliased, reason: "priority-alias" };
+	}
 	if (!isPriority(candidate) || candidate === raw) {
 		return undefined;
 	}
