@@ -35,3 +35,5 @@ new ADR that supersedes it and update the `Status` line and the index below.
 | [0011](0011-point-events-in-all-day-row.md) | Point events in the all-day row | Accepted, 2026-08-29 |
 | [0012](0012-missing-status-defaults-to-open.md) | Missing status defaults to the first open status | Accepted, 2026-08-30 |
 | [0013](0013-plugin-local-reschedule-undo.md) | Plugin-local undo for calendar reschedules | Accepted, 2026-08-30 |
+| [0014](0014-three-level-priority-with-marks.md) | Three-level priority with Apple Reminders-style marks | Accepted, 2026-08-31 |
+| [0015](0015-project-color-drives-card-dot.md) | Project color drives the card dot/bar | Accepted, 2026-08-31 |

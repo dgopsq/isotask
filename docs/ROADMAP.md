@@ -93,7 +93,7 @@ are not in `package.json` yet — added back when the calendar adapter and recur
       `windowSize`/`setWindowSize` in `e2e/specs/views.e2e.ts` — WebDriver's `setWindowSize` is
       unimplemented in this Electron session and wdio's `emulate()` is Bidi-only).
 - [ ] Month view is barely usable at phone width: at 390px a day cell is ~53px, so event chips
-      render as a priority dot with no readable title. Decide between a dots-only month rendering
+      render as a project-coloured dot with no readable title. Decide between a dots-only month rendering
       with a day detail on tap, a horizontally scrollable grid, or steering narrow viewports to
       week/day view. Event Calendar's own header also wraps to three rows there, eating most of
       the screen before the grid starts.

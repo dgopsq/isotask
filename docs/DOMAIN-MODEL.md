@@ -12,12 +12,12 @@ A note is a task iff `<markerKey> == <markerValue>` (default `type == "task"`); 
 |-------------|-------------------|----------|----------------|-------|
 | `type`      | text              | yes      | —              | marker; key and value both configurable |
 | `status`    | text              | yes      | `todo`         | id of a configured status, see Statuses |
-| `priority`  | text              | no       | `normal`       | `low \| normal \| high \| urgent`; absent means `normal` |
+| `priority`  | text              | no       | `normal`       | `normal \| high \| urgent`; absent means `normal`; `low` (retired) aliases to `normal` |
 | `due`       | date / datetime   | no       | —              | ISO 8601, local wall-clock, no timezone suffix |
 | `scheduled` | date / datetime   | no       | —              | when the task is planned to be worked; datetime enables `duration` |
 | `duration`  | number            | no       | —              | minutes; meaningful when `scheduled` has a time component |
 | `repeat`    | text              | no       | —              | RRULE body only, no `DTSTART`; anchor is `due`, else `scheduled` |
-| `project`   | text (wikilink)   | no       | —              | `[[Project note]]`; Bases renders it as a link |
+| `project`   | text (wikilink)   | no       | —              | `[[Project note]]`; Bases renders it as a link; the project note itself may carry its own `color` (see "Project color" below) |
 | `tags`      | list              | no       | —              | native Obsidian tags |
 | `created`   | datetime          | yes      | now, on create | set by the plugin, never edited by the user |
 | `completed` | datetime          | no       | —              | set when status transitions into a `done`-kind status; removed on reopen |
@@ -67,9 +67,61 @@ the exact closed set beyond these four). `id`/`label`/`icon` are user-facing and
 
 ## Priority
 
-Fixed set, ordered low to high: `low`, `normal`, `high`, `urgent`. Absent `priority` is treated as
-`normal`. Used as the second sort key inside feed buckets (priority desc) and to color calendar
-events via Obsidian's `--color-*` palette variables.
+Fixed set, ordered low to high: `normal`, `high`, `urgent`. Absent `priority` is treated as
+`normal`. The retired fourth level, `low`, is aliased to `normal` during parsing (any case
+variant; `CanonicalFixReason` `"priority-alias"`, see "Lenient parse, canonical write" below) — a
+one-way collapse, never reconstructed. Used as the second sort key inside feed buckets (priority
+desc).
+
+Priority drives no dot/bar color anywhere (that's project color's job, below); instead it renders
+as an Apple Reminders-style text mark at the right of a card, via `domain/task.ts#priorityMarks`:
+`normal` -> no mark (`high`/`urgent`'s clickable `!`/`!!` span is replaced by an empty, inert
+placeholder — `obtask-feed__priority--empty` on the feed row — kept only so a mixed-priority
+feed's later columns stay aligned; the calendar's `event-content.ts` emits nothing at all for
+`normal`), `high` -> `!` (`--color-orange`), `urgent` -> `!!` (`--color-red`), reusing the existing
+`priorityChipClass` mapping for color. Editing priority (the row's priority menu, the task panel,
+the "Set priority" command) is unaffected by whether a mark currently renders.
+
+## Project color
+
+A project note (whatever a task's `project` wikilink resolves to) may declare its own `color`
+frontmatter property. This is a property of the **project note**, not a task property key — it is
+not one of the configurable `PropertyKeys`; the key is always literally `color`, read straight off
+the resolved project note's own frontmatter (`adapters/obsidian/project-color-lookup.ts`).
+
+`domain/project-color.ts#resolveDotColor` decides what a task's card dot/bar (the feed row's
+leading dot, the calendar's month dot, due ring, and time-grid pill) renders, in order:
+
+1. The task has no `project` at all -> neutral (`var(--text-faint)`).
+2. The project note's `color` parses (`parseProjectColor`) -> that color: one of 8 palette names
+   (`red orange yellow green cyan blue purple pink`, mapped to Obsidian's `--color-*` variables)
+   or a `#rgb`/`#rrggbb` hex string, case- and whitespace-insensitive.
+3. Otherwise -> a frozen djb2a hash of the project name onto the same 8-entry palette
+   (`hashPaletteColor`), giving every project a consistent, distinguishable color with zero
+   configuration.
+
+**Parse-error policy for `color`:** an invalid value — a non-string, blank/unrecognized text, or a
+malformed hex (`#gg0000`, `#12345`) — never errors and never affects the task's own parse result;
+`parseProjectColor` simply returns `undefined` and step 3's hash fallback applies. There is no
+`TaskParseError` variant for a bad project `color`.
+
+Palette colors apply as one of 8 pre-declared static CSS classes. A hex color has no such class —
+Obsidian's plugin guidelines forbid a plugin registering stylesheet rules at runtime — so it's
+applied as a scoped `--obtask-dot-color` custom property directly on the element via Obsidian's
+`setCssProps`, at the one place each renderer (the feed row, the calendar's `eventDidMount`) holds
+the actual DOM node. A known limitation: an on-screen calendar event's hex color repaints only on
+remount (`eventDidMount` is mount-only), not live the way a palette class does; palette colors
+repaint live since they're plain CSS classes.
+
+Editing is via `ui/project-color-modal.ts` (palette swatches, "Automatic" to clear the property,
+or a custom hex field), writing through `processFrontMatter` on the *project* note — reachable
+from the feed's project-link context menu, the task panel's color swatch, and the "Set project
+color…" command. Feed/calendar views track which project note paths their last render's dots
+depended on and re-render on a `metadataCache` `changed` event for one of them, so editing a
+project's `color` updates every card referencing it without any task note being touched. There is
+no rename handling: `metadataCache` fires no `changed` event on a rename, and a rename doesn't
+itself change frontmatter, so a renamed project's dot simply keeps following the note under its
+new name/path.
 
 ## Date formats
 
@@ -184,7 +236,8 @@ right:
 
 - `Due` or `Scheduled` -> one date chip, at the position of whichever of the two appears first in
   the menu; the second (if also enabled) is ignored — a row shows one date chip, never two.
-- `Priority` -> the priority chip. `Project` -> the project link.
+- `Priority` -> the priority mark (see "Priority" above; nothing renders for `normal`).
+  `Project` -> the project link.
 - `Tags` (either the frontmatter `tags` property or Obsidian's own inline/`file.tags`) -> the tags
   list, same first-wins dedupe as the date chip.
 - The task marker property (`type` by default) contributes nothing — it's noise in a feed row.
@@ -281,14 +334,23 @@ Each task can contribute up to two calendar events, controlled by the `events` v
   time order.
 
 A task with both `due` and `scheduled` set and `events: both` produces two separate calendar
-events for the same task. Event color follows `priority` by reusing the feed's existing
-`domain/task.ts#priorityChipClass` mapping — no new priority-to-color table. The adapter
-(`event-calendar-mapping.ts#toEventCalendarEvent`) attaches `obtask-priority-<priority>` as one of
-the event's `classNames`, and `styles/calendar.css` maps each to an Obsidian `--color-*` variable,
-scoped under `.obtask-calendar` so it doesn't affect the feed's own (differently-styled) priority
-chip: `urgent`/`high` set the event's background (`--color-red`/`--color-orange`) plus
-`--text-on-accent` text; `normal`/`low` leave the background alone and only tint the event's
-left-edge accent bar (`--text-muted`/`--text-faint`). No recurrence expansion: `eventsForTask`
+events for the same task. Every event renders on a neutral, uncoded surface
+(`--background-modifier-hover`, `styles/calendar.css`) — color is carried entirely by two
+independent, smaller signals instead of the event background:
+
+- **The leading dot/ring** follows the task's **project**, not its priority (see "Project color"
+  above): `due` renders as a ring, `scheduled` as a filled dot, both colored via
+  `--obtask-dot-color`, which `domain/calendar-events.ts#CalendarEvent.dotColor` carries and
+  `event-calendar-mapping.ts#toEventCalendarEvent` applies as a class
+  (`domain/project-color.ts#dotColorClasses`) or, for a hex project color, a `setCssProps` custom
+  property set by the renderer's `eventDidMount` (see "Project color" above for the remount
+  limitation this implies).
+- **The trailing `!`/`!!` marks** (present only for `high`/`urgent`) follow the task's
+  **priority**, reusing the same `obtask-priority-high`/`obtask-priority-urgent` color classes the
+  feed's priority mark uses (`domain/task.ts#priorityChipClass`), attached by
+  `event-content.ts#eventContent` — see "Priority" above.
+
+No recurrence expansion: `eventsForTask`
 never reads `repeat` — one note is one occurrence (ADR 0005), so a recurring task's calendar
 presence is exactly its own `due`/`scheduled` values, with no future-occurrence events synthesized.
 

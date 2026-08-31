@@ -52,7 +52,11 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
 - Use `setIcon` for icons, `Setting` for settings-style rows (including inside modals where it
   fits), and `Menu` for context/dropdown menus — don't hand-roll these Obsidian already provides.
 - CSS classes: kebab-case, prefixed `obtask-` (e.g. `obtask-feed-row`, `obtask-status-dot`). No
-  inline `style=` attributes; put styling in `src/styles/*.css`.
+  inline `style=` attributes; put styling in `src/styles/*.css`. A value only known at render time
+  (e.g. a project's custom hex color) is never a style string or a runtime-created `<style>`/
+  `<link>` element (Obsidian's plugin guidelines forbid the latter) — apply it as a CSS custom
+  property via Obsidian's `setCssProps` on the specific element, scoped to a static rule already
+  in the stylesheet that consumes it (see `domain/project-color.ts`).
 - Use theme CSS variables, not literal colors. Common ones: `--background-primary`,
   `--background-secondary`, `--text-normal`, `--text-muted`, `--text-faint`,
   `--interactive-accent`, `--interactive-accent-hover`, `--color-red`, `--color-orange`,

@@ -190,7 +190,7 @@ call, compact or not. Month used to collapse into the renderer's rolling 3-day v
 threshold (too narrow for a 7-column CHIP grid); it no longer does, because compact month doesn't
 need 7 columns of chips any more — `styles/calendar.css`'s `.obtask-calendar--compact .ec-day-grid`
 rules render every event as a small dot instead (the title stays in the DOM, clipped to 1px, so
-assistive tech still gets it; only the existing priority-coloured `::before` dot — already drawn for
+assistive tech still gets it; only the existing project-coloured `::before` dot (ADR 0015) — already drawn for
 the wide-pane "dot + title" chip — stays visible), and `pointer-events: none` on every event lets a
 tap anywhere in the cell, dot included, reach the day cell's own click handler. `week` still becomes
 a rolling 3-day window when compact (`"3 days"` in the header, replacing "Week") — that part is
