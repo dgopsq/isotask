@@ -1021,9 +1021,10 @@
  * unrelated marks floating in the cell, not one event — see the reported
  * bug this restores a container for. Same `--background-modifier-hover`
  * fill the non-compact month/all-day pill uses (`.ec-day-grid .ec-event`,
- * above), sized to its own content (`inline-size: max-content`, not a
- * percentage of the column) so a dot-only pill stays small and a
- * dot-plus-mark pill only grows as much as the mark needs.
+ * above), spanning the full day-cell width like a normal event chip —
+ * just shorter and with the title visually hidden — so the dot sits at
+ * the pill's left edge and the mark at its right edge, mirroring the
+ * wide-pane chip's layout at a glance.
  *
  * `pointer-events: none` on the whole event is what makes a tap anywhere in
  * the cell — including directly on a pill — reach the day cell's own
@@ -1057,20 +1058,17 @@
 	border-radius: var(--radius-l);
 	padding: 2px 5px;
 	margin-inline: 2px;
-	inline-size: max-content;
+	inline-size: auto;
 	max-inline-size: 100%;
 	block-size: 14px;
 	overflow: hidden;
 }
 
 /*
- * Dot and (optional) priority mark flow inline inside the pill, one small
- * `gap` apart — `gap` (not a margin on the mark) so a dot-only pill doesn't
- * carry a trailing gap with nothing after it. This overrides the mark's own
- * `margin-inline-start: auto` (below), which — sized to the pill's own
- * content width here, unlike the wide-pane chip's full-column width — would
- * otherwise still try to push the mark to the pill's far edge instead of
- * right next to the dot.
+ * Dot at the pill's left edge, mark at its right — the mark's own base
+ * `margin-inline-start: auto` (above) does the pushing, exactly as in the
+ * wide-pane chip; the pill spans the full cell width so the two edges are
+ * the cell's own.
  */
 .obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event-body {
 	padding: 0;
@@ -1081,10 +1079,6 @@
 	margin-inline-end: 0;
 }
 
-.obtask-calendar.obtask-calendar--compact .ec-day-grid .obtask-event-marks {
-	margin-inline-start: 0;
-	padding-inline-start: 0;
-}
 
 /*
  * Caps how many dots a busy day cell shows at a small, deterministic number
