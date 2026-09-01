@@ -21,8 +21,10 @@ reusing row elements and re-rendering only their contents; per-row Obsidian `Com
 listeners. (2) `@formkit/auto-animate` (v0.10.0, ~3 kB min+gzip, zero dependencies, MIT) is
 attached to that list element; it observes direct-child mutations only (`childList: true`, no
 subtree) and derives move (FLIP), add, and remove animations automatically, respecting
-`prefers-reduced-motion` by default. Duration 180ms. Static hover/press feedback elsewhere
-stays plain CSS.
+`prefers-reduced-motion` by default. Duration 220ms with an ease-out curve
+(`cubic-bezier(0.22, 1, 0.36, 1)`, replacing auto-animate's symmetrical default ease-in-out) so a
+row's move to its new position decelerates into place instead of reading mechanical. Static
+hover/press feedback elsewhere stays plain CSS.
 
 ## Consequences
 

@@ -244,13 +244,16 @@
 	 * Eases hover (background-color) and both drag/drop transitions the
 	 * library itself drives with plain CSS properties: opacity (the
 	 * original event drops to the vendored `.ec-ghost` class's `opacity: .5`
-	 * while dragging, then back to 1 on drop) and box-shadow (nothing sets
-	 * one on this element today, but this also "settles" any future
-	 * drag-class removal for free). No hardcoded ms/`!important` — see the
-	 * `--obtask-motion` guard at the end of this file. `scale` eases the
-	 * pickup/landing lift (see the drag/resize lift comment below) — the
-	 * ghost's `scale: 0.97` on pickup and the reused element's return to
-	 * `scale: 1` once `.ec-ghost` is dropped at the new slot both ride this.
+	 * while dragging, then back to 1 on drop) and box-shadow. The press-lift
+	 * rule below (`.ec-event:active`) sets box-shadow on press using its OWN
+	 * (faster) transition; releasing removes that `:active` match, so THIS
+	 * rule's (slower) transition is what eases the shadow back to `none` —
+	 * see the press-lift comment below for why the two speeds are split. No
+	 * hardcoded ms/`!important` — see the `--obtask-motion` guard at the end
+	 * of this file. `scale` eases the pickup/landing lift (see the
+	 * drag/resize lift comment below) — the ghost's `scale: 0.97` on pickup
+	 * and the reused element's return to `scale: 1` once `.ec-ghost` is
+	 * dropped at the new slot both ride this.
 	 *
 	 * `scale` is split onto its own, LONGER duration token
 	 * (`--obtask-motion-settle`) than the other three properties here: a
@@ -933,7 +936,7 @@
  * explicitly on it.
  *
  * The `from` restates the preview's exact float state — `scale: 1.05;
- * rotate: 0.6deg; box-shadow: var(--shadow-s)` — so the clone's deletion
+ * rotate: 0.6deg; box-shadow: var(--obtask-lift-shadow)` — so the clone's deletion
  * hands off to the real element mid-air and the landing reads as one
  * continuous motion rather than a cut: scale and tilt relax to their
  * natural (unset) values while the shadow fades out, as if the block is
@@ -1057,6 +1060,20 @@
  * workspace panes) is wide enough that the preview's painted extent never
  * reaches them, so `.ec-main` — not Obsidian's own scroller — is the actual
  * clipper.
+ *
+ * Still exceeds `.ec-main` today, even though both the shadow and the
+ * day-view lift have since shrunk from what the probe above measured:
+ * `--obtask-lift-shadow` (0 x-offset, 8px blur) alone paints 8px past the
+ * block's left/right edges, and `--obtask-lift-scale: 1.01` on a
+ * full-pane-width column (~900-1000px) adds another (1.01 − 1) / 2 ≈ 5px of
+ * scale growth per side — roughly 13px of painted overflow past the
+ * block's own edge. The block's margin to `.ec-main`'s edge is
+ * `--ec-event-col-gap / 2` (this file's own time-grid redefinition, 16px /
+ * 2 = 8px) plus the sub-pixel slack the probe above found between the
+ * column edge and `.ec-main`'s own edge (~1px) — call it 9px total. 13px of
+ * overflow against a 9px margin still clips, so this rule stays required;
+ * revisit this arithmetic if either `--obtask-lift-shadow` or
+ * `--ec-event-col-gap` changes again.
  *
  * Safe to relax: this plugin always mounts Event Calendar with `height:
  * "auto"` (see the `height` option comment in
