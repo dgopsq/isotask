@@ -1089,6 +1089,55 @@
 }
 
 /*
+ * Visual gap BETWEEN members of an overlap group — they tile edge-to-edge
+ * via the inline `inset-inline-start`/`inline-size` calc described above
+ * (`(100% - var(--ec-event-col-gap)) / N * i`), and that split's geometry is
+ * guarded by the "keeps an overlapping pair … inside their day column" e2e,
+ * so this must add a gap WITHOUT touching either property or the box's
+ * outer edges at all.
+ *
+ * The lever: `border-inline-start` with a *transparent* color, plus
+ * `background-clip: padding-box`, shrinks only the PAINTED background
+ * inward from the box's start edge — `.ec-event` is confirmed
+ * `box-sizing: border-box` (live DOM probe), so the border is carved out of
+ * the existing border-box rather than added on top of it, and the box's own
+ * `getBoundingClientRect()` — what the overlap-geometry e2e measures — is
+ * completely unchanged. `overflow: hidden`/`container-type: size` on
+ * `.ec-event` don't interact: a border sits inside the border box, not in
+ * the overflow/containment path.
+ *
+ * Selector: `[style*="inset-inline-start"]` alone is NOT enough to mean
+ * "overlap member" — a live probe found EC inlines `inset-inline-start` on
+ * EVERY timed block now, solo included (`… / 1 * 0`), contradicting this
+ * file's older comments (written against an earlier EC build) that claimed
+ * solo blocks get no inline `inset-inline-start` at all. A solo block's
+ * `inline-size` calc is always `… / 1 * 1)` (group size 1, the only case
+ * where the denominator is 1), and a real overlap member's group size is
+ * always >= 2 — so excluding that exact substring reliably isolates true
+ * overlap members regardless of group size. The same probe found the drag
+ * `.ec-preview` clone carries NEITHER property (its inline style is only
+ * `grid-column`/`inset-block-start`/`block-size`), so it never matches this
+ * selector on its own merits — no `:not(.ec-preview)` needed.
+ *
+ * Side: a live probe of a runtime-created overlap ("Team sync" at i=0,
+ * "Standup" at i=1, N=2) showed BOTH members — including i=0 — carry
+ * `inset-inline-start` (`… / 2 * 0` and `… / 2 * 1`), so every member in a
+ * group matches this rule uniformly; `border-inline-start` was chosen (over
+ * `-end`) so the gap lands strictly BETWEEN members (before each one after
+ * the first) and the group's trailing edge stays exactly as flush as a solo
+ * block's — only the very first member gains a barely-there extra 2px start
+ * inset. It also keeps the priority pill (`::before`, `inset-inline-start:
+ * var(--size-4-1)`, positioned against the padding box) exactly 4px from
+ * the now-inset VISIBLE edge, since border-box sizing pushes the padding
+ * box in by the border's width — confirmed visually, no separate offset
+ * needed.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event[style*="inset-inline-start"]:not([style*="/ 1 * 1)"]) {
+	border-inline-start: var(--size-2-1) solid transparent;
+	background-clip: padding-box;
+}
+
+/*
  * Time-grid's `.ec-event-body` is `display: flex; flex-direction: column`
  * (the library's default — only day-grid/all-day/timeline switch it to
  * `row`), with exactly two direct children/flex items: `<time
