@@ -247,12 +247,16 @@
 	 * while dragging, then back to 1 on drop) and box-shadow (nothing sets
 	 * one on this element today, but this also "settles" any future
 	 * drag-class removal for free). No hardcoded ms/`!important` — see the
-	 * `--obtask-motion` guard at the end of this file.
+	 * `--obtask-motion` guard at the end of this file. `scale` eases the
+	 * pickup/landing lift (see the drag/resize lift comment below) — the
+	 * ghost's `scale: 0.97` on pickup and the reused element's return to
+	 * `scale: 1` once `.ec-ghost` is dropped at the new slot both ride this.
 	 */
 	transition:
 		background-color var(--obtask-motion, 120ms) ease,
 		opacity var(--obtask-motion, 120ms) ease,
-		box-shadow var(--obtask-motion, 120ms) ease;
+		box-shadow var(--obtask-motion, 120ms) ease,
+		scale var(--obtask-motion, 120ms) ease;
 }
 
 /*
@@ -486,12 +490,13 @@
 	border-radius: var(--radius-s);
 	box-shadow: none;
 	overflow: hidden;
-	/* Same hover ease + drag/drop opacity-and-box-shadow settle as the
+	/* Same hover ease + drag/drop opacity/box-shadow/scale settle as the
 	 * day-grid/all-day rule above — see its comment for why. */
 	transition:
 		background-color var(--obtask-motion, 120ms) ease,
 		opacity var(--obtask-motion, 120ms) ease,
-		box-shadow var(--obtask-motion, 120ms) ease;
+		box-shadow var(--obtask-motion, 120ms) ease,
+		scale var(--obtask-motion, 120ms) ease;
 	/* Tight (not the library's own 1.5) — see the day-grid/all-day `.ec-event`
 	 * rule above for the same change; this also shrinks the container-query
 	 * threshold below, since the time line's line-height is one of its
@@ -579,14 +584,19 @@
  * to force a `cursor` for the whole interaction (confirmed against
  * `@event-calendar/core/dist/index.js`: `mainState.iClass` is set to
  * "dragging"/"resizingX"/"resizingY" and applied as a class up on the shared
- * interaction root, not per-event). What actually moves under the pointer is
- * a *clone* of the event, themed `.ec-preview` (`createIEvent` sets the
- * clone's `display` to "preview"; the vendored stylesheet already gives
+ * interaction root — that root wraps the whole view, `.ec-preview`/
+ * `.ec-ghost` included, so `.ec-dragging`/etc. are genuine ANCESTORS of
+ * them, not siblings). What actually moves under the pointer is a *clone*
+ * of the event, themed `.ec-preview` (`createIEvent` sets the clone's
+ * `display` to "preview"; the vendored stylesheet already gives
  * `.ec-preview` `z-index: 1000; opacity: .8`) — the original event instead
  * gets `display: "ghost"` (`.ec-ghost`: `opacity: .5; pointer-events: none`)
  * and stays put as an in-place placeholder, which is exactly what the
  * `.ec-event` `transition: opacity …` above now eases in and back out on
- * drop.
+ * drop. `createIEvent` (the function that assigns "preview"/"ghost") is the
+ * single call site for both drag AND resize, so resize ghosts/previews the
+ * original exactly like drag does — anything scoped to `.ec-dragging` alone
+ * stays lift-free during a resize, which matters below.
  *
  * A `box-shadow: var(--shadow-s)` lift was tried first, matching the view
  * switcher's original "raised card" attempt (~line 900 below) — but that
@@ -599,9 +609,64 @@
  * as this file's single source of truth for it (nothing else here touches
  * `.ec-preview`'s opacity) rather than layering a second opacity change on
  * top of the library's — a barely-there nudge off .8, not a redo of it.
+ *
+ * On top of that opacity, a scale "lift" makes the pickup unmistakable:
+ * the clone grows to 105% right as it's inserted, the original visibly
+ * "gives up" its slot at 97%, and the block settles back to 100% at
+ * wherever it lands. `scale` (the standalone CSS property), never
+ * `transform: scale(…)`: EC never sets an inline `transform` on any event
+ * (confirmed — it positions everything with `inset-block-start`/
+ * `inset-inline-start`/`block-size`/`inline-size`/`margin-block-start`
+ * logical-property strings instead), so either would work today, but
+ * `scale` composes with a `transform` no matter which one a future EC
+ * version reaches for, where `transform: scale(…)` would just clobber it.
+ * Support floor: the container-query comment above (~line 781) already
+ * establishes this plugin's runtime floor at Chromium >= 106 / iOS 16.4+
+ * WebKit — both years past `scale`'s own ship dates (Chromium 79, Safari
+ * 14.1), so no separate floor check is needed for it.
+ *
+ * - Pickup: `.ec-dragging .ec-preview` scoped, not plain `.ec-preview` — a
+ *   resize's own preview is a size change already in progress under the
+ *   pointer, and a simultaneous 105% scale on it would visibly fight the
+ *   dimension the drag is actively editing. The static `scale: 1.05` is
+ *   the resting lifted state; `animation: obtask-lift` is what makes
+ *   *reaching* it visible. A `transition` can't do that job here — the
+ *   preview is a freshly inserted clone, so there's no prior computed
+ *   style for a transition to ease from on its first paint. The
+ *   `@keyframes` below only defines `from { scale: 1; }`; with no `to`
+ *   keyframe, the animation's end value falls back to the element's own
+ *   underlying `scale: 1.05`, so the two declarations can't drift apart.
+ *   Under `prefers-reduced-motion` the shared `--obtask-motion` guard at
+ *   the end of this file zeroes the animation duration too (both read the
+ *   same var), so the lift just lands at 105% instantly instead of easing.
+ * - Ghost + landing: `.ec-dragging .ec-ghost` (same drag-only scoping, for
+ *   the same fight-the-resize reason) shrinks the original to 97% right
+ *   where it sits — it visibly "gives up" its slot the moment the clone is
+ *   picked up. Because drop removes `.ec-dragging` from the root and
+ *   `.ec-ghost` from the (possibly reused) element at the NEW slot in the
+ *   same update, that element's `scale` cascades back to the base
+ *   `.ec-event` value of 1 — and since `.ec-event` already carries `scale
+ *   var(--obtask-motion, 120ms) ease` in its transition list (added
+ *   alongside opacity/box-shadow above), that reversion eases in, reading
+ *   as the block settling into its landing spot rather than snapping.
  */
 .obtask-calendar .ec-preview {
 	opacity: 0.85;
+}
+
+@keyframes obtask-lift {
+	from {
+		scale: 1;
+	}
+}
+
+.obtask-calendar .ec-dragging .ec-preview {
+	scale: 1.05;
+	animation: obtask-lift var(--obtask-motion, 120ms) ease;
+}
+
+.obtask-calendar .ec-dragging .ec-ghost {
+	scale: 0.97;
 }
 
 /*
