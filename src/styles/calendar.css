@@ -1091,6 +1091,12 @@
 	pointer-events: none;
 	background-color: var(--background-modifier-hover);
 	box-shadow: none;
+	/* The shared `justify-self: center` (wide-pane centering fix, above)
+	 * would shrink THIS pill to its content — unlike the wide chip it has
+	 * `inline-size: auto`, so it needs the grid default back: stretch
+	 * fills the track, and the symmetric `margin-inline` keeps the even
+	 * inset the centering fix exists for. */
+	justify-self: stretch;
 	border-radius: var(--radius-l);
 	padding: 2px 5px;
 	margin-inline: 2px;
