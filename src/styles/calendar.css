@@ -549,14 +549,17 @@
  * live DOM probe), not absolutely positioned, so a normal `margin` inset
  * applies on all four sides exactly like any other box, shrinking the
  * block a few px into its time-slot allocation rather than filling it
- * edge-to-edge. In the common non-overlapping case that leaves the CSS
- * free to narrow the box further; an overlapping pair falls back to EC's
- * own inline sizing (inline styles always win), an acceptable trade-off
- * for a rare case.
+ * edge-to-edge. inline-size is deliberately NOT set here: EC's v5 layout
+ * puts an inline `inline-size: calc(...)` on every real timed block
+ * (overlapping or not — confirmed via a live mid-drag DOM probe), so a
+ * stylesheet width could only ever bite the one timed element EC does NOT
+ * inline-size — the drag `.ec-preview` — which a narrower calc here made
+ * visibly smaller than the block being dragged (67px vs 75px, measured).
+ * With no stylesheet override, the preview falls back to the library's own
+ * base `.ec-event` width and matches real blocks exactly.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event {
 	margin: var(--size-4-1);
-	inline-size: calc(100% - var(--ec-event-col-gap) - (var(--size-4-1) * 2));
 }
 
 /*
