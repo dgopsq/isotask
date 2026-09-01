@@ -253,10 +253,21 @@
  * tried first and lost to the resolved shortfall.
  */
 .obtask-calendar .ec-day-grid .ec-event,
-.obtask-calendar .ec-all-day .ec-event,
-.obtask-calendar .ec-time-grid .ec-body .ec-event {
+.obtask-calendar .ec-all-day .ec-event {
 	justify-self: center;
 }
+
+/*
+ * The time grid is deliberately NOT in the justify-self rule above: EC's
+ * overlap layout positions each member of an overlapping group with inline
+ * `inset-inline-start`/`inline-size` percentages that assume a
+ * start-anchored box — centering shifts the whole group right by the
+ * centering offset and the group's last member overflows into the next day
+ * column (user-reported; single blocks masked it). Symmetric margins of
+ * half the col-gap give the same even inset for the n=1 case while leaving
+ * EC's start-anchored overlap math intact: the group's last member ends at
+ * `margin + (100% - gap)` = track - half-gap, flush with the same inset.
+ */
 
 .obtask-calendar .ec-day-grid .ec-event:hover,
 .obtask-calendar .ec-all-day .ec-event:hover {
@@ -559,7 +570,8 @@
  * base `.ec-event` width and matches real blocks exactly.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event {
-	margin: var(--size-4-1);
+	margin-block: var(--size-4-1);
+	margin-inline: calc(var(--ec-event-col-gap) / 2);
 }
 
 /*
