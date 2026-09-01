@@ -99,6 +99,10 @@
 	box-shadow: var(--input-shadow);
 	font-size: var(--font-ui-small);
 	padding: var(--size-4-1) var(--size-4-3);
+	/* Covers both the plain hover rule below and the active-tab tint change
+	 * in the view switcher (`.ec-active`, further down) — both only ever
+	 * change background-color/color on this same element. */
+	transition: background-color var(--obtask-motion, 120ms) ease, color var(--obtask-motion, 120ms) ease;
 }
 
 .obtask-calendar .ec-button:not(:disabled):hover {
@@ -236,6 +240,19 @@
 	 * against the same "denser month rows" goal. */
 	line-height: var(--line-height-tight);
 	box-shadow: none;
+	/*
+	 * Eases hover (background-color) and both drag/drop transitions the
+	 * library itself drives with plain CSS properties: opacity (the
+	 * original event drops to the vendored `.ec-ghost` class's `opacity: .5`
+	 * while dragging, then back to 1 on drop) and box-shadow (nothing sets
+	 * one on this element today, but this also "settles" any future
+	 * drag-class removal for free). No hardcoded ms/`!important` — see the
+	 * `--obtask-motion` guard at the end of this file.
+	 */
+	transition:
+		background-color var(--obtask-motion, 120ms) ease,
+		opacity var(--obtask-motion, 120ms) ease,
+		box-shadow var(--obtask-motion, 120ms) ease;
 }
 
 /*
@@ -469,6 +486,12 @@
 	border-radius: var(--radius-s);
 	box-shadow: none;
 	overflow: hidden;
+	/* Same hover ease + drag/drop opacity-and-box-shadow settle as the
+	 * day-grid/all-day rule above — see its comment for why. */
+	transition:
+		background-color var(--obtask-motion, 120ms) ease,
+		opacity var(--obtask-motion, 120ms) ease,
+		box-shadow var(--obtask-motion, 120ms) ease;
 	/* Tight (not the library's own 1.5) — see the day-grid/all-day `.ec-event`
 	 * rule above for the same change; this also shrinks the container-query
 	 * threshold below, since the time line's line-height is one of its
@@ -547,6 +570,38 @@
 .obtask-calendar .ec-time-grid .ec-body .ec-event:hover {
 	background-color: var(--background-modifier-border);
 	color: var(--text-normal);
+}
+
+/*
+ * Drag/resize lift. Event Calendar does NOT put a "dragging" class on the
+ * event being moved — `.ec-dragging`/`.ec-resizing-x`/`.ec-resizing-y`
+ * (vendored stylesheet) land on the calendar's own root/main element purely
+ * to force a `cursor` for the whole interaction (confirmed against
+ * `@event-calendar/core/dist/index.js`: `mainState.iClass` is set to
+ * "dragging"/"resizingX"/"resizingY" and applied as a class up on the shared
+ * interaction root, not per-event). What actually moves under the pointer is
+ * a *clone* of the event, themed `.ec-preview` (`createIEvent` sets the
+ * clone's `display` to "preview"; the vendored stylesheet already gives
+ * `.ec-preview` `z-index: 1000; opacity: .8`) — the original event instead
+ * gets `display: "ghost"` (`.ec-ghost`: `opacity: .5; pointer-events: none`)
+ * and stays put as an in-place placeholder, which is exactly what the
+ * `.ec-event` `transition: opacity …` above now eases in and back out on
+ * drop.
+ *
+ * A `box-shadow: var(--shadow-s)` lift was tried first, matching the view
+ * switcher's original "raised card" attempt (~line 900 below) — but that
+ * comment's finding (`--shadow-s` reads as a dark rim, not elevation, once
+ * Obsidian's dark themes make the fill lighter than the surrounding surface)
+ * applies at least as strongly here: a floating preview has no track
+ * background to frame it at all, so a dark rim around it would read even
+ * more like a hole cut in the grid than a lifted block. Skipped the shadow
+ * entirely. `opacity: 0.85` restates the library's own `.ec-preview` value
+ * as this file's single source of truth for it (nothing else here touches
+ * `.ec-preview`'s opacity) rather than layering a second opacity change on
+ * top of the library's — a barely-there nudge off .8, not a redo of it.
+ */
+.obtask-calendar .ec-preview {
+	opacity: 0.85;
 }
 
 /*
@@ -1178,4 +1233,19 @@
  */
 .obtask-calendar.obtask-calendar--compact .ec-day-foot {
 	display: none;
+}
+
+/*
+ * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` transition
+ * above. `--obtask-motion` inherits, so zeroing it once here collapses every
+ * transition beneath `.obtask-calendar` to 0s with no `!important` and no
+ * per-rule media query. The feed's own equivalent guard (styles/obtask.css)
+ * covers the other view; the feed list's move/enter/exit animation
+ * (auto-animate) already gates itself on this same media feature, so this
+ * keeps the whole plugin consistent with it.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.obtask-calendar {
+		--obtask-motion: 0s;
+	}
 }

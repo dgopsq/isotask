@@ -97,6 +97,19 @@
 	align-items: center;
 	padding: var(--size-4-1) 0;
 	border-bottom: 1px solid var(--background-modifier-border);
+	transition: background-color var(--obtask-motion, 120ms) ease;
+}
+
+/*
+ * Neutral (not accent) hover tint, per the plugin's own hover conventions
+ * (e.g. the calendar's day-grid event hover in `styles/calendar.css` uses
+ * --background-modifier-border, not an accent color) — this just makes the
+ * row's own right-click/context-menu affordance discoverable, not a
+ * selection state. Excludes `--invalid` rows: those are flex, not grid, and
+ * carry no context-menu affordance of their own to surface.
+ */
+.obtask-feed__row:not(.obtask-feed__row--invalid):hover {
+	background-color: var(--background-modifier-hover);
 }
 
 .obtask-feed__row--invalid {
@@ -151,6 +164,7 @@
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 	cursor: pointer;
+	transition: transform var(--obtask-motion, 120ms) ease;
 }
 
 .obtask-feed__status-icon {
@@ -162,6 +176,7 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	cursor: pointer;
+	transition: transform var(--obtask-motion, 120ms) ease;
 }
 
 .obtask-feed__date--empty {
@@ -192,6 +207,22 @@
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-semibold);
 	cursor: pointer;
+	transition: transform var(--obtask-motion, 120ms) ease;
+}
+
+/*
+ * Press feedback for the three clickable feed chips (status, date,
+ * priority — excluding `.obtask-feed__priority--empty`, which renders as an
+ * inert alignment placeholder with no click target, so it must never look
+ * pressable). `transform` only —
+ * no layout impact (unlike e.g. padding/border changes, which would reflow
+ * neighbouring subgrid cells) — and works identically for a touch tap, not
+ * just a mouse click.
+ */
+.obtask-feed__status:active,
+.obtask-feed__date:active,
+.obtask-feed__priority:not(.obtask-feed__priority--empty):active {
+	transform: scale(0.96);
 }
 
 /*
@@ -492,6 +523,7 @@
 	background-color: var(--obtask-dot-color, var(--text-faint));
 	background-clip: content-box;
 	cursor: pointer;
+	transition: border-color var(--obtask-motion, 120ms) ease, box-shadow var(--obtask-motion, 120ms) ease;
 }
 
 .obtask-swatch:hover {
@@ -530,4 +562,21 @@
  */
 .obtask-project-color-modal-error--hidden {
 	display: none;
+}
+
+/*
+ * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` transition
+ * above. `--obtask-motion` inherits, so zeroing it once at these two roots
+ * (the feed container and the swatch itself — the compact swatch button
+ * lives outside `.obtask-feed`, e.g. the task panel's Project field, so it
+ * needs its own root) collapses every transition beneath them to 0s with no
+ * `!important` and no per-rule media query. The feed list's own move/enter/
+ * exit animation (auto-animate) already gates itself on this same media
+ * feature, so this keeps the whole view consistent with it.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.obtask-feed,
+	.obtask-swatch {
+		--obtask-motion: 0s;
+	}
 }

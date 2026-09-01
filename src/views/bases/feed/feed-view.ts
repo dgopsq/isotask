@@ -124,6 +124,8 @@ export class FeedBasesView extends BasesView {
 	private readonly listEl: HTMLElement;
 	/** autoAnimate's handle on `listEl`, disabled in `onunload` — see that method's comment. */
 	private readonly animation: AnimationController;
+	/** Whether a first `onDataUpdated` has already armed `animation` — see the enable at the end of that method. */
+	private animatedOnce = false;
 	/**
 	 * One entry per top-level child of `listEl` held after the last render,
 	 * keyed by reconciliation key (`g:`/`b:`/`e:`/`i:`/`r:` prefixes below).
@@ -162,6 +164,11 @@ export class FeedBasesView extends BasesView {
 		// plugin; autoAnimate no-ops under `prefers-reduced-motion` on its
 		// own, so there's nothing to gate here.
 		this.animation = autoAnimate(this.listEl, { duration: 180 });
+		// Disabled until the first `onDataUpdated` has painted: the initial
+		// render adds every row at once, and animating that reads as the
+		// whole feed fading in on every view open (and left e2e screenshots
+		// half-transparent) — only real data changes should animate.
+		this.animation.disable();
 
 		refreshAfterMetadataResolved(this, this.deps.app);
 
@@ -357,6 +364,22 @@ export class FeedBasesView extends BasesView {
 				item.el.remove();
 				this.rendered.delete(key);
 			}
+		}
+
+		if (!this.animatedOnce) {
+			this.animatedOnce = true;
+			// Enable only once this first render's mutations have been
+			// consumed: the MutationObserver callback is a microtask, and a
+			// requestAnimationFrame callback runs after microtasks drain, so
+			// the observer sees the initial population while still disabled.
+			// The registered cancel keeps a view unloaded before the frame
+			// fires from re-enabling animation on a removed list.
+			const raf = window.requestAnimationFrame(() => {
+				this.animation.enable();
+			});
+			this.register(() => {
+				window.cancelAnimationFrame(raf);
+			});
 		}
 	}
 
