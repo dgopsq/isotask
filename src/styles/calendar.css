@@ -900,6 +900,58 @@
 }
 
 /*
+ * Day-view drag clipping fix. Reported bug: the dragged `.ec-preview`
+ * block's slight scale growth and its `--shadow-s` cast shadow were
+ * visually cut off at the block's left/right edges in day view (week view
+ * was fine, since its narrower per-day columns leave the block away from
+ * the clipping edges).
+ *
+ * Confirmed by a mid-drag DOM probe (walking `.ec-preview`'s ancestor chain
+ * while `.ec.ec-dragging` was live, day view, one full-pane-width column):
+ * `.ec-body`/`.ec-events` directly above the preview are `overflow:
+ * visible`; the next ancestor up, `.ec-main` (vendored, `@event-calendar/
+ * core/dist/index.css` — EC's own time-grid scroller wrapper), is
+ * `overflow: auto`, and its measured right edge (993px in the probe) sat
+ * essentially flush against the preview's own right edge (991.8px) —
+ * the block occupies almost the full column width, so its `--shadow-s`
+ * layers (0 x-offset, up to a 30px blur radius) paint well past `.ec-main`
+ * on the side the pointer moves toward and get clipped there. Every
+ * ancestor further out (`.bases-view`, `.view-content`, the Obsidian
+ * workspace panes) is wide enough that the preview's painted extent never
+ * reaches them, so `.ec-main` — not Obsidian's own scroller — is the actual
+ * clipper.
+ *
+ * Safe to relax: this plugin always mounts Event Calendar with `height:
+ * "auto"` (see the `height` option comment in
+ * `event-calendar-renderer.ts`) specifically so `.ec-main` never needs an
+ * internal scroller — the pane's own scroll does that job instead — so
+ * dropping its `overflow: auto` to `visible` costs no real scrolling
+ * behavior, only while `.ec-dragging` is live.
+ *
+ * Scoped to `.ec-day-view.ec-dragging`, not every view and not resize:
+ * week/3-day/month keep their narrower columns (unaffected already, per the
+ * bug report) and scoping to day view alone also avoids this rule ever
+ * outranking the vendored `.ec-main.ec-day-grid.ec-uniform { overflow:
+ * hidden }` compact-month rule (`@event-calendar/core/dist/index.css`),
+ * which still needs its own clipping to cap a busy day-grid cell's stack —
+ * this selector's higher specificity would otherwise beat it during any
+ * drag. A resize's preview never grows past `.ec-main` in the first place:
+ * the lift rules above (`.ec-dragging .ec-preview`, `.ec-event:active`) are
+ * deliberately NOT scoped to `.ec-resizing-x`/`.ec-resizing-y` (see the
+ * "Pickup" bullet in the drag-lift arc comment further up), so a resize's
+ * preview carries no extra scale or shadow to clip — hence no
+ * `.ec-resizing-x`/`.ec-resizing-y` variant of this rule is needed.
+ *
+ * Reverts the instant EC removes `.ec-dragging` from the root on drop, so
+ * the day header's `position: sticky` only ever repositions against a
+ * different scrolling ancestor (`.bases-view`/`.view-content`, both already
+ * scroll containers) for the transient duration of the drag itself.
+ */
+.obtask-calendar .ec.ec-day-view.ec-dragging .ec-main {
+	overflow: visible;
+}
+
+/*
  * Uniform edge inset for timed blocks, same reasoning and same four-side
  * `margin` shorthand as the day-grid/all-day rule above. EC lays these out
  * with `inline-size: calc(100% - var(--ec-event-col-gap))` (left-aligned,
