@@ -586,8 +586,8 @@
 }
 
 /*
- * Drag/resize lift. Event Calendar does NOT put a "dragging" class on the
- * event being moved — `.ec-dragging`/`.ec-resizing-x`/`.ec-resizing-y`
+ * Press/drag/resize lift. Event Calendar does NOT put a "dragging" class on
+ * the event being moved — `.ec-dragging`/`.ec-resizing-x`/`.ec-resizing-y`
  * (vendored stylesheet) land on the calendar's own root/main element purely
  * to force a `cursor` for the whole interaction (confirmed against
  * `@event-calendar/core/dist/index.js`: `mainState.iClass` is set to
@@ -606,13 +606,31 @@
  * original exactly like drag does — anything scoped to `.ec-dragging` alone
  * stays lift-free during a resize, which matters below.
  *
- * The full arc reads as three physical beats, pickup through landing:
- *   1. Grab (instant, `--obtask-motion`): the clone pops to 105% with a
- *      slight tilt (`rotate: 0.6deg`) and a cast shadow, animated in on a
- *      back-out bezier that overshoots past 105% (~107%) before relaxing
- *      back to rest — a hand grabbing an object overshoots its lift before
- *      settling into a steady hold, it doesn't glide straight to the held
- *      height.
+ * The lift now starts on PRESS, before EC even knows whether this becomes a
+ * drag: `.ec-event:active` (below, plain CSS, no library involvement) lifts
+ * the original the instant a pointer/finger presses it. Once a drag
+ * threshold does fire and EC inserts the preview clone, the clone is born
+ * already carrying that lifted state — no separate "pop" plays at
+ * drag-start, the clone just continues what the press already showed.
+ *
+ * The full arc reads as four physical beats, press through landing:
+ *   0. Press (instant, `--obtask-motion`, `.ec-event:active`): the original
+ *      lifts to 105% with a cast shadow the moment it's pressed — no tilt
+ *      yet, since a straight lift reads as "raised", acknowledging the
+ *      touch itself ("I've got it"). On touch this blooms during the 500ms
+ *      `longPressDelay` (`event-calendar-renderer.ts`) as the cue to keep
+ *      holding; on desktop it precedes the drag threshold firing at all, so
+ *      even a press that never turns into a drag gets the acknowledgement.
+ *   1. Handoff (same frame, no animation): once the drag threshold fires,
+ *      EC swaps the pressed original's display to "ghost" and inserts the
+ *      "preview" clone. The clone's resting state — `scale: 1.05; box-
+ *      shadow: var(--shadow-s)` — is exactly what the pressed original was
+ *      already showing, plus a tilt (`rotate: 0.6deg`) that lands
+ *      untransitioned on the clone: deliberately, since the tilt is what
+ *      marks the instant the block starts travelling, distinct from the
+ *      straight press-lift that preceded it. Nothing needs to animate in
+ *      here (unlike a fresh pop would need) because the clone spawns
+ *      already at the state the eye just saw on the original.
  *   2. Float (held, no further animation): the clone sits tilted, shadowed,
  *      and nearly opaque (0.9) while it tracks the pointer.
  *   3. Settle (slow, `--obtask-motion-settle`): on drop, the ghost's 97%
@@ -626,11 +644,11 @@
  * finding (`--shadow-s` reads as a dark rim, not elevation, once Obsidian's
  * dark themes make the fill lighter than the surrounding surface) was about
  * a tab raised ABOVE a track it shares a surface family with, where the
- * shadow had to frame a fill lighter than what surrounds it. A drag preview
- * is the opposite case: it's a clone floating free of the grid with no
- * shared surface to clash against, which is exactly the situation a cast
- * shadow is the natural depth cue for — Obsidian's own menus/popovers reach
- * for this same `--shadow-s` token under dark themes for exactly that
+ * shadow had to frame a fill lighter than what surrounds it. A pressed or
+ * dragged event is the opposite case: it reads as lifting free of the grid
+ * with no shared surface to clash against, which is exactly the situation a
+ * cast shadow is the natural depth cue for — Obsidian's own menus/popovers
+ * reach for this same `--shadow-s` token under dark themes for exactly that
  * floating-above-the-page read, so it applies here without the rim problem.
  *
  * `opacity: 0.9` (up from the library's own default `.8`, previously
@@ -643,39 +661,53 @@
  * a future EC version might set, where `transform: rotate(…)` would clobber
  * it outright.
  *
- * On top of that opacity, a scale "lift" makes the pickup unmistakable:
- * the clone grows to 105% right as it's inserted, the original visibly
- * "gives up" its slot at 97%, and the block settles back to 100% at
- * wherever it lands. `scale` (the standalone CSS property), never
- * `transform: scale(…)`: EC never sets an inline `transform` on any event
- * (confirmed — it positions everything with `inset-block-start`/
- * `inset-inline-start`/`block-size`/`inline-size`/`margin-block-start`
- * logical-property strings instead), so either would work today, but
- * `scale` composes with a `transform` no matter which one a future EC
- * version reaches for, where `transform: scale(…)` would just clobber it.
- * Support floor: the container-query comment above (~line 781) already
- * establishes this plugin's runtime floor at Chromium >= 106 / iOS 16.4+
- * WebKit — both years past `scale`'s own ship dates (Chromium 79, Safari
- * 14.1), so no separate floor check is needed for it.
+ * On top of that opacity, a scale "lift" makes the pickup unmistakable: the
+ * pressed original grows to 105% under the pointer, the clone that takes
+ * over once a drag starts continues at that same 105% (now tilted), the
+ * original (turned ghost) visibly "gives up" its slot at 97%, and the block
+ * settles back to 100% at wherever it lands. `scale` (the standalone CSS
+ * property), never `transform: scale(…)`: EC never sets an inline
+ * `transform` on any event (confirmed — it positions everything with
+ * `inset-block-start`/`inset-inline-start`/`block-size`/`inline-size`/
+ * `margin-block-start` logical-property strings instead), so either would
+ * work today, but `scale` composes with a `transform` no matter which one a
+ * future EC version reaches for, where `transform: scale(…)` would just
+ * clobber it. Support floor: the container-query comment above (~line 781)
+ * already establishes this plugin's runtime floor at Chromium >= 106 / iOS
+ * 16.4+ WebKit — both years past `scale`'s own ship dates (Chromium 79,
+ * Safari 14.1), so no separate floor check is needed for it.
  *
+ * - Press: `.ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active))`
+ *   (below) — plain `:active`, no EC involvement, so it fires immediately on
+ *   pointer/finger down rather than waiting for the drag threshold.
+ *   `:not(.ec-ghost)`: the moment ANY interaction starts (drag OR resize) EC
+ *   swaps the original's display to "ghost", and a still-held `:active` must
+ *   not keep that ghost inflated — this matters most for a resize, where the
+ *   ghost stays in place under the still-pressed pointer for the whole
+ *   gesture instead of being replaced by a preview clone. `:not(:has(.ec-
+ *   resizer:active))`: `.ec-resizer` (vendored, `@event-calendar/core/dist/
+ *   index.css`) is the resize-handle drag grip rendered as a CHILD of
+ *   `.ec-event` (confirmed against the event component's own template in
+ *   `@event-calendar/core/dist/index.js`), so pressing the handle also
+ *   `:active`s the event it belongs to — without this exclusion, grabbing an
+ *   edge to resize a block would lift the very block being stretched,
+ *   fighting the resize instead of getting out of its way. `:has()` is
+ *   already relied on elsewhere in this file (the time-grid title rule
+ *   below), so it's within this plugin's existing support floor. No tilt on
+ *   press: a straight lift reads as "raised" — the tilt is a *carry* cue and
+ *   joins only once the block is actually moving (the preview clone, below).
  * - Pickup: `.ec-dragging .ec-preview` scoped, not plain `.ec-preview` — a
  *   resize's own preview is a size change already in progress under the
  *   pointer, and a simultaneous 105% scale on it would visibly fight the
- *   dimension the drag is actively editing. The static `scale: 1.05;
- *   rotate: 0.6deg` is the resting lifted state; `animation: obtask-lift`
- *   is what makes *reaching* it visible, on `cubic-bezier(0.34, 1.56, 0.64,
- *   1)` (a back-out curve) so the animation overshoots past 105% before
- *   settling there, reading as a grab rather than a glide. A `transition`
- *   can't do that job here — the preview is a freshly inserted clone, so
- *   there's no prior computed style for a transition to ease from on its
- *   first paint. The `@keyframes` below only defines `from { scale: 1;
- *   rotate: 0deg; }`; with no `to` keyframe, the animation's end value
- *   falls back to the element's own underlying `scale: 1.05; rotate:
- *   0.6deg`, so the two declarations can't drift apart. Under
- *   `prefers-reduced-motion` the shared `--obtask-motion` guard at the end
- *   of this file zeroes the animation duration too (both read the same
- *   var), so the lift just lands at 105%/0.6deg instantly instead of
- *   easing.
+ *   dimension the drag is actively editing. `scale: 1.05; rotate: 0.6deg;
+ *   box-shadow: var(--shadow-s)` are all static now, no `animation`: the
+ *   press rule above already brought the pressed original to this same
+ *   scale/shadow before the clone ever existed, so the clone just inherits
+ *   the lifted look on the same frame it's inserted — only `rotate` is new
+ *   on the clone, and it's meant to appear untransitioned (see beat 1 of the
+ *   arc above). A `transition` couldn't ease it in anyway — the clone is a
+ *   freshly inserted element with no prior computed style to ease from on
+ *   its first paint.
  * - Ghost + landing: `.ec-dragging .ec-ghost` (same drag-only scoping, for
  *   the same fight-the-resize reason) shrinks the original to 97% right
  *   where it sits — it visibly "gives up" its slot the moment the clone is
@@ -694,18 +726,34 @@
 	opacity: 0.9;
 }
 
-@keyframes obtask-lift {
-	from {
-		scale: 1;
-		rotate: 0deg;
-	}
+/*
+ * Press lift on the original event — see beat 0 of the arc comment above.
+ * Uses THIS rule's own transition (the destination state's — entering a
+ * state runs the transition declared on the rule being entered, per normal
+ * CSS transition semantics) rather than the base `.ec-event` rule's
+ * `--obtask-motion-settle`, so the grab reads snappier than the slower
+ * settle un-press/drop keeps: releasing removes the `:active` match, so the
+ * base rule's own (slower) transition governs the way back down instead.
+ */
+.obtask-calendar .ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active)) {
+	scale: 1.05;
+	box-shadow: var(--shadow-s);
+	transition:
+		scale var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
+		box-shadow var(--obtask-motion, 160ms) ease;
 }
 
+/*
+ * Preview continuity: no `@keyframes`/`animation` here (removed — see beat 1
+ * of the arc above). The clone spawns already at the lifted state the
+ * pressed original was showing; `rotate: 0.6deg` is the one value that's new
+ * on the clone versus the press-lift rule above, and it's deliberately
+ * static/untransitioned — it marks the moment the block starts travelling.
+ */
 .obtask-calendar .ec-dragging .ec-preview {
 	scale: 1.05;
 	rotate: 0.6deg;
 	box-shadow: var(--shadow-s);
-	animation: obtask-lift var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .obtask-calendar .ec-dragging .ec-ghost {
