@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 
 import QuietReporter from "./e2e/quiet-reporter.ts";
@@ -62,5 +63,10 @@ export const config: WebdriverIO.Config = {
 	// E2E_VERBOSE=1 shows wdio/service/Obsidian launch and command logs.
 	logLevel: verbose ? "info" : "silent",
 
-	cacheDir: resolve(".obsidian-cache"),
+	// Shared across every checkout/worktree of this repo — the cache holds
+	// downloaded Obsidian app/installer versions (~600MB), which would
+	// otherwise be re-downloaded per worktree. Safe to share: versions are
+	// written once and then only read. `OBSIDIAN_CACHE` overrides (CI, or a
+	// deliberate per-checkout cache).
+	cacheDir: process.env["OBSIDIAN_CACHE"] ?? resolve(homedir(), ".cache", "obtask", "obsidian-cache"),
 };

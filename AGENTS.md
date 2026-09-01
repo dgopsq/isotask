@@ -78,6 +78,13 @@ src/
 
 ## Workflow expectations
 
+- **Worktrees + PRs**: every task happens on a branch in its own worktree, never directly on
+  `main`. `pnpm wt feat/<name>` creates `../obtask.worktrees/feat-<name>` (branched off `main`)
+  and installs dependencies there in seconds — pnpm hardlinks from its global store (no
+  duplicated packages) and the Obsidian e2e cache is shared across worktrees
+  (`~/.cache/obtask/obsidian-cache`, override with `OBSIDIAN_CACHE`). Finish with `pnpm check`
+  and the full `pnpm test:e2e`, push, open a PR (`gh pr create`), merge via PR only, then
+  `pnpm wt rm <branch>`.
 - Run `pnpm check` before finishing any task.
 - Add or extend vitest tests for anything in `src/domain` or `src/app`.
 - Write an ADR (`docs/adr/NNNN-title.md`, see `docs/adr/README.md` for format) for any change to
