@@ -495,6 +495,27 @@
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	border-radius: var(--radius-s);
+	/*
+	 * `background-clip: padding-box` (further down, alongside
+	 * `border-block-end`) clips the PAINTED background to the padding box,
+	 * whose own corner radius the CSS Backgrounds & Borders spec derives by
+	 * shrinking each outer (border-box) radius by the width of that
+	 * corner's two adjacent borders, independently per edge. Both bottom
+	 * corners are adjacent to `border-block-end` (`--size-4-1`, 4px, added
+	 * below for the vertical slot-line gap/inset) — left at the bare
+	 * `--radius-s` above, their painted radius would come out
+	 * `--radius-s − 4px`, which for this plugin's `--radius-s` (~4px in the
+	 * default theme) rounds to zero: squared-off bottom corners
+	 * (user-reported "no more radius" regression from that border's 2px ->
+	 * 4px growth). Inflating the border-box's OWN bottom radii by that same
+	 * 4px below cancels the subtraction exactly, so the PAINTED corner
+	 * comes back to a clean `--radius-s`; only the invisible
+	 * transparent-border zone and the lift/drag shadow's silhouette (which
+	 * both follow the border-box, not the padding box) get the slightly
+	 * bigger outer radius — imperceptible at a 4px difference on either.
+	 */
+	border-end-start-radius: calc(var(--radius-s) + var(--size-4-1));
+	border-end-end-radius: calc(var(--radius-s) + var(--size-4-1));
 	box-shadow: none;
 	overflow: hidden;
 	/* Same hover ease + drag/drop opacity/box-shadow/scale settle as the
@@ -560,51 +581,69 @@
 	container-type: size;
 	container-name: obtask-event;
 	/*
-	 * Vertical gap between BACK-TO-BACK timed blocks: when one block's end
-	 * time exactly equals the next's start time, EC's vertical layout has no
-	 * equivalent of `--ec-event-col-gap` (the horizontal gap variable used
-	 * further down) — `block-size` and the block's own top offset come
-	 * straight from the time span alone (`slotHeight * duration`,
+	 * Vertical gap between BACK-TO-BACK timed blocks, AND slot-line symmetry
+	 * for every block (solo or not): when one block's end time exactly
+	 * equals the next's start time, EC's vertical layout has no equivalent
+	 * of `--ec-event-col-gap` (the horizontal gap variable used further
+	 * down) — `block-size` and the block's own top offset come straight
+	 * from the time span alone (`slotHeight * duration`,
 	 * event-calendar-renderer.ts), so two such blocks tile edge-to-edge with
-	 * nothing between them ("surfaces fuse").
+	 * nothing between them ("surfaces fuse") unless something recedes one
+	 * of the touching edges.
 	 *
-	 * `margin-block: var(--size-4-1)` (further down) can't fix this: it sets
-	 * the SAME 4px on every block's start AND end side, so a back-to-back
-	 * pair gets shifted by an equal amount in the same direction rather than
-	 * shrinking toward each other — the identical cancellation that already
-	 * ruled out `margin-inline` for the horizontal overlap gap below (see
-	 * that rule's own comment), just on the other axis. A margin insets a
-	 * SOLO box from the empty space around it; it can't carve a gap out of
-	 * two boxes that already touch.
+	 * `margin-block: var(--size-2-1)` (further down, 2px) shifts the box's
+	 * whole border-box down by 2px from where EC placed it — this is normal-
+	 * flow margin, not a grid-area inset, so `margin-block-end` never pulls
+	 * the box's own bottom edge back up; only `margin-block-start` moves
+	 * anything, and it moves the ENTIRE box (top edge same 2px past the
+	 * start line, bottom edge same 2px past the end line, since block-size
+	 * itself is untouched). That's why a border-only, paint-only recede is
+	 * required on the bottom edge to bring it back — a bare margin can only
+	 * push a box around, it can't shrink one edge independently of the
+	 * other (the identical reasoning that already ruled out `margin-inline`
+	 * for the horizontal overlap gap below — see that rule's own comment —
+	 * just on this axis instead).
 	 *
-	 * Same lever as that horizontal fix, on the opposite edge:
-	 * `border-block-end` with a *transparent* color plus `background-clip:
-	 * padding-box` shrinks only the PAINTED background inward from the box's
-	 * own end (bottom) edge. `.ec-event` is `box-sizing: border-box`
-	 * (confirmed via a live DOM probe, same as the horizontal case), so the
-	 * border is carved OUT of the existing border-box rather than added on
-	 * top of it — the inline `block-size` this rule's own comment above
-	 * describes, the block's `top` offset, and every layout calc EC or this
-	 * stylesheet does elsewhere are completely unaffected; only paint moves.
-	 * No `border-block-start`: the block's TOP edge must land exactly on its
-	 * start-time line (nothing recedes there) — only the bottom recedes,
-	 * which reads as "a gap after each block", not "every block shrunk from
-	 * both ends".
+	 * The lever: `border-block-end` with a *transparent* color plus
+	 * `background-clip: padding-box` shrinks only the PAINTED background
+	 * inward from the box's own end (bottom) edge. `.ec-event` is
+	 * `box-sizing: border-box` (confirmed via a live DOM probe, same as the
+	 * horizontal case), so the border is carved OUT of the existing
+	 * border-box rather than added on top of it — the inline `block-size`
+	 * this rule's own comment above describes, the block's `top` offset,
+	 * and every layout calc EC or this stylesheet does elsewhere are
+	 * completely unaffected; only paint moves. No `border-block-start`: the
+	 * asymmetry is deliberate — margin already pushes BOTH edges down by
+	 * the same 2px, so recede-only-the-bottom is what turns "both edges 2px
+	 * past their line, same direction" into "both edges 2px INSIDE their
+	 * line" (see the arithmetic below), not "shrunk from both ends".
+	 *
+	 * Resulting geometry (4px border, 2px margin — the two are sized as a
+	 * matched pair, not independently): painted top = start line + 2px
+	 * (margin push, nothing recedes the top). Painted bottom = border-box
+	 * bottom (end line + 2px, same margin push) − 4px border recede = end
+	 * line − 2px. Both slot lines now get the SAME 2px inset, one from
+	 * each side, instead of the old +4px top / +2px-past-the-line bottom
+	 * split that let the painted box visibly cross its end gridline. A
+	 * back-to-back pair: block A's painted bottom sits at its end line − 2,
+	 * block B's painted top sits at its start line + 2 — since A's end line
+	 * and B's start line are the SAME coordinate, the two painted surfaces
+	 * end up 4px apart (a bigger, more visible gap than the old 2px, and
+	 * pure upside — nothing depends on the old value).
 	 *
 	 * Scoped here, on the BASE rule (every timed block), unlike the
 	 * horizontal gap below which targets only overlap-group members: on that
 	 * axis a solo block is already inset on both sides by real margin and
 	 * only overlap members tile edge-to-edge, so only those need the paint
-	 * trick. On THIS axis there's no equivalent "solo" case that's
-	 * inherently separated — any block can end up back-to-back with a
-	 * neighbor, and nothing here reads adjacency cheaply enough to gate the
-	 * rule on it. Applying the same 2px recede unconditionally instead means
-	 * a solo block's and the drag `.ec-preview` clone's (which matches this
-	 * same selector) painted height are IDENTICAL to a back-to-back block's
-	 * — the preview intentionally gets this too, so nothing pops by 2px as a
-	 * block is pressed or dragged into or out of contact with a neighbor.
+	 * trick. On THIS axis every block needs the same bottom recede just to
+	 * land on its own end line (it's not merely a back-to-back nicety
+	 * anymore), and applying it unconditionally also means a solo block's
+	 * and the drag `.ec-preview` clone's (which matches this same selector)
+	 * painted height stay IDENTICAL to a back-to-back block's — the preview
+	 * intentionally gets this too, so nothing pops by 4px as a block is
+	 * pressed or dragged into or out of contact with a neighbor.
 	 */
-	border-block-end: var(--size-2-1) solid transparent;
+	border-block-end: var(--size-4-1) solid transparent;
 	background-clip: padding-box;
 }
 
@@ -1129,9 +1168,24 @@
  * reads `--ec-event-col-gap` off the redefinition just above, not the
  * library's own 6px default — see that rule's comment for the full
  * derivation of why halving it keeps this exactly symmetric.
+ *
+ * `margin-block: var(--size-2-1)` (2px, not the day-grid/all-day rule's
+ * 4px) is deliberately the SMALLER half of a matched pair with the base
+ * rule's `border-block-end: var(--size-4-1)` (4px) above: this is normal-
+ * flow margin, so it shifts the box's ENTIRE border-box down by 2px from
+ * where EC placed it (both edges move the same direction by the same
+ * amount — `margin-block-end` never pulls the bottom edge back up on its
+ * own), landing both raw edges 2px PAST their slot line before any border
+ * recede. The border then claws 4px of that back off the bottom only,
+ * netting painted-bottom = end line − 2px against painted-top = start
+ * line + 2px — symmetric 2px insets on both lines. A 4px/4px split (border
+ * matching margin) would instead have under-shot the top consistently: the
+ * pairing only comes out symmetric because the shift (2px) and the recede
+ * (4px) are a matched 1:2 pair, not equal — see the base rule's own
+ * comment for the full arithmetic and the resulting back-to-back gap.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event {
-	margin-block: var(--size-4-1);
+	margin-block: var(--size-2-1);
 	margin-inline: calc(var(--ec-event-col-gap) / 2);
 }
 
@@ -1178,10 +1232,29 @@
  * the now-inset VISIBLE edge, since border-box sizing pushes the padding
  * box in by the border's width — confirmed visually, no separate offset
  * needed.
+ *
+ * Same padding-box corner-radius flattening as the base rule's
+ * `border-end-*-radius` compensation (see that rule's comment for the
+ * general mechanism), on the two corners adjacent to THIS border-inline-
+ * start (2px): the START-side corners, top-start and bottom-start.
+ * Top-start (`border-start-start-radius`) is adjacent to no block-start
+ * border (0 width there), so only its horizontal component is actually
+ * squashed by this 2px border; a single value still corrects the visible
+ * (horizontal) flattening, at the cost of a ~2px-too-generous vertical
+ * component nothing else constrains — imperceptible at this radius scale.
+ * Bottom-start (`border-end-start-radius`) is the one corner shared with
+ * the base rule's OWN compensation: it sits adjacent to both this 2px
+ * inline border AND the base rule's 4px `border-block-end`, so it needs
+ * BOTH corrections at once, one per axis — the two-value
+ * `<horizontal> <vertical>` form, not the base rule's single value, is
+ * required here specifically so the two borders' different widths don't
+ * get cross-applied to the wrong axis.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event[style*="inset-inline-start"]:not([style*="/ 1 * 1)"]) {
 	border-inline-start: var(--size-2-1) solid transparent;
 	background-clip: padding-box;
+	border-start-start-radius: calc(var(--radius-s) + var(--size-2-1));
+	border-end-start-radius: calc(var(--radius-s) + var(--size-2-1)) calc(var(--radius-s) + var(--size-4-1));
 }
 
 /*
@@ -1333,20 +1406,21 @@
  * for it) is comfortably between a 1-hour block (32px, must hide) and a
  * 2-hour block (64px, must show) either way.
  *
- * `border-block-end: var(--size-2-1)` (2px, added to this same rule for the
- * vertical back-to-back gap, above) shaves a little more off the margin
- * either side of that threshold: a CSS size container query reads the
- * container's own CONTENT box, and since `.ec-event` is `box-sizing:
- * border-box` that border is carved OUT of the same border-box the inline
- * `block-size` sets — so for any given block-size, the queried content-box
- * height is now ~2px (0.1667em at this 12px base) smaller than before this
- * border existed, on top of the padding already subtracted above. Re-run
- * against the two concrete cases: a 1-hour block (32px block-size) now
- * queries at 32 - 2 (padding-top) - 2 (padding-bottom) - 2 (this border) =
- * 26px (~2.17em), still comfortably under 3.05em — hides, as required; a
- * 2-hour block (64px block-size) now queries at 64 - 6 = 58px (~4.83em),
- * still comfortably over — shows, as required. A 2px shift this small never
- * comes close to flipping either case; only a block within ~2px of the
+ * `border-block-end: var(--size-4-1)` (4px — grown from 2px so the painted
+ * box lands symmetrically on its slot lines, see that rule's own comment
+ * for the geometry) shaves more off the margin either side of that
+ * threshold: a CSS size container query reads the container's own CONTENT
+ * box, and since `.ec-event` is `box-sizing: border-box` that border is
+ * carved OUT of the same border-box the inline `block-size` sets — so for
+ * any given block-size, the queried content-box height is now ~4px
+ * (0.333em at this 12px base) smaller than before this border existed, on
+ * top of the padding already subtracted above. Re-run against the two
+ * concrete cases: a 1-hour block (32px block-size) now queries at 32 - 2
+ * (padding-top) - 2 (padding-bottom) - 4 (this border) = 24px (~2em),
+ * still comfortably under 3.05em — hides, as required; a 2-hour block
+ * (64px block-size) now queries at 64 - 8 = 56px (~4.67em), still
+ * comfortably over — shows, as required. A 4px shift this small never
+ * comes close to flipping either case; only a block within ~4px of the
  * 3.05em line itself would need re-checking, and none of this plugin's
  * fixed slot durations (15/30/60/120min at `slotHeight: 32`) land there.
  *
