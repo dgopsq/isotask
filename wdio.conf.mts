@@ -47,6 +47,13 @@ export const config: WebdriverIO.Config = {
 	mochaOpts: {
 		ui: "bdd",
 		timeout: 120 * 1000,
+		// Targeted debugging: E2E_GREP runs only tests whose full name
+		// matches (mocha grep, substring or /regex/). Combine with wdio's
+		// own `--spec <substring>` to skip whole spec files — each spec
+		// file boots its own Obsidian window, so a debug loop on one test
+		// should pass both, e.g.:
+		//   E2E_GREP="drags a timed" pnpm test:e2e --spec views
+		...(process.env["E2E_GREP"] === undefined ? {} : { grep: process.env["E2E_GREP"] }),
 	},
 
 	waitforInterval: 250,

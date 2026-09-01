@@ -39,6 +39,10 @@ no query language.
 - `pnpm typecheck` — `tsc -noEmit`.
 - `pnpm lint` / `pnpm lint:fix` — ESLint.
 - `pnpm test` / `pnpm test:watch` — vitest.
+- `pnpm test:e2e` — full e2e suite (builds first; `E2E_SCREENSHOT=1` saves screenshots).
+- `E2E_GREP="<pattern>" pnpm test:e2e --spec <substring>` — targeted e2e for debug loops:
+  grep filters tests by name, `--spec` skips other spec files (each spec file boots its own
+  Obsidian window). ~7s instead of ~30s; run the FULL suite once before committing.
 - `pnpm check` — typecheck + lint + test + build. Run before finishing any task.
 
 ## Where things live
