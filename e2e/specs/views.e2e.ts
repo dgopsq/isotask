@@ -2360,7 +2360,73 @@ describe("Views", function () {
 		 * equals `start` for a point-in-time drop), so `reschedule-task.ts`
 		 * never includes `duration` in the write.
 		 */
+		/**
+		 * Overlap-group geometry guard. EC lays an overlapping group out with
+		 * inline `inset-inline-start`/`inline-size` percentages that assume a
+		 * start-anchored box; two regressions have shipped against exactly
+		 * this layout (a `justify-self: center` that pushed whole groups into
+		 * the next day column, and corner marks drawn over sliver titles), so
+		 * this test creates a real overlap at runtime — no permanent fixture:
+		 * "Standup" is moved onto "Team sync"'s slot via `processFrontMatter`
+		 * and restored afterwards — and asserts the group stays inside its
+		 * day column with the same half-gap inset single blocks get.
+		 */
+		it("keeps an overlapping pair of timed blocks inside their day column (week view)", async function () {
+			await setCalendarInitialView("week");
+			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+			const setStandupTime = async (time: string): Promise<void> => {
+				await browser.executeObsidian(
+					async ({ app }, t: string) => {
+						const file = app.vault.getFileByPath("Tasks/Standup.md");
+						if (file === null) {
+							throw new Error("no Standup fixture");
+						}
+						await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+							fm["scheduled"] = (fm["scheduled"] as string).slice(0, 11) + t;
+						});
+					},
+					time,
+				);
+			};
+			await setStandupTime("09:30");
+			try {
+				await browser.waitUntil(
+					async () =>
+						browser.execute((eventCls) => {
+							const els = Array.from(document.querySelectorAll(`.ec-time-grid .ec-body .${eventCls}`));
+							return els.filter((el) => (el.getAttribute("style") ?? "").includes("inset-inline-start")).length >= 2;
+						}, cssClass("event")),
+					{ timeout: SELECT_TIMEOUT, timeoutMsg: "the runtime overlap never produced EC's overlap layout" },
+				);
+				const layout = await browser.execute((eventCls) => {
+					const cols = Array.from(document.querySelectorAll(".ec-col-head")).map((el) => {
+						const r = el.getBoundingClientRect();
+						return { left: r.left, right: r.right };
+					});
+					return Array.from(document.querySelectorAll(`.ec-time-grid .ec-body .${eventCls}`)).map((el) => {
+						const r = el.getBoundingClientRect();
+						const col = cols.find((c) => c.left - 1 <= (r.left + r.right) / 2 && (r.left + r.right) / 2 <= c.right + 1);
+						return col === undefined
+							? null
+							: { title: el.querySelector(".ec-event-title")?.textContent ?? "", leftInset: r.left - col.left, rightInset: col.right - r.right };
+					});
+				}, cssClass("event"));
+				for (const block of layout) {
+					expect(block).not.toBeNull();
+					if (block !== null) {
+						// Inside the column on both sides — an overflow into the
+						// neighbouring day shows up as a negative inset here.
+						expect(block.leftInset).toBeGreaterThanOrEqual(2);
+						expect(block.rightInset).toBeGreaterThanOrEqual(2);
+					}
+				}
+			} finally {
+				await setStandupTime("11:00");
+			}
+		});
+
 		it("drags a timed scheduled block to a different day, leaving its duration untouched (week view)", async function () {
+
 			await setCalendarInitialView("week");
 			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
 
