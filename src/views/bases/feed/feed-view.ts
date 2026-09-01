@@ -323,7 +323,7 @@ export class FeedBasesView extends BasesView {
 						continue;
 					}
 					for (const entry of invalid) {
-						const item = mount(`i:${entry.path}`, () =>
+						const item = mount(`i:${groupKey}:${entry.path}`, () =>
 							createDiv({ cls: [cssClass("feed__row"), cssClass("feed__row--invalid")] }),
 						);
 						item.el.empty();
@@ -348,7 +348,14 @@ export class FeedBasesView extends BasesView {
 						// there. Guards the lookup instead of asserting past it.
 						continue;
 					}
-					this.fillRow(mount(`r:${task.path}`, () => createDiv({ cls: cssClass("feed__row") })), { task, entry }, statuses, options.dateSource, columns);
+					// Group-scoped like the `b:`/`e:` keys — a Base grouped by a
+					// multi-value property can place the SAME task in two groups,
+					// and an unscoped `r:` key would hand one occurrence's
+					// persisted element to the other whenever iteration order
+					// shifts (the `#n` suffix is order-dependent). A task moving
+					// BETWEEN groups therefore exits/enters rather than FLIPing
+					// across — the honest animation for a regroup anyway.
+					this.fillRow(mount(`r:${groupKey}:${task.path}`, () => createDiv({ cls: cssClass("feed__row") })), { task, entry }, statuses, options.dateSource, columns);
 				}
 			}
 		}
