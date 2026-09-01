@@ -513,9 +513,18 @@
 	 * transparent-border zone and the lift/drag shadow's silhouette (which
 	 * both follow the border-box, not the padding box) get the slightly
 	 * bigger outer radius — imperceptible at a 4px difference on either.
+	 *
+	 * TWO-VALUE (horizontal vertical) form, not a single value: the spec's
+	 * per-edge subtraction shrinks only the radius component PERPENDICULAR
+	 * to the bordered side — a block-end border eats the corner's VERTICAL
+	 * component alone. A single-value compensation inflated the horizontal
+	 * component with nothing subtracting it back, painting the bottom
+	 * corners as wide (radius+4)×radius ellipses — the user-reported bulgy
+	 * "melted" corners. Horizontal stays `--radius-s`; only vertical
+	 * carries the +4px that the border claws back.
 	 */
-	border-end-start-radius: calc(var(--radius-s) + var(--size-4-1));
-	border-end-end-radius: calc(var(--radius-s) + var(--size-4-1));
+	border-end-start-radius: var(--radius-s) calc(var(--radius-s) + var(--size-4-1));
+	border-end-end-radius: var(--radius-s) calc(var(--radius-s) + var(--size-4-1));
 	box-shadow: none;
 	overflow: hidden;
 	/* Same hover ease + drag/drop opacity/box-shadow/scale settle as the
@@ -1238,22 +1247,23 @@
  * general mechanism), on the two corners adjacent to THIS border-inline-
  * start (2px): the START-side corners, top-start and bottom-start.
  * Top-start (`border-start-start-radius`) is adjacent to no block-start
- * border (0 width there), so only its horizontal component is actually
- * squashed by this 2px border; a single value still corrects the visible
- * (horizontal) flattening, at the cost of a ~2px-too-generous vertical
- * component nothing else constrains — imperceptible at this radius scale.
+ * border (0 width there), so only its horizontal component is squashed by
+ * this 2px border — compensated on the horizontal component ALONE via the
+ * two-value form (an earlier single-value version also inflated the
+ * unclipped vertical component, the same "melted corner" ellipse bug the
+ * base rule's comment documents).
  * Bottom-start (`border-end-start-radius`) is the one corner shared with
  * the base rule's OWN compensation: it sits adjacent to both this 2px
  * inline border AND the base rule's 4px `border-block-end`, so it needs
  * BOTH corrections at once, one per axis — the two-value
- * `<horizontal> <vertical>` form, not the base rule's single value, is
+ * `<horizontal> <vertical>` form is
  * required here specifically so the two borders' different widths don't
  * get cross-applied to the wrong axis.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event[style*="inset-inline-start"]:not([style*="/ 1 * 1)"]) {
 	border-inline-start: var(--size-2-1) solid transparent;
 	background-clip: padding-box;
-	border-start-start-radius: calc(var(--radius-s) + var(--size-2-1));
+	border-start-start-radius: calc(var(--radius-s) + var(--size-2-1)) var(--radius-s);
 	border-end-start-radius: calc(var(--radius-s) + var(--size-2-1)) calc(var(--radius-s) + var(--size-4-1));
 }
 
