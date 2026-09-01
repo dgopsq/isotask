@@ -18,22 +18,37 @@
 	 */
 	--obtask-feed-meta-col-max: 180px;
 	--obtask-feed-title-min: 200px;
-	display: grid;
-	/*
-	 * Leading `max-content` track is the project-color dot (`.obtask-feed__dot`,
-	 * `feed-view.ts`'s `renderDot` — the row's actual first DOM child), ahead
-	 * of the pre-existing status/title/meta tracks. Wide mode has no explicit
-	 * `grid-column` anywhere on a row's children — this template's column
-	 * order and each row's DOM order (dot, status, title, meta) just have to
-	 * keep matching.
-	 */
-	grid-template-columns: max-content max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
-	column-gap: var(--size-4-2);
 	padding: var(--size-4-2);
 }
 
-/* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. Leading track matches `.obtask-feed`'s own (see the comment there). */
-.obtask-feed--no-meta {
+/*
+ * The actual grid — a dedicated child of `.obtask-feed` (`feed-view.ts`'s
+ * `listEl`) rather than the view container itself, so the container can be
+ * emptied once on construction and the reconciler never has to touch it
+ * again. `--obtask-feed-meta-columns` is still set on `.obtask-feed` (the
+ * view container) and reaches this rule by inheritance.
+ *
+ * Leading `max-content` track is the project-color dot (`.obtask-feed__dot`,
+ * `feed-view.ts`'s `renderDot` — the row's actual first DOM child), ahead
+ * of the pre-existing status/title/meta tracks. Wide mode has no explicit
+ * `grid-column` anywhere on a row's children — this template's column
+ * order and each row's DOM order (dot, status, title, meta) just have to
+ * keep matching.
+ *
+ * `position: relative`: auto-animate inline-sets this on a static animation
+ * parent (its absolute-positioned exit clones need a positioned ancestor)
+ * — authoring it here keeps that off the inline-style path and stable
+ * across container reuse.
+ */
+.obtask-feed__list {
+	display: grid;
+	grid-template-columns: max-content max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
+	column-gap: var(--size-4-2);
+	position: relative;
+}
+
+/* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. Leading track matches `.obtask-feed__list`'s own (see the comment there). */
+.obtask-feed--no-meta .obtask-feed__list {
 	grid-template-columns: max-content max-content minmax(0, 1fr);
 }
 
@@ -320,7 +335,7 @@
  * readable title, so this drops the grid down to two rows per task: status
  * + title on the first line, the wrapped metadata chips on the second.
  */
-.obtask-feed--compact {
+.obtask-feed--compact .obtask-feed__list {
 	display: block;
 }
 

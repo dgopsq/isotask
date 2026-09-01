@@ -1,3 +1,5 @@
+import type { AnimationController } from "@formkit/auto-animate";
+import autoAnimate from "@formkit/auto-animate";
 import type { App, BasesEntry, BasesPropertyId, QueryController } from "obsidian";
 import { BasesView, Component, Menu, NullValue, setIcon } from "obsidian";
 
@@ -45,6 +47,18 @@ interface BasesViewAction {
 	readonly name: string;
 	readonly icon: string;
 	readonly callback: () => void;
+}
+
+/**
+ * One top-level child of the feed list (group/bucket header, task row,
+ * invalid row, empty-bucket placeholder), kept across renders under its
+ * reconciliation key — see `FeedBasesView#rendered`. `comp` exists only for
+ * task rows (the one kind that registers DOM listeners) and is swapped on
+ * every refill of that row's contents.
+ */
+interface RenderedItem {
+	readonly el: HTMLElement;
+	comp: Component | undefined;
 }
 
 const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
@@ -106,14 +120,22 @@ export class FeedBasesView extends BasesView {
 
 	private readonly viewContainerEl: HTMLElement;
 	private readonly deps: FeedBasesViewDeps;
+	/** The grid itself — a dedicated child of `viewContainerEl` so `onunload` can drop it wholesale and a fresh view never inherits a stale animation observer. */
+	private readonly listEl: HTMLElement;
+	/** autoAnimate's handle on `listEl`, disabled in `onunload` — see that method's comment. */
+	private readonly animation: AnimationController;
 	/**
-	 * Owns the DOM listeners of the current render. Rows are rebuilt on every
-	 * `onDataUpdated`, so registering their listeners on the view itself would
-	 * accumulate cleanup closures (and the detached rows they close over) for
-	 * the view's whole lifetime. Swapping a child component per render frees
-	 * the previous render's listeners instead.
+	 * One entry per top-level child of `listEl` held after the last render,
+	 * keyed by reconciliation key (`g:`/`b:`/`e:`/`i:`/`r:` prefixes below).
+	 * Reusing an unchanged task's element across renders — rather than the
+	 * old full `empty()` rebuild — is what lets autoAnimate see a surviving
+	 * child move rather than reading every render as a remove-all/add-all (no
+	 * FLIP to animate). A row's `comp` owns that row's DOM listeners and is
+	 * swapped on every refill of its contents, same lifecycle idea as the old
+	 * per-render `rows` component, now at row granularity instead of
+	 * view-render granularity.
 	 */
-	private rows: Component = new Component();
+	private readonly rendered = new Map<string, RenderedItem>();
 
 	/**
 	 * Vault-relative paths of every project note the last render's dots
@@ -130,6 +152,16 @@ export class FeedBasesView extends BasesView {
 		this.viewContainerEl = containerEl;
 		this.deps = deps;
 		this.viewContainerEl.addClass(cssClass("feed"));
+
+		// Bases reuses containerEl across view switches and the reconciler
+		// below never empties it again — clear whatever a previous view left
+		// behind once, here, instead of on every data update.
+		this.viewContainerEl.empty();
+		this.listEl = this.viewContainerEl.createDiv({ cls: cssClass("feed__list") });
+		// `duration` matches the row-level transitions elsewhere in the
+		// plugin; autoAnimate no-ops under `prefers-reduced-motion` on its
+		// own, so there's nothing to gate here.
+		this.animation = autoAnimate(this.listEl, { duration: 180 });
 
 		refreshAfterMetadataResolved(this, this.deps.app);
 
@@ -190,16 +222,17 @@ export class FeedBasesView extends BasesView {
 	 * inherits the feed's grid layout.
 	 */
 	override onunload(): void {
+		// The container outlives this view, so the animated list and its
+		// resize observer must not.
+		this.animation.disable();
+		this.rendered.clear();
+		this.listEl.remove();
 		this.viewContainerEl.removeClass(cssClass("feed"), cssClass("feed--no-meta"), cssClass("feed--compact"));
 		this.viewContainerEl.style.removeProperty("--obtask-feed-meta-columns");
 		super.onunload();
 	}
 
 	override onDataUpdated(): void {
-		this.removeChild(this.rows);
-		this.rows = this.addChild(new Component());
-		this.viewContainerEl.empty();
-
 		const keys = this.deps.getPropertyKeys();
 		const statuses = this.deps.getStatuses();
 		const today = fromJsDate(new Date());
@@ -213,9 +246,51 @@ export class FeedBasesView extends BasesView {
 		this.viewContainerEl.toggleClass(cssClass("feed--no-meta"), columns.length === 0);
 		this.applyCompact();
 
+		const used = new Set<string>();
+		let cursor: Element | null = this.listEl.firstElementChild;
+
+		// `createEl`/`createDiv` below are Obsidian's DETACHED global helpers
+		// (same pattern as `createSpan` in
+		// `event-calendar-renderer.ts`'s `allDayContentOption`), so a new
+		// node costs exactly one insertion mutation — the `insertBefore`
+		// here — never a reparent. Keys are unique by construction (a path
+		// appears once per query result), but a collision must degrade to a
+		// duplicate element, never fuse two rows onto one reused node —
+		// suffix defensively.
+		const mount = (rawKey: string, create: () => HTMLElement): RenderedItem => {
+			let key = rawKey;
+			for (let n = 2; used.has(key); n += 1) {
+				key = `${rawKey}#${String(n)}`;
+			}
+			used.add(key);
+			let item = this.rendered.get(key);
+			if (item === undefined) {
+				item = { el: create(), comp: undefined };
+				this.rendered.set(key, item);
+			}
+			// An in-place child advances the cursor with zero DOM mutations,
+			// so an unchanged feed produces none at all; only a moved or new
+			// child reaches `insertBefore`.
+			if (item.el === cursor) {
+				cursor = cursor.nextElementSibling;
+			} else {
+				this.listEl.insertBefore(item.el, cursor);
+			}
+			return item;
+		};
+
+		const mountText = (key: string, tag: "h3" | "h4" | "div", cls: string, text: string): void => {
+			const item = mount(key, () => createEl(tag, { cls }));
+			if (item.el.textContent !== text) {
+				item.el.setText(text);
+			}
+		};
+
 		for (const group of this.data.groupedData) {
-			if (group.hasKey() && group.key !== undefined) {
-				this.viewContainerEl.createEl("h3", { text: group.key.toString(), cls: cssClass("feed__group") });
+			const groupLabel = group.hasKey() && group.key !== undefined ? group.key.toString() : undefined;
+			const groupKey = groupLabel ?? "";
+			if (groupLabel !== undefined) {
+				mountText(`g:${groupKey}`, "h3", cssClass("feed__group"), groupLabel);
 			}
 
 			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
@@ -233,26 +308,27 @@ export class FeedBasesView extends BasesView {
 			);
 
 			for (const bucket of visibleBuckets(buckets, invalid.length, options.showEmptyBuckets)) {
-				this.viewContainerEl.createEl("h4", { text: BUCKET_LABELS[bucket], cls: cssClass("feed__bucket") });
+				mountText(`b:${groupKey}:${bucket}`, "h4", cssClass("feed__bucket"), BUCKET_LABELS[bucket]);
 
 				if (bucket === "errors") {
 					if (invalid.length === 0) {
-						this.viewContainerEl.createDiv({ text: "No tasks", cls: cssClass("feed__bucket-empty") });
+						mountText(`e:${groupKey}:${bucket}`, "div", cssClass("feed__bucket-empty"), "No tasks");
 						continue;
 					}
 					for (const entry of invalid) {
-						const row = this.viewContainerEl.createDiv({
-							cls: [cssClass("feed__row"), cssClass("feed__row--invalid")],
-						});
-						row.createSpan({ text: entry.path, cls: cssClass("feed__title") });
-						row.createSpan({ text: entry.errors.map((e) => describeTaskParseError(e)).join(", "), cls: cssClass("feed__error") });
+						const item = mount(`i:${entry.path}`, () =>
+							createDiv({ cls: [cssClass("feed__row"), cssClass("feed__row--invalid")] }),
+						);
+						item.el.empty();
+						item.el.createSpan({ text: entry.path, cls: cssClass("feed__title") });
+						item.el.createSpan({ text: entry.errors.map((e) => describeTaskParseError(e)).join(", "), cls: cssClass("feed__error") });
 					}
 					continue;
 				}
 
 				const bucketTasks = buckets.get(bucket) ?? [];
 				if (bucketTasks.length === 0) {
-					this.viewContainerEl.createDiv({ text: "No tasks", cls: cssClass("feed__bucket-empty") });
+					mountText(`e:${groupKey}:${bucket}`, "div", cssClass("feed__bucket-empty"), "No tasks");
 					continue;
 				}
 
@@ -265,25 +341,52 @@ export class FeedBasesView extends BasesView {
 						// there. Guards the lookup instead of asserting past it.
 						continue;
 					}
-					this.renderRow({ task, entry }, statuses, options.dateSource, columns);
+					this.fillRow(mount(`r:${task.path}`, () => createDiv({ cls: cssClass("feed__row") })), { task, entry }, statuses, options.dateSource, columns);
 				}
+			}
+		}
+
+		// Removal is what autoAnimate turns into the exit animation;
+		// deleting from `this.rendered` mid-iteration is fine in JS (the
+		// iterator already captured the entries live at loop start).
+		for (const [key, item] of this.rendered) {
+			if (!used.has(key)) {
+				if (item.comp !== undefined) {
+					this.removeChild(item.comp);
+				}
+				item.el.remove();
+				this.rendered.delete(key);
 			}
 		}
 	}
 
-	private renderRow(row: TaskWithEntry, statuses: readonly StatusConfig[], dateSource: DateSource, columns: readonly FeedColumn[]): void {
+	/**
+	 * Rebuilds one row's contents from scratch (cheap, and identical to the
+	 * old full-render cost per row) — only `item.el`'s identity is stable
+	 * across renders, which is all the list-level reconciliation/animation
+	 * needs. Listeners land on this row's own `comp`, freed on the next
+	 * refill of this same row or on its removal (`onDataUpdated`'s sweep).
+	 */
+	private fillRow(item: RenderedItem, row: TaskWithEntry, statuses: readonly StatusConfig[], dateSource: DateSource, columns: readonly FeedColumn[]): void {
+		if (item.comp !== undefined) {
+			this.removeChild(item.comp);
+		}
+		const comp = this.addChild(new Component());
+		item.comp = comp;
+		const rowEl = item.el;
+		rowEl.empty();
+
 		const { task, entry } = row;
-		const rowEl = this.viewContainerEl.createDiv({ cls: cssClass("feed__row") });
 
 		this.renderDot(rowEl, task);
-		this.renderStatusControl(rowEl, task, statuses);
+		this.renderStatusControl(comp, rowEl, task, statuses);
 
 		const link = rowEl.createEl("a", {
 			text: task.title,
 			cls: ["internal-link", cssClass("feed__title")],
 			href: task.path,
 		});
-		this.rows.registerDomEvent(link, "click", (evt) => {
+		comp.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
@@ -298,13 +401,13 @@ export class FeedBasesView extends BasesView {
 		for (const column of columns) {
 			switch (column.kind) {
 				case "date":
-					this.renderDateChip(metaEl, task, dateSource);
+					this.renderDateChip(comp, metaEl, task, dateSource);
 					break;
 				case "priority":
-					this.renderPriorityControl(metaEl, task);
+					this.renderPriorityControl(comp, metaEl, task);
 					break;
 				case "project":
-					this.renderProjectLink(metaEl, task);
+					this.renderProjectLink(comp, metaEl, task);
 					break;
 				case "tags":
 					this.renderTags(metaEl, task);
@@ -319,7 +422,7 @@ export class FeedBasesView extends BasesView {
 			}
 		}
 
-		this.registerRowContextMenu(rowEl, task, statuses);
+		this.registerRowContextMenu(comp, rowEl, task, statuses);
 	}
 
 	/**
@@ -359,7 +462,7 @@ export class FeedBasesView extends BasesView {
 	 * anchor date yet, renders a muted "Set date" chip that still opens the
 	 * modal, targeting `feedRowDefaultDateField(dateSource)`.
 	 */
-	private renderDateChip(parent: HTMLElement, task: Task, dateSource: DateSource): void {
+	private renderDateChip(comp: Component, parent: HTMLElement, task: Task, dateSource: DateSource): void {
 		const anchor = feedRowAnchor(task, dateSource);
 		const field = anchor.some ? anchor.value.field : feedRowDefaultDateField(dateSource);
 		const initial: Option<TaskDate> = anchor.some ? some(anchor.value.value) : none();
@@ -383,8 +486,8 @@ export class FeedBasesView extends BasesView {
 			}).open();
 		};
 
-		this.rows.registerDomEvent(chip, "click", openModal);
-		this.rows.registerDomEvent(chip, "keydown", (evt) => {
+		comp.registerDomEvent(chip, "click", openModal);
+		comp.registerDomEvent(chip, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
 				openModal();
@@ -403,7 +506,7 @@ export class FeedBasesView extends BasesView {
 	 * `buildPriorityMenu` on click/Enter/Space and dispatches to
 	 * `setPriority`.
 	 */
-	private renderPriorityControl(parent: HTMLElement, task: Task): void {
+	private renderPriorityControl(comp: Component, parent: HTMLElement, task: Task): void {
 		if (task.priority === "normal") {
 			// Still emits an (empty, inert) grid cell: in wide mode the meta
 			// chips are direct subgrid items of the row (`.obtask-feed__meta`
@@ -433,8 +536,8 @@ export class FeedBasesView extends BasesView {
 			}
 		};
 
-		this.rows.registerDomEvent(control, "click", openMenu);
-		this.rows.registerDomEvent(control, "keydown", (evt) => {
+		comp.registerDomEvent(control, "click", openMenu);
+		comp.registerDomEvent(control, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
 				openMenu(evt);
@@ -449,7 +552,7 @@ export class FeedBasesView extends BasesView {
 	 * exactly one top-level element (an empty placeholder span when there is
 	 * no project) so the grid's project column stays aligned across rows.
 	 */
-	private renderProjectLink(parent: HTMLElement, task: Task): void {
+	private renderProjectLink(comp: Component, parent: HTMLElement, task: Task): void {
 		const project = task.project;
 		if (project === undefined) {
 			parent.createSpan({ cls: [cssClass("feed__project"), cssClass("feed__project--empty")] });
@@ -467,11 +570,11 @@ export class FeedBasesView extends BasesView {
 			cls: ["internal-link", cssClass("feed__project")],
 			href: project,
 		});
-		this.rows.registerDomEvent(link, "click", (evt) => {
+		comp.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();
 			void this.deps.app.workspace.openLinkText(project, task.path, false);
 		});
-		this.rows.registerDomEvent(link, "contextmenu", (evt) => {
+		comp.registerDomEvent(link, "contextmenu", (evt) => {
 			// Own handler, not the row's `buildTaskEditMenu` one
 			// (`registerRowContextMenu`) — stopped from bubbling so the two
 			// menus never both open for one right-click.
@@ -573,7 +676,7 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/** Button-like span (icon + label) that opens the status `Menu` on click/Enter/Space and dispatches to `setStatus`. */
-	private renderStatusControl(row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
+	private renderStatusControl(comp: Component, row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
 		const statusOption = findStatus(statuses, task.status);
 		const control = row.createSpan({
 			cls: [cssClass("feed__status"), "clickable-icon"],
@@ -599,8 +702,8 @@ export class FeedBasesView extends BasesView {
 			}
 		};
 
-		this.rows.registerDomEvent(control, "click", openMenu);
-		this.rows.registerDomEvent(control, "keydown", (evt) => {
+		comp.registerDomEvent(control, "click", openMenu);
+		comp.registerDomEvent(control, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
 				openMenu(evt);
@@ -614,9 +717,9 @@ export class FeedBasesView extends BasesView {
 	 * mobile — Obsidian exposes no built-in long-press helper, so this times
 	 * `touchstart`..`touchend`/`touchmove`/`touchcancel` itself via
 	 * `window.setTimeout`, cleared on any of those or (as a safety net) when
-	 * `this.rows` unloads.
+	 * this row's `comp` unloads.
 	 */
-	private registerRowContextMenu(row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
+	private registerRowContextMenu(comp: Component, row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
 		const openEditMenu = (position: { readonly clientX: number; readonly clientY: number }): void => {
 			const menu = newMenu();
 			buildTaskEditMenu(menu, task, {
@@ -643,7 +746,7 @@ export class FeedBasesView extends BasesView {
 		// its `contextmenu` event always opens the menu as before.
 		let suppressNextContextMenu = false;
 
-		this.rows.registerDomEvent(row, "contextmenu", (evt) => {
+		comp.registerDomEvent(row, "contextmenu", (evt) => {
 			evt.preventDefault();
 			if (suppressNextContextMenu) {
 				suppressNextContextMenu = false;
@@ -660,7 +763,7 @@ export class FeedBasesView extends BasesView {
 			}
 		};
 
-		this.rows.registerDomEvent(row, "touchstart", (evt) => {
+		comp.registerDomEvent(row, "touchstart", (evt) => {
 			const touch = evt.touches[0];
 			if (touch === undefined) {
 				return;
@@ -672,10 +775,10 @@ export class FeedBasesView extends BasesView {
 				openEditMenu({ clientX, clientY });
 			}, 500);
 		});
-		this.rows.registerDomEvent(row, "touchend", clearLongPress);
-		this.rows.registerDomEvent(row, "touchmove", clearLongPress);
-		this.rows.registerDomEvent(row, "touchcancel", clearLongPress);
-		this.rows.register(clearLongPress);
+		comp.registerDomEvent(row, "touchend", clearLongPress);
+		comp.registerDomEvent(row, "touchmove", clearLongPress);
+		comp.registerDomEvent(row, "touchcancel", clearLongPress);
+		comp.register(clearLongPress);
 	}
 
 	private async setStatus(path: TaskPath, statusId: StatusId): Promise<void> {

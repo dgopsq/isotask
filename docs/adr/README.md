@@ -37,3 +37,4 @@ new ADR that supersedes it and update the `Status` line and the index below.
 | [0013](0013-plugin-local-reschedule-undo.md) | Plugin-local undo for calendar reschedules | Accepted, 2026-08-30 |
 | [0014](0014-three-level-priority-with-marks.md) | Three-level priority with Apple Reminders-style marks | Accepted, 2026-08-31 |
 | [0015](0015-project-color-drives-card-dot.md) | Project color drives the card dot/bar | Accepted, 2026-08-31 |
+| [0016](0016-auto-animate-feed-motion.md) | Feed interaction motion via @formkit/auto-animate and keyed row reconciliation | Accepted, 2026-09-01 |
