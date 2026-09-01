@@ -985,6 +985,82 @@
 }
 
 /*
+ * Uniform edge inset for timed blocks, matching the day-grid/all-day chips'
+ * `--size-4-1` breathing room (previous inset here was a bare `col-gap / 2`
+ * = 3px, visibly tighter than the chips' ~7px — measured via a live DOM
+ * probe on both). Getting there took a different mechanism than the chips,
+ * though, because timed blocks resolve their box very differently: a live
+ * probe of a real block's inline style reads
+ * `grid-column: 2; …; inset-inline-start: calc((100% - var(--ec-event-col-gap))
+ * / N * i); inline-size: calc((100% - var(--ec-event-col-gap)) / N * 1);`
+ * (`N`/`i` = overlap-group size/index, `1`/`0` when solo) — EC places each
+ * block with `grid-column` into `.ec-events`' subgridded column tracks
+ * (`.ec-events { grid-template: subgrid / subgrid }`, inheriting the exact
+ * day-column lines from `.ec-main`'s own `grid-template-columns`), so the
+ * `100%` in that formula is the SUBGRID COLUMN TRACK's width — a value
+ * `.ec-main` computes from ITS OWN box, not from any padding on an
+ * intermediate wrapper. `padding-inline` on `.ec-events`/`.ec-day` (the
+ * "pad the resolving container" approach that works for the day-grid/
+ * all-day chips, which get no inline position/size override at all) was
+ * tried and measured to do nothing here — the subgrid tracks stay put
+ * regardless of a subgrid item's own padding. `.ec-day` isn't even a safe
+ * padding target on its own merits: in the time grid it draws the hour/
+ * column gridlines as a `background-image` directly on itself (vendored
+ * `@event-calendar/core/dist/index.css`, `.ec-day` `.ec-time-grid .ec-body &`
+ * block) — padding it would misalign that background pattern from the
+ * real column border, a visible seam.
+ *
+ * The lever that DOES work: `var(--ec-event-col-gap)` inside that inline
+ * calc is EC's own custom property, read live off the cascade (the inline
+ * style is literally the text `var(--ec-event-col-gap)`, not a baked
+ * pixel number), so redefining it on an ancestor changes every block's
+ * resolved position/width without EC re-running any layout JS. The existing
+ * `margin-inline: calc(var(--ec-event-col-gap) / 2)` below already keys off
+ * the same variable, so bumping it here updates margin AND the inline calc
+ * in lockstep. For a solo block (`i` = 0) `inset-inline-start` is exactly 0
+ * (no shift from the box's own start-anchored grid position) and
+ * `inline-size` is `100% - gap`, so a margin of exactly `gap / 2` on both
+ * sides cancels out to a precisely symmetric inset of `gap / 2` — confirmed
+ * against the current 6px default (`.375rem`, vendored `:root`) yielding
+ * measured 3px/3px insets either side, matching the existing halved-margin
+ * rule exactly. The same cancellation holds for every member of an overlap
+ * group too: summed across `N` members the group still spans exactly
+ * `100% - gap`, so the same per-member `gap / 2` margin still lands each
+ * outer edge `gap / 2` from the column edge (and gives inner members a full
+ * `gap` gap between them) — this is why bumping the ONE variable, not the
+ * margin rule directly, is what keeps the overlap-group geometry e2e
+ * ("keeps an overlapping pair of timed blocks inside their day column")
+ * passing unmodified. Doubling the desired inset back out: for an
+ * `var(--size-4-2)` (8px) inset on each side, `--ec-event-col-gap` needs to
+ * be `var(--size-4-2) * 2` (16px) — measured after the change: 8px/8px,
+ * within a px of the chips' own ~7px (chips reach that off a totally
+ * different, grid-alignment-driven mechanism — see the day-grid/all-day
+ * rule above — so an exact match isn't available from a shared formula;
+ * 8px reads the same to the eye and stays on a clean spacing token rather
+ * than a composite one).
+ *
+ * Scoped to `.ec-body` specifically (not just `.ec-time-grid`) so this
+ * redefinition never leaks to `.ec-all-day` (a sibling of `.ec-body`, not a
+ * descendant) — the all-day row keeps reading the library's own unmodified
+ * `--ec-event-col-gap` default, which its own inset math (day-grid/all-day
+ * rule above) already accounts for.
+ *
+ * Critically, this also fixes the drag `.ec-preview`: EC gives the preview
+ * NO inline `inset-inline-start`/`inline-size` of its own (confirmed via a
+ * live mid-drag DOM probe — its inline style carries only `grid-column`/
+ * `inset-block-start`/`block-size`), so it falls back to the vendored
+ * default `.ec-event { inline-size: calc(100% - var(--ec-event-col-gap)) }`
+ * plus this same stylesheet's `margin-inline` rule below — both of which
+ * read the SAME redefined variable, so the preview's width tracks real
+ * blocks automatically with no separate preview-specific rule (and no
+ * stylesheet `inline-size` override here at all, which is what desynced the
+ * preview from real blocks before — see that landmine's history below).
+ */
+.obtask-calendar .ec-time-grid .ec-body {
+	--ec-event-col-gap: calc(var(--size-4-2) * 2);
+}
+
+/*
  * Uniform edge inset for timed blocks, same reasoning and same four-side
  * `margin` shorthand as the day-grid/all-day rule above. EC lays these out
  * with `inline-size: calc(100% - var(--ec-event-col-gap))` (left-aligned,
@@ -1002,7 +1078,10 @@
  * inline-size — the drag `.ec-preview` — which a narrower calc here made
  * visibly smaller than the block being dragged (67px vs 75px, measured).
  * With no stylesheet override, the preview falls back to the library's own
- * base `.ec-event` width and matches real blocks exactly.
+ * base `.ec-event` width and matches real blocks exactly. `margin-inline`
+ * reads `--ec-event-col-gap` off the redefinition just above, not the
+ * library's own 6px default — see that rule's comment for the full
+ * derivation of why halving it keeps this exactly symmetric.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event {
 	margin-block: var(--size-4-1);
