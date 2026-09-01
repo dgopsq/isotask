@@ -749,8 +749,17 @@
  * pressed original was showing; `rotate: 0.6deg` is the one value that's new
  * on the clone versus the press-lift rule above, and it's deliberately
  * static/untransitioned — it marks the moment the block starts travelling.
+ *
+ * Specificity is load-bearing: the clone also matches the time-grid base
+ * rule (`.obtask-calendar .ec-time-grid .ec-body .ec-event`, 0,4,0), whose
+ * `box-shadow: none` silently beat an earlier 3-class version of this
+ * selector the moment Event Calendar re-slotted the clone inside `.ec-body`
+ * — the reported "shadow disappears while dragging". `.ec.ec-dragging`
+ * (both classes sit on the same calendar root) and `.ec-event.ec-preview`
+ * (both on the clone) lift this to 0,5,0 so it wins on weight, not on
+ * source order.
  */
-.obtask-calendar .ec-dragging .ec-preview {
+.obtask-calendar .ec.ec-dragging .ec-event.ec-preview {
 	scale: 1.05;
 	rotate: 0.6deg;
 	box-shadow: var(--shadow-s);
