@@ -559,6 +559,53 @@
 	 */
 	container-type: size;
 	container-name: obtask-event;
+	/*
+	 * Vertical gap between BACK-TO-BACK timed blocks: when one block's end
+	 * time exactly equals the next's start time, EC's vertical layout has no
+	 * equivalent of `--ec-event-col-gap` (the horizontal gap variable used
+	 * further down) — `block-size` and the block's own top offset come
+	 * straight from the time span alone (`slotHeight * duration`,
+	 * event-calendar-renderer.ts), so two such blocks tile edge-to-edge with
+	 * nothing between them ("surfaces fuse").
+	 *
+	 * `margin-block: var(--size-4-1)` (further down) can't fix this: it sets
+	 * the SAME 4px on every block's start AND end side, so a back-to-back
+	 * pair gets shifted by an equal amount in the same direction rather than
+	 * shrinking toward each other — the identical cancellation that already
+	 * ruled out `margin-inline` for the horizontal overlap gap below (see
+	 * that rule's own comment), just on the other axis. A margin insets a
+	 * SOLO box from the empty space around it; it can't carve a gap out of
+	 * two boxes that already touch.
+	 *
+	 * Same lever as that horizontal fix, on the opposite edge:
+	 * `border-block-end` with a *transparent* color plus `background-clip:
+	 * padding-box` shrinks only the PAINTED background inward from the box's
+	 * own end (bottom) edge. `.ec-event` is `box-sizing: border-box`
+	 * (confirmed via a live DOM probe, same as the horizontal case), so the
+	 * border is carved OUT of the existing border-box rather than added on
+	 * top of it — the inline `block-size` this rule's own comment above
+	 * describes, the block's `top` offset, and every layout calc EC or this
+	 * stylesheet does elsewhere are completely unaffected; only paint moves.
+	 * No `border-block-start`: the block's TOP edge must land exactly on its
+	 * start-time line (nothing recedes there) — only the bottom recedes,
+	 * which reads as "a gap after each block", not "every block shrunk from
+	 * both ends".
+	 *
+	 * Scoped here, on the BASE rule (every timed block), unlike the
+	 * horizontal gap below which targets only overlap-group members: on that
+	 * axis a solo block is already inset on both sides by real margin and
+	 * only overlap members tile edge-to-edge, so only those need the paint
+	 * trick. On THIS axis there's no equivalent "solo" case that's
+	 * inherently separated — any block can end up back-to-back with a
+	 * neighbor, and nothing here reads adjacency cheaply enough to gate the
+	 * rule on it. Applying the same 2px recede unconditionally instead means
+	 * a solo block's and the drag `.ec-preview` clone's (which matches this
+	 * same selector) painted height are IDENTICAL to a back-to-back block's
+	 * — the preview intentionally gets this too, so nothing pops by 2px as a
+	 * block is pressed or dragged into or out of contact with a neighbor.
+	 */
+	border-block-end: var(--size-2-1) solid transparent;
+	background-clip: padding-box;
 }
 
 /*
@@ -1285,6 +1332,23 @@
  * doesn't accidentally hide the time line in a block that actually has room
  * for it) is comfortably between a 1-hour block (32px, must hide) and a
  * 2-hour block (64px, must show) either way.
+ *
+ * `border-block-end: var(--size-2-1)` (2px, added to this same rule for the
+ * vertical back-to-back gap, above) shaves a little more off the margin
+ * either side of that threshold: a CSS size container query reads the
+ * container's own CONTENT box, and since `.ec-event` is `box-sizing:
+ * border-box` that border is carved OUT of the same border-box the inline
+ * `block-size` sets — so for any given block-size, the queried content-box
+ * height is now ~2px (0.1667em at this 12px base) smaller than before this
+ * border existed, on top of the padding already subtracted above. Re-run
+ * against the two concrete cases: a 1-hour block (32px block-size) now
+ * queries at 32 - 2 (padding-top) - 2 (padding-bottom) - 2 (this border) =
+ * 26px (~2.17em), still comfortably under 3.05em — hides, as required; a
+ * 2-hour block (64px block-size) now queries at 64 - 6 = 58px (~4.83em),
+ * still comfortably over — shows, as required. A 2px shift this small never
+ * comes close to flipping either case; only a block within ~2px of the
+ * 3.05em line itself would need re-checking, and none of this plugin's
+ * fixed slot durations (15/30/60/120min at `slotHeight: 32`) land there.
  *
  * Container size queries are supported by every runtime this plugin ships
  * on: Obsidian desktop (Electron >= 28 / Chromium >= 106, well past
