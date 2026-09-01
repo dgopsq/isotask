@@ -251,12 +251,19 @@
 	 * pickup/landing lift (see the drag/resize lift comment below) — the
 	 * ghost's `scale: 0.97` on pickup and the reused element's return to
 	 * `scale: 1` once `.ec-ghost` is dropped at the new slot both ride this.
+	 *
+	 * `scale` is split onto its own, LONGER duration token
+	 * (`--obtask-motion-settle`) than the other three properties here: a
+	 * pickup must register as immediate (120-160ms, `--obtask-motion`, same
+	 * as hover), but a springy landing needs the slower half of the arc to
+	 * read as a settle rather than a snap — see the drag/resize lift comment
+	 * below for the full pickup-to-landing arc this feeds.
 	 */
 	transition:
 		background-color var(--obtask-motion, 120ms) ease,
 		opacity var(--obtask-motion, 120ms) ease,
 		box-shadow var(--obtask-motion, 120ms) ease,
-		scale var(--obtask-motion, 120ms) ease;
+		scale var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /*
@@ -491,12 +498,13 @@
 	box-shadow: none;
 	overflow: hidden;
 	/* Same hover ease + drag/drop opacity/box-shadow/scale settle as the
-	 * day-grid/all-day rule above — see its comment for why. */
+	 * day-grid/all-day rule above — see its comment for why, including the
+	 * split pickup-vs-settle duration on `scale`. */
 	transition:
 		background-color var(--obtask-motion, 120ms) ease,
 		opacity var(--obtask-motion, 120ms) ease,
 		box-shadow var(--obtask-motion, 120ms) ease,
-		scale var(--obtask-motion, 120ms) ease;
+		scale var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 	/* Tight (not the library's own 1.5) — see the day-grid/all-day `.ec-event`
 	 * rule above for the same change; this also shrinks the container-query
 	 * threshold below, since the time line's line-height is one of its
@@ -598,17 +606,42 @@
  * original exactly like drag does — anything scoped to `.ec-dragging` alone
  * stays lift-free during a resize, which matters below.
  *
- * A `box-shadow: var(--shadow-s)` lift was tried first, matching the view
- * switcher's original "raised card" attempt (~line 900 below) — but that
- * comment's finding (`--shadow-s` reads as a dark rim, not elevation, once
- * Obsidian's dark themes make the fill lighter than the surrounding surface)
- * applies at least as strongly here: a floating preview has no track
- * background to frame it at all, so a dark rim around it would read even
- * more like a hole cut in the grid than a lifted block. Skipped the shadow
- * entirely. `opacity: 0.85` restates the library's own `.ec-preview` value
- * as this file's single source of truth for it (nothing else here touches
- * `.ec-preview`'s opacity) rather than layering a second opacity change on
- * top of the library's — a barely-there nudge off .8, not a redo of it.
+ * The full arc reads as three physical beats, pickup through landing:
+ *   1. Grab (instant, `--obtask-motion`): the clone pops to 105% with a
+ *      slight tilt (`rotate: 0.6deg`) and a cast shadow, animated in on a
+ *      back-out bezier that overshoots past 105% (~107%) before relaxing
+ *      back to rest — a hand grabbing an object overshoots its lift before
+ *      settling into a steady hold, it doesn't glide straight to the held
+ *      height.
+ *   2. Float (held, no further animation): the clone sits tilted, shadowed,
+ *      and nearly opaque (0.9) while it tracks the pointer.
+ *   3. Settle (slow, `--obtask-motion-settle`): on drop, the ghost's 97%
+ *      scale cascades back to the base `.ec-event` value of 1 through the
+ *      SAME back-out bezier, now on a longer duration — overshooting past
+ *      100% (~101%) before relaxing — reading as the block landing,
+ *      compressing, and springing to rest rather than snapping into place.
+ *
+ * A `box-shadow: var(--shadow-s)` lift was tried and dropped once already
+ * for the view switcher's "raised card" attempt (~line 900 below) — that
+ * finding (`--shadow-s` reads as a dark rim, not elevation, once Obsidian's
+ * dark themes make the fill lighter than the surrounding surface) was about
+ * a tab raised ABOVE a track it shares a surface family with, where the
+ * shadow had to frame a fill lighter than what surrounds it. A drag preview
+ * is the opposite case: it's a clone floating free of the grid with no
+ * shared surface to clash against, which is exactly the situation a cast
+ * shadow is the natural depth cue for — Obsidian's own menus/popovers reach
+ * for this same `--shadow-s` token under dark themes for exactly that
+ * floating-above-the-page read, so it applies here without the rim problem.
+ *
+ * `opacity: 0.9` (up from the library's own default `.8`, previously
+ * restated here as `.85`): a lifted object reads more physical the more
+ * solid it is, and 0.9 keeps just enough transparency for the dragger to
+ * still aim at the drop slot underneath the clone.
+ *
+ * `rotate` is the standalone CSS property, not part of a `transform:`
+ * string — same reasoning as `scale` below: it composes with a `transform`
+ * a future EC version might set, where `transform: rotate(…)` would clobber
+ * it outright.
  *
  * On top of that opacity, a scale "lift" makes the pickup unmistakable:
  * the clone grows to 105% right as it's inserted, the original visibly
@@ -628,17 +661,21 @@
  * - Pickup: `.ec-dragging .ec-preview` scoped, not plain `.ec-preview` — a
  *   resize's own preview is a size change already in progress under the
  *   pointer, and a simultaneous 105% scale on it would visibly fight the
- *   dimension the drag is actively editing. The static `scale: 1.05` is
- *   the resting lifted state; `animation: obtask-lift` is what makes
- *   *reaching* it visible. A `transition` can't do that job here — the
- *   preview is a freshly inserted clone, so there's no prior computed
- *   style for a transition to ease from on its first paint. The
- *   `@keyframes` below only defines `from { scale: 1; }`; with no `to`
- *   keyframe, the animation's end value falls back to the element's own
- *   underlying `scale: 1.05`, so the two declarations can't drift apart.
- *   Under `prefers-reduced-motion` the shared `--obtask-motion` guard at
- *   the end of this file zeroes the animation duration too (both read the
- *   same var), so the lift just lands at 105% instantly instead of easing.
+ *   dimension the drag is actively editing. The static `scale: 1.05;
+ *   rotate: 0.6deg` is the resting lifted state; `animation: obtask-lift`
+ *   is what makes *reaching* it visible, on `cubic-bezier(0.34, 1.56, 0.64,
+ *   1)` (a back-out curve) so the animation overshoots past 105% before
+ *   settling there, reading as a grab rather than a glide. A `transition`
+ *   can't do that job here — the preview is a freshly inserted clone, so
+ *   there's no prior computed style for a transition to ease from on its
+ *   first paint. The `@keyframes` below only defines `from { scale: 1;
+ *   rotate: 0deg; }`; with no `to` keyframe, the animation's end value
+ *   falls back to the element's own underlying `scale: 1.05; rotate:
+ *   0.6deg`, so the two declarations can't drift apart. Under
+ *   `prefers-reduced-motion` the shared `--obtask-motion` guard at the end
+ *   of this file zeroes the animation duration too (both read the same
+ *   var), so the lift just lands at 105%/0.6deg instantly instead of
+ *   easing.
  * - Ghost + landing: `.ec-dragging .ec-ghost` (same drag-only scoping, for
  *   the same fight-the-resize reason) shrinks the original to 97% right
  *   where it sits — it visibly "gives up" its slot the moment the clone is
@@ -646,23 +683,29 @@
  *   `.ec-ghost` from the (possibly reused) element at the NEW slot in the
  *   same update, that element's `scale` cascades back to the base
  *   `.ec-event` value of 1 — and since `.ec-event` already carries `scale
- *   var(--obtask-motion, 120ms) ease` in its transition list (added
- *   alongside opacity/box-shadow above), that reversion eases in, reading
- *   as the block settling into its landing spot rather than snapping.
+ *   var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1)` in
+ *   its transition list (added alongside opacity/box-shadow above, but on
+ *   its own longer, springier duration token — see that rule's comment),
+ *   that reversion eases in on the same back-out overshoot as the pickup,
+ *   reading as the block landing, compressing, and settling into its spot
+ *   over the slower half of the arc rather than snapping.
  */
 .obtask-calendar .ec-preview {
-	opacity: 0.85;
+	opacity: 0.9;
 }
 
 @keyframes obtask-lift {
 	from {
 		scale: 1;
+		rotate: 0deg;
 	}
 }
 
 .obtask-calendar .ec-dragging .ec-preview {
 	scale: 1.05;
-	animation: obtask-lift var(--obtask-motion, 120ms) ease;
+	rotate: 0.6deg;
+	box-shadow: var(--shadow-s);
+	animation: obtask-lift var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .obtask-calendar .ec-dragging .ec-ghost {
@@ -1301,16 +1344,19 @@
 }
 
 /*
- * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` transition
- * above. `--obtask-motion` inherits, so zeroing it once here collapses every
- * transition beneath `.obtask-calendar` to 0s with no `!important` and no
- * per-rule media query. The feed's own equivalent guard (styles/obtask.css)
- * covers the other view; the feed list's move/enter/exit animation
- * (auto-animate) already gates itself on this same media feature, so this
- * keeps the whole plugin consistent with it.
+ * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` AND
+ * `var(--obtask-motion-settle, 240ms)` transition/animation above. Both
+ * custom properties inherit, so zeroing them once here collapses every
+ * transition beneath `.obtask-calendar` — pickup and settle alike — to 0s
+ * with no `!important` and no per-rule media query. The feed's own
+ * equivalent guard (styles/obtask.css) covers the other view; the feed
+ * list's move/enter/exit animation (auto-animate) already gates itself on
+ * this same media feature, so this keeps the whole plugin consistent with
+ * it.
  */
 @media (prefers-reduced-motion: reduce) {
 	.obtask-calendar {
 		--obtask-motion: 0s;
+		--obtask-motion-settle: 0s;
 	}
 }

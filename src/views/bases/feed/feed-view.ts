@@ -160,10 +160,14 @@ export class FeedBasesView extends BasesView {
 		// behind once, here, instead of on every data update.
 		this.viewContainerEl.empty();
 		this.listEl = this.viewContainerEl.createDiv({ cls: cssClass("feed__list") });
-		// `duration` matches the row-level transitions elsewhere in the
-		// plugin; autoAnimate no-ops under `prefers-reduced-motion` on its
-		// own, so there's nothing to gate here.
-		this.animation = autoAnimate(this.listEl, { duration: 180 });
+		// auto-animate's default ease-in-out accelerates into and out of a
+		// move symmetrically, which reads mechanical for a row sliding to a
+		// new position; an ease-out curve (fast departure, long deceleration
+		// into place) matches how physical objects come to rest instead. The
+		// slightly longer duration (was 180ms) keeps that decelerating tail
+		// visible rather than cutting it short. autoAnimate no-ops under
+		// `prefers-reduced-motion` on its own, so there's nothing to gate here.
+		this.animation = autoAnimate(this.listEl, { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
 		// Disabled until the first `onDataUpdated` has painted: the initial
 		// render adds every row at once, and animating that reads as the
 		// whole feed fading in on every view open (and left e2e screenshots
