@@ -624,7 +624,7 @@
  *   1. Handoff (same frame, no animation): once the drag threshold fires,
  *      EC swaps the pressed original's display to "ghost" and inserts the
  *      "preview" clone. The clone's resting state — `scale: 1.05; box-
- *      shadow: var(--shadow-s)` — is exactly what the pressed original was
+ *      shadow: var(--obtask-lift-shadow)` — is exactly what the pressed original was
  *      already showing, plus a tilt (`rotate: 0.6deg`) that lands
  *      untransitioned on the clone: deliberately, since the tilt is what
  *      marks the instant the block starts travelling, distinct from the
@@ -640,7 +640,7 @@
  *      below) tagged onto that landed element by the `eventDrop`/
  *      `eventResize` handler (`event-calendar-renderer.ts`). Its keyframe
  *      `from` restates the clone's exact float state (105% scale, 0.6deg
- *      tilt, `--shadow-s`) so the clone's deletion hands off to the real
+ *      tilt, `--obtask-lift-shadow`) so the clone's deletion hands off to the real
  *      element mid-air instead of visibly cutting the shadow, and settles
  *      through the SAME back-out bezier, now on a longer duration —
  *      overshooting past 100% before relaxing — reading as the block
@@ -672,8 +672,13 @@
  * dragged event is the opposite case: it reads as lifting free of the grid
  * with no shared surface to clash against, which is exactly the situation a
  * cast shadow is the natural depth cue for — Obsidian's own menus/popovers
- * reach for this same `--shadow-s` token under dark themes for exactly that
+ * reach for this same shadow COLOR under dark themes for exactly that
  * floating-above-the-page read, so it applies here without the rim problem.
+ * The actual token used, `--obtask-lift-shadow` (defined below, `0 2px 8px
+ * var(--background-modifier-box-shadow)`), is `--shadow-s`'s same color
+ * idiom at a deliberately tighter blur/offset — see that token's own
+ * comment for why: `--shadow-s`'s full 30px blur was measured crossing the
+ * pane's own unfixable scroll-container edge in a narrow pane.
  *
  * `opacity: 0.9` (up from the library's own default `.8`, previously
  * restated here as `.85`): a lifted object reads more physical the more
@@ -724,7 +729,7 @@
  *   resize's own preview is a size change already in progress under the
  *   pointer, and a simultaneous 105% scale on it would visibly fight the
  *   dimension the drag is actively editing. `scale: 1.05; rotate: 0.6deg;
- *   box-shadow: var(--shadow-s)` are all static now, no `animation`: the
+ *   box-shadow: var(--obtask-lift-shadow)` are all static now, no `animation`: the
  *   press rule above already brought the pressed original to this same
  *   scale/shadow before the clone ever existed, so the clone just inherits
  *   the lifted look on the same frame it's inserted — only `rotate` is new
@@ -756,11 +761,39 @@
  * here with the values that read right on a narrow column (week/3-day/
  * month); `.ec-day-view` (below the ghost rule) overrides all three toward
  * neutral for the full-pane-width case.
+ *
+ * `--obtask-lift-shadow`: the lift's cast shadow, deliberately tighter than
+ * `--shadow-s` (Obsidian's own floating-element shadow, `0 15px 30px` at its
+ * largest layer — measured via an in-app computed-style probe). The float is
+ * often flush against the PANE's own scroll container
+ * (`.bases-view.obtask-calendar-view`, `overflow: auto`, Obsidian's own —
+ * the one clipper this plugin cannot relax the way the day-view fix just
+ * below relaxes `.ec-main`, because pane scrolling and dragScroll both rely
+ * on it staying a scroller), and `.obtask-calendar`'s own `--size-4-4`
+ * padding (~16px) is the ENTIRE budget the shadow may paint into past a
+ * flush-against-the-edge block. `--shadow-s`'s 30px blur was measured
+ * crossing that pane edge in a narrow pane, where the hard clip line at
+ * `.bases-view`'s boundary read as the block being cut rather than a
+ * shadow fading out.
+ *
+ * Kept to an 8px blur + 2px y-offset (10px of paint past the block's own
+ * edge, plus a negligible 1px spread from the 0 x-offset/no-spread shape) so
+ * the total overhang stays inside that 16px budget even after the lift's
+ * own scale growth: at the current tokens (1.05 lift / 1.01 day-view lift,
+ * both below), scale growth is at most (1.05 - 1) / 2 = 2.5% of the
+ * element's own size per side, which for the widest realistic block (a
+ * full-pane day-view column, easily 300px+) is single-digit pixels but
+ * given a generous upper bound of ~3px/side — 3px (scale) + 10px (shadow) =
+ * 13px < 16px (padding), so the shadow never reaches the pane's clip edge.
+ * `--background-modifier-box-shadow` (probed in-app: resolves to
+ * `rgba(0, 0, 0, 0.3)`, the same color Obsidian's own shadow tokens use) —
+ * not a hardcoded rgba — keeps this themed like `--shadow-s` was.
  */
 .obtask-calendar {
 	--obtask-lift-scale: 1.05;
 	--obtask-lift-tilt: 0.6deg;
 	--obtask-ghost-scale: 0.97;
+	--obtask-lift-shadow: 0 2px 8px var(--background-modifier-box-shadow);
 }
 
 .obtask-calendar .ec-preview {
@@ -778,7 +811,7 @@
  */
 .obtask-calendar .ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active)) {
 	scale: var(--obtask-lift-scale);
-	box-shadow: var(--shadow-s);
+	box-shadow: var(--obtask-lift-shadow);
 	transition:
 		scale var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
 		box-shadow var(--obtask-motion, 160ms) ease;
@@ -836,7 +869,7 @@
 	from {
 		scale: var(--obtask-lift-scale);
 		rotate: var(--obtask-lift-tilt);
-		box-shadow: var(--shadow-s);
+		box-shadow: var(--obtask-lift-shadow);
 	}
 }
 
@@ -863,7 +896,7 @@
 .obtask-calendar .ec.ec-dragging .ec-event.ec-preview {
 	scale: var(--obtask-lift-scale);
 	rotate: var(--obtask-lift-tilt);
-	box-shadow: var(--shadow-s);
+	box-shadow: var(--obtask-lift-shadow);
 }
 
 .obtask-calendar .ec-dragging .ec-ghost {
