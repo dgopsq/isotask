@@ -111,6 +111,24 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					info.revert();
 				}
 			})();
+
+			// Event Calendar deletes the `.ec-preview` drag clone outright on
+			// drop (the shadow it carried disappears with it), and the real
+			// element at the new slot never had a shadow of its own -- so the
+			// "set" landing animation has to play on THIS element instead,
+			// picking up from the preview's lifted state. The class is
+			// deliberately left on the element after the animation finishes
+			// (a completed animation is inert, so no listener is needed to
+			// remove it) -- the remove/reflow/add below restarts it if the
+			// same event is dropped again in the same frame, which would
+			// otherwise coalesce a remove+add of the same class into a no-op.
+			const el = mountedElements.get(String(info.event.id));
+			if (el?.isConnected) {
+				const droppedCls = cssClass("dropped");
+				el.removeClass(droppedCls);
+				void el.offsetWidth;
+				el.addClass(droppedCls);
+			}
 		};
 
 		const eventDropOption: Pick<Calendar.Options, "eventDrop"> = onEventMoved === undefined ? {} : { eventDrop: applyMove };

@@ -633,11 +633,20 @@
  *      already at the state the eye just saw on the original.
  *   2. Float (held, no further animation): the clone sits tilted, shadowed,
  *      and nearly opaque (0.9) while it tracks the pointer.
- *   3. Settle (slow, `--obtask-motion-settle`): on drop, the ghost's 97%
- *      scale cascades back to the base `.ec-event` value of 1 through the
- *      SAME back-out bezier, now on a longer duration — overshooting past
- *      100% (~101%) before relaxing — reading as the block landing,
- *      compressing, and springing to rest rather than snapping into place.
+ *   3. Settle (slow, `--obtask-motion-settle`): EC deletes the `.ec-preview`
+ *      clone outright on drop, taking its shadow with it, and the element at
+ *      the new slot never carried one of its own — so the settle is played
+ *      explicitly, as a one-shot `obtask-set` animation (`.obtask-dropped`,
+ *      below) tagged onto that landed element by the `eventDrop`/
+ *      `eventResize` handler (`event-calendar-renderer.ts`). Its keyframe
+ *      `from` restates the clone's exact float state (105% scale, 0.6deg
+ *      tilt, `--shadow-s`) so the clone's deletion hands off to the real
+ *      element mid-air instead of visibly cutting the shadow, and settles
+ *      through the SAME back-out bezier, now on a longer duration —
+ *      overshooting past 100% before relaxing — reading as the block
+ *      landing, compressing, and springing to rest rather than snapping into
+ *      place. (A resize's "landing" plays the same way, on its new extent —
+ *      `applyMove` is the shared handler for both gestures.)
  *
  * A `box-shadow: var(--shadow-s)` lift was tried and dropped once already
  * for the view switcher's "raised card" attempt (~line 900 below) — that
@@ -714,13 +723,16 @@
  *   picked up. Because drop removes `.ec-dragging` from the root and
  *   `.ec-ghost` from the (possibly reused) element at the NEW slot in the
  *   same update, that element's `scale` cascades back to the base
- *   `.ec-event` value of 1 — and since `.ec-event` already carries `scale
- *   var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1)` in
- *   its transition list (added alongside opacity/box-shadow above, but on
- *   its own longer, springier duration token — see that rule's comment),
- *   that reversion eases in on the same back-out overshoot as the pickup,
- *   reading as the block landing, compressing, and settling into its spot
- *   over the slower half of the arc rather than snapping.
+ *   `.ec-event` value of 1 through the same transition — but that alone only
+ *   ever covered `scale`, and only for a REUSED element (a freshly created
+ *   one at the new slot never had `.ec-ghost` on it to revert from, and
+ *   neither had a shadow, since `.ec-preview` — the only thing that ever
+ *   carried one — is deleted, not moved, on drop). The actual "landing"
+ *   flourish, shadow included, is the explicit `.obtask-dropped` animation
+ *   below (beat 3), tagged on unconditionally by the drop/resize handler
+ *   regardless of whether EC reused or recreated the element; this `scale`
+ *   reversion still fires alongside it on a reused element, harmlessly
+ *   redundant with the animation already driving the same property.
  */
 .obtask-calendar .ec-preview {
 	opacity: 0.9;
@@ -741,6 +753,66 @@
 	transition:
 		scale var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
 		box-shadow var(--obtask-motion, 160ms) ease;
+}
+
+/*
+ * "Set" landing animation — see beat 3 of the arc comment above. EC deletes
+ * the `.ec-preview` clone outright on drop, so it never hands the shadow it
+ * carried off to anything; the real element sitting at the new slot never
+ * had one of its own either. Rather than rely on a scale-only transition
+ * that only ever fired for a REUSED element (see the "Ghost + landing"
+ * bullet above), the drop/resize handler (`applyMove` in
+ * `event-calendar-renderer.ts`) tags the landed element with `.obtask-
+ * dropped` unconditionally, and this keyframe plays the whole landing
+ * explicitly on it.
+ *
+ * The `from` restates the preview's exact float state — `scale: 1.05;
+ * rotate: 0.6deg; box-shadow: var(--shadow-s)` — so the clone's deletion
+ * hands off to the real element mid-air and the landing reads as one
+ * continuous motion rather than a cut: scale and tilt relax to their
+ * natural (unset) values while the shadow fades out, as if the block is
+ * descending and settling under its own weight over the course of the
+ * animation. No explicit `to` is needed — an omitted end state falls back to
+ * the element's own computed style, i.e. the base `.ec-event` rule (no
+ * `rotate`, `box-shadow: none`), which is exactly the rest state landing
+ * should arrive at.
+ *
+ * A running `animation` always outranks a property's own `transition` (the
+ * animation engine wins the cascade for any property it's actively
+ * animating), so this doesn't fight the base `.ec-event` rule's own `scale`
+ * transition (still doing its job for the ghost-shrink release on pickup,
+ * beat "Ghost + landing" above) or the time-grid base rule's `box-shadow:
+ * none` — both simply take back over once the animation ends.
+ *
+ * The spring bezier (same one used throughout this arc) gives the settle a
+ * brief compression below rest (scale dips under 1, box-shadow fully faded)
+ * before relaxing back up to the resting state — reads as the block
+ * absorbing its own landing impact rather than free-falling into place.
+ *
+ * Deliberately left on the element once finished rather than removed by a
+ * listener: a finished CSS animation is inert (its keyframe values stop
+ * applying once the fill mode's default, `none`, takes over at 100%), so an
+ * `animationend` listener would only ever be bookkeeping, not a visual
+ * fix — and the handler already needs a remove/reflow/add sequence to
+ * RESTART the animation on a same-frame re-drop regardless (a bare
+ * `classList.add` when the class is already present is a no-op, coalesced
+ * by the browser before it ever reaches layout).
+ *
+ * `--obtask-motion-settle` is the same duration token the pickup/release
+ * scale transition uses; under `prefers-reduced-motion` (see the
+ * `--obtask-motion` guard at the end of this file) it's 0s, so the landing
+ * resolves instantly rather than animating.
+ */
+@keyframes obtask-set {
+	from {
+		scale: 1.05;
+		rotate: 0.6deg;
+		box-shadow: var(--shadow-s);
+	}
+}
+
+.obtask-calendar .ec-event.obtask-dropped {
+	animation: obtask-set var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /*
