@@ -321,6 +321,10 @@
 .obtask-feed__priority {
 	display: inline-flex;
 	align-items: center;
+	/* The one cell that's centred in its track: a 1–2 glyph mark (or the
+	 * "no priority" icon) reads better centred under the column than
+	 * hugging its left edge like the text cells do. */
+	justify-self: center;
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-semibold);
 	cursor: pointer;
@@ -328,15 +332,15 @@
 }
 
 /*
- * "No priority" state: a muted icon (sized down via Obsidian's `--icon-size`
- * override, per `setIcon`'s own docs — not italic, unlike the date/project/
- * tags empty states, since an icon has no font style to italicise) instead
- * of the `!`/`!!` mark, styled the same clickable control as every other
+ * "No priority" state: a muted icon at Obsidian's default `--icon-size`
+ * (the same size the priority menu draws it — not shrunk to match the
+ * mark's glyph height; not italic either, unlike the date/project/tags
+ * empty states, since an icon has no font style to italicise) instead of
+ * the `!`/`!!` mark, styled the same clickable control as every other
  * priority value.
  */
 .obtask-feed__priority--empty {
 	color: var(--text-faint);
-	--icon-size: var(--icon-xs);
 }
 
 /*
