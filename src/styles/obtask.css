@@ -160,29 +160,6 @@
 	white-space: nowrap;
 	text-overflow: ellipsis;
 	color: var(--text-accent);
-	transition: color var(--obtask-motion, 120ms) ease;
-}
-
-/*
- * Faint title for a done/cancelled row (`.obtask-feed__row--done`, set by
- * `renderStatusControl`); `--completing` fades it in step with the check
- * animation while the row is being marked done.
- */
-.obtask-feed__row--done .obtask-feed__title {
-	color: var(--text-faint);
-}
-
-.obtask-feed__row--completing .obtask-feed__title {
-	animation: obtask-title-fade 220ms 120ms ease-out both;
-}
-
-@keyframes obtask-title-fade {
-	from {
-		color: var(--text-accent);
-	}
-	to {
-		color: var(--text-faint);
-	}
 }
 
 /*
@@ -745,9 +722,8 @@
 	}
 
 	/*
-	 * The status control's check-pop/draw/ripple and the title's
-	 * fade (`.obtask-feed__status--completing`,
-	 * `.obtask-feed__row--completing`, above) are one-shot `animation`s, not
+	 * The status control's check-pop/draw/ripple
+	 * (`.obtask-feed__status--completing`, above) are one-shot `animation`s, not
 	 * `transition`s, so `--obtask-motion` doesn't reach them — disabled here
 	 * instead, at matching specificity, and placed after those rules in file
 	 * order so the cascade picks this one with no `!important` needed.
@@ -756,8 +732,7 @@
 	 */
 	.obtask-feed__status--completing .obtask-feed__check,
 	.obtask-feed__status--completing .obtask-feed__check svg,
-	.obtask-feed__status--completing .obtask-feed__check::after,
-	.obtask-feed__row--completing .obtask-feed__title {
+	.obtask-feed__status--completing .obtask-feed__check::after {
 		animation: none;
 	}
 }
