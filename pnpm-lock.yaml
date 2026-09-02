@@ -11,6 +11,9 @@ importers:
       '@event-calendar/core':
         specifier: 5.12.0
         version: 5.12.0(@typescript-eslint/types@8.68.0)
+      '@formkit/auto-animate':
+        specifier: 0.10.0
+        version: 0.10.0
       date-fns:
         specifier: 4.4.0
         version: 4.4.0
@@ -347,6 +350,9 @@ packages:
 
   '@event-calendar/core@5.12.0':
     resolution: {integrity: sha512-qvdbuC04vfucWRh2Sr6toi95Mno3PQnBJ+3J8VMDor9u7d1xmNI+20ZVD635jgetQAwPN9+ScEqM4xeP4pVc1Q==}
+
+  '@formkit/auto-animate@0.10.0':
+    resolution: {integrity: sha512-KGomRttjUfORuPUaR/ZGQw+6xfMrTM+sxnILv7JAd9AmabU9rg9i6gF/iC0Ih+QpKCubJpCA/1DX9UHKE8cX+A==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3776,6 +3782,8 @@ snapshots:
       svelte: 5.56.10(@typescript-eslint/types@8.68.0)
     transitivePeerDependencies:
       - '@typescript-eslint/types'
+
+  '@formkit/auto-animate@0.10.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

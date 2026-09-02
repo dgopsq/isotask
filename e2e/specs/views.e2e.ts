@@ -504,9 +504,11 @@ describe("Views", function () {
 			// `execute()` callbacks run inside the Obsidian window, not this Node
 			// process, so the plugin-id-derived class names must be passed in as
 			// arguments rather than closed over.
+			// Headers/rows are children of the reconciled list (`.obtask-feed__list`,
+			// `feed-view.ts`'s `listEl`), not the outer view container.
 			structure = await browser.execute(
-				(feedCls, bucketCls, rowCls, rowInvalidCls, titleCls) => {
-					const container = document.querySelector(`.${feedCls}`);
+				(listCls, bucketCls, rowCls, rowInvalidCls, titleCls) => {
+					const container = document.querySelector(`.${listCls}`);
 					const result: { bucketLabel: string; titles: string[] }[] = [];
 					if (container === null) {
 						return result;
@@ -525,7 +527,7 @@ describe("Views", function () {
 					}
 					return result;
 				},
-				cssClass("feed"),
+				cssClass("feed__list"),
 				cssClass("feed__bucket"),
 				cssClass("feed__row"),
 				cssClass("feed__row--invalid"),

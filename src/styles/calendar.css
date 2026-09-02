@@ -99,6 +99,10 @@
 	box-shadow: var(--input-shadow);
 	font-size: var(--font-ui-small);
 	padding: var(--size-4-1) var(--size-4-3);
+	/* Covers both the plain hover rule below and the active-tab tint change
+	 * in the view switcher (`.ec-active`, further down) — both only ever
+	 * change background-color/color on this same element. */
+	transition: background-color var(--obtask-motion, 120ms) ease, color var(--obtask-motion, 120ms) ease;
 }
 
 .obtask-calendar .ec-button:not(:disabled):hover {
@@ -236,6 +240,33 @@
 	 * against the same "denser month rows" goal. */
 	line-height: var(--line-height-tight);
 	box-shadow: none;
+	/*
+	 * Eases hover (background-color) and both drag/drop transitions the
+	 * library itself drives with plain CSS properties: opacity (the
+	 * original event drops to the vendored `.ec-ghost` class's `opacity: .5`
+	 * while dragging, then back to 1 on drop) and box-shadow. The press-lift
+	 * rule below (`.ec-event:active`) sets box-shadow on press using its OWN
+	 * (faster) transition; releasing removes that `:active` match, so THIS
+	 * rule's (slower) transition is what eases the shadow back to `none` —
+	 * see the press-lift comment below for why the two speeds are split. No
+	 * hardcoded ms/`!important` — see the `--obtask-motion` guard at the end
+	 * of this file. `scale` eases the pickup/landing lift (see the
+	 * drag/resize lift comment below) — the ghost's `scale: 0.97` on pickup
+	 * and the reused element's return to `scale: 1` once `.ec-ghost` is
+	 * dropped at the new slot both ride this.
+	 *
+	 * `scale` is split onto its own, LONGER duration token
+	 * (`--obtask-motion-settle`) than the other three properties here: a
+	 * pickup must register as immediate (120-160ms, `--obtask-motion`, same
+	 * as hover), but a springy landing needs the slower half of the arc to
+	 * read as a settle rather than a snap — see the drag/resize lift comment
+	 * below for the full pickup-to-landing arc this feeds.
+	 */
+	transition:
+		background-color var(--obtask-motion, 120ms) ease,
+		opacity var(--obtask-motion, 120ms) ease,
+		box-shadow var(--obtask-motion, 120ms) ease,
+		scale var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /*
@@ -467,8 +498,47 @@
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	border-radius: var(--radius-s);
+	/*
+	 * `background-clip: padding-box` (further down, alongside
+	 * `border-block-end`) clips the PAINTED background to the padding box,
+	 * whose own corner radius the CSS Backgrounds & Borders spec derives by
+	 * shrinking each outer (border-box) radius by the width of that
+	 * corner's two adjacent borders, independently per edge. Both bottom
+	 * corners are adjacent to `border-block-end` (`calc(var(--size-4-1) + 1px)`,
+	 * 5px, added below for the vertical slot-line gap/inset — the extra 1px
+	 * compensates the slot gridline's own thickness, see that rule's own
+	 * comment) — left at the bare `--radius-s` above, their painted radius
+	 * would come out `--radius-s − 5px`, which for this plugin's
+	 * `--radius-s` (~4px in the default theme) rounds to zero: squared-off
+	 * bottom corners (user-reported "no more radius" regression from that
+	 * border's 2px -> 4px growth). Inflating the border-box's OWN bottom
+	 * radii by that same 5px below cancels the subtraction exactly, so the
+	 * PAINTED corner comes back to a clean `--radius-s`; only the invisible
+	 * transparent-border zone and the lift/drag shadow's silhouette (which
+	 * both follow the border-box, not the padding box) get the slightly
+	 * bigger outer radius — imperceptible at a 5px difference on either.
+	 *
+	 * TWO-VALUE (horizontal vertical) form, not a single value: the spec's
+	 * per-edge subtraction shrinks only the radius component PERPENDICULAR
+	 * to the bordered side — a block-end border eats the corner's VERTICAL
+	 * component alone. A single-value compensation inflated the horizontal
+	 * component with nothing subtracting it back, painting the bottom
+	 * corners as wide (radius+4)×radius ellipses — the user-reported bulgy
+	 * "melted" corners. Horizontal stays `--radius-s`; only vertical
+	 * carries the +5px that the border claws back.
+	 */
+	border-end-start-radius: var(--radius-s) calc(var(--radius-s) + var(--size-4-1) + 1px);
+	border-end-end-radius: var(--radius-s) calc(var(--radius-s) + var(--size-4-1) + 1px);
 	box-shadow: none;
 	overflow: hidden;
+	/* Same hover ease + drag/drop opacity/box-shadow/scale settle as the
+	 * day-grid/all-day rule above — see its comment for why, including the
+	 * split pickup-vs-settle duration on `scale`. */
+	transition:
+		background-color var(--obtask-motion, 120ms) ease,
+		opacity var(--obtask-motion, 120ms) ease,
+		box-shadow var(--obtask-motion, 120ms) ease,
+		scale var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 	/* Tight (not the library's own 1.5) — see the day-grid/all-day `.ec-event`
 	 * rule above for the same change; this also shrinks the container-query
 	 * threshold below, since the time line's line-height is one of its
@@ -523,6 +593,79 @@
 	 */
 	container-type: size;
 	container-name: obtask-event;
+	/*
+	 * Vertical gap between BACK-TO-BACK timed blocks, AND slot-line symmetry
+	 * for every block (solo or not): when one block's end time exactly
+	 * equals the next's start time, EC's vertical layout has no equivalent
+	 * of `--ec-event-col-gap` (the horizontal gap variable used further
+	 * down) — `block-size` and the block's own top offset come straight
+	 * from the time span alone (`slotHeight * duration`,
+	 * event-calendar-renderer.ts), so two such blocks tile edge-to-edge with
+	 * nothing between them ("surfaces fuse") unless something recedes one
+	 * of the touching edges.
+	 *
+	 * `margin-block: var(--size-2-1)` (further down, 2px) shifts the box's
+	 * whole border-box down by 2px from where EC placed it — this is normal-
+	 * flow margin, not a grid-area inset, so `margin-block-end` never pulls
+	 * the box's own bottom edge back up; only `margin-block-start` moves
+	 * anything, and it moves the ENTIRE box (top edge same 2px past the
+	 * start line, bottom edge same 2px past the end line, since block-size
+	 * itself is untouched). That's why a border-only, paint-only recede is
+	 * required on the bottom edge to bring it back — a bare margin can only
+	 * push a box around, it can't shrink one edge independently of the
+	 * other (the identical reasoning that already ruled out `margin-inline`
+	 * for the horizontal overlap gap below — see that rule's own comment —
+	 * just on this axis instead).
+	 *
+	 * The lever: `border-block-end` with a *transparent* color plus
+	 * `background-clip: padding-box` shrinks only the PAINTED background
+	 * inward from the box's own end (bottom) edge. `.ec-event` is
+	 * `box-sizing: border-box` (confirmed via a live DOM probe, same as the
+	 * horizontal case), so the border is carved OUT of the existing
+	 * border-box rather than added on top of it — the inline `block-size`
+	 * this rule's own comment above describes, the block's `top` offset,
+	 * and every layout calc EC or this stylesheet does elsewhere are
+	 * completely unaffected; only paint moves. No `border-block-start`: the
+	 * asymmetry is deliberate — margin already pushes BOTH edges down by
+	 * the same 2px, so recede-only-the-bottom is what turns "both edges 2px
+	 * past their line, same direction" into "both edges 2px INSIDE their
+	 * line" (see the arithmetic below), not "shrunk from both ends".
+	 *
+	 * Resulting geometry (5px border, 2px margin — the two are sized as a
+	 * matched pair, not independently; the border is `calc(var(--size-4-1) +
+	 * 1px)`, where the `+ 1px` compensates the slot gridline's own
+	 * thickness — the vendored `@event-calendar/core/dist/index.css` time
+	 * grid draws slot lines as a repeating `linear-gradient(to top,
+	 * var(--ec-border-color) 1px, transparent 1px)` tile, so each line
+	 * occupies the 1px JUST ABOVE its slot boundary, not the boundary pixel
+	 * itself): painted top = start line + 2px (margin push, nothing recedes
+	 * the top) — the START line lives in the 1px directly above the
+	 * boundary, so the gap between the line and the painted top is a clean
+	 * 2px. Painted bottom = border-box bottom (end line + 2px, same margin
+	 * push) − 5px border recede = end line − 3px — 2px above the END line's
+	 * own top edge (that line spans [end − 1, end]), the same 2px gap as
+	 * the top, just measured off the far side of a 1px line instead of
+	 * directly off the boundary — visually symmetric 2px/2px. A
+	 * back-to-back pair: block A's painted bottom sits at its end line − 3,
+	 * block B's painted top sits at its start line + 2 — since A's end line
+	 * and B's start line are the SAME coordinate, the two painted surfaces
+	 * end up 5px apart with the 1px gridline centered inside that gap (2px
+	 * clear on either side of it).
+	 *
+	 * Scoped here, on the BASE rule (every timed block), unlike the
+	 * horizontal gap below which targets only overlap-group members: on that
+	 * axis a solo block is already inset on both sides by real margin and
+	 * only overlap members tile edge-to-edge, so only those need the paint
+	 * trick. On THIS axis every block needs the same bottom recede just to
+	 * land on its own end line (it's not merely a back-to-back nicety
+	 * anymore), and applying it unconditionally also means a solo block's
+	 * and the drag `.ec-preview` clone's (which matches this same selector)
+	 * painted height stay IDENTICAL to a back-to-back block's — the preview
+	 * intentionally gets this too, so nothing pops by 5px as a block is
+	 * pressed or dragged into or out of contact with a neighbor.
+	 */
+	border-block-end: calc(var(--size-4-1) + 1px) solid transparent;
+	background-clip: padding-box;
 }
 
 /*
@@ -550,6 +693,495 @@
 }
 
 /*
+ * Press/drag/resize lift. Event Calendar does NOT put a "dragging" class on
+ * the event being moved — `.ec-dragging`/`.ec-resizing-x`/`.ec-resizing-y`
+ * (vendored stylesheet) land on the calendar's own root/main element purely
+ * to force a `cursor` for the whole interaction (confirmed against
+ * `@event-calendar/core/dist/index.js`: `mainState.iClass` is set to
+ * "dragging"/"resizingX"/"resizingY" and applied as a class up on the shared
+ * interaction root — that root wraps the whole view, `.ec-preview`/
+ * `.ec-ghost` included, so `.ec-dragging`/etc. are genuine ANCESTORS of
+ * them, not siblings). What actually moves under the pointer is a *clone*
+ * of the event, themed `.ec-preview` (`createIEvent` sets the clone's
+ * `display` to "preview"; the vendored stylesheet already gives
+ * `.ec-preview` `z-index: 1000; opacity: .8`) — the original event instead
+ * gets `display: "ghost"` (`.ec-ghost`: `opacity: .5; pointer-events: none`)
+ * and stays put as an in-place placeholder, which is exactly what the
+ * `.ec-event` `transition: opacity …` above now eases in and back out on
+ * drop. `createIEvent` (the function that assigns "preview"/"ghost") is the
+ * single call site for both drag AND resize, so resize ghosts/previews the
+ * original exactly like drag does — anything scoped to `.ec-dragging` alone
+ * stays lift-free during a resize, which matters below.
+ *
+ * The lift now starts on PRESS, before EC even knows whether this becomes a
+ * drag: `.ec-event:active` (below, plain CSS, no library involvement) lifts
+ * the original the instant a pointer/finger presses it. Once a drag
+ * threshold does fire and EC inserts the preview clone, the clone is born
+ * already carrying that lifted state — no separate "pop" plays at
+ * drag-start, the clone just continues what the press already showed.
+ *
+ * The full arc reads as four physical beats, press through landing:
+ *   0. Press (instant, `--obtask-motion`, `.ec-event:active`): the original
+ *      lifts to 105% with a cast shadow the moment it's pressed — no tilt
+ *      yet, since a straight lift reads as "raised", acknowledging the
+ *      touch itself ("I've got it"). On touch this blooms during the 500ms
+ *      `longPressDelay` (`event-calendar-renderer.ts`) as the cue to keep
+ *      holding; on desktop it precedes the drag threshold firing at all, so
+ *      even a press that never turns into a drag gets the acknowledgement.
+ *   1. Handoff (same frame, no animation): once the drag threshold fires,
+ *      EC swaps the pressed original's display to "ghost" and inserts the
+ *      "preview" clone. The clone's resting state — `scale: 1.05; box-
+ *      shadow: var(--obtask-lift-shadow)` — is exactly what the pressed original was
+ *      already showing, plus a tilt (`rotate: 0.6deg`) that lands
+ *      untransitioned on the clone: deliberately, since the tilt is what
+ *      marks the instant the block starts travelling, distinct from the
+ *      straight press-lift that preceded it. Nothing needs to animate in
+ *      here (unlike a fresh pop would need) because the clone spawns
+ *      already at the state the eye just saw on the original.
+ *   2. Float (held, no further animation): the clone sits tilted, shadowed,
+ *      and nearly opaque (0.9) while it tracks the pointer.
+ *   3. Settle (slow, `--obtask-motion-settle`): EC deletes the `.ec-preview`
+ *      clone outright on drop, taking its shadow with it, and the element at
+ *      the new slot never carried one of its own — so the settle is played
+ *      explicitly, as a one-shot `obtask-set` animation (`.obtask-dropped`,
+ *      below) tagged onto that landed element by the `eventDrop`/
+ *      `eventResize` handler (`event-calendar-renderer.ts`). Its keyframe
+ *      `from` restates the clone's exact float state (105% scale, 0.6deg
+ *      tilt, `--obtask-lift-shadow`) so the clone's deletion hands off to the real
+ *      element mid-air instead of visibly cutting the shadow, and settles
+ *      through the SAME back-out bezier, now on a longer duration —
+ *      overshooting past 100% before relaxing — reading as the block
+ *      landing, compressing, and springing to rest rather than snapping into
+ *      place. (A resize's "landing" plays the same way, on its new extent —
+ *      `applyMove` is the shared handler for both gestures.)
+ *
+ * All three magnitudes above — 105% lift, 0.6deg tilt, 97% ghost-shrink —
+ * live in inherited custom properties (`--obtask-lift-scale`,
+ * `--obtask-lift-tilt`, `--obtask-ghost-scale`, defined on `.obtask-calendar`
+ * itself just below) rather than as literals repeated across the four rules
+ * that use them, because the right magnitude is a function of the event's
+ * on-screen width, not a fixed constant: `scale`/`rotate` are proportional to
+ * the element they're applied to, so 5% or 0.6deg reads as a subtle "lift"
+ * on a narrow week/3-day/month column but becomes tens of pixels of
+ * horizontal growth/shrink (misreading as an actual resize) or a visible
+ * corner-lift (tilt's apparent corner rise is width × sin(angle)) on a
+ * full-pane-width day-view block. `.ec-day-view` overrides all three tokens
+ * down near-neutral (see that rule, below the ghost rule) rather than this
+ * arc special-casing day view directly, so every rule here stays written in
+ * terms of "the lift", agnostic to which view is active.
+ *
+ * A `box-shadow: var(--shadow-s)` lift was tried and dropped once already
+ * for the view switcher's "raised card" attempt (~line 900 below) — that
+ * finding (`--shadow-s` reads as a dark rim, not elevation, once Obsidian's
+ * dark themes make the fill lighter than the surrounding surface) was about
+ * a tab raised ABOVE a track it shares a surface family with, where the
+ * shadow had to frame a fill lighter than what surrounds it. A pressed or
+ * dragged event is the opposite case: it reads as lifting free of the grid
+ * with no shared surface to clash against, which is exactly the situation a
+ * cast shadow is the natural depth cue for — Obsidian's own menus/popovers
+ * reach for this same shadow COLOR under dark themes for exactly that
+ * floating-above-the-page read, so it applies here without the rim problem.
+ * The actual token used, `--obtask-lift-shadow` (defined below, `0 2px 8px
+ * var(--background-modifier-box-shadow)`), is `--shadow-s`'s same color
+ * idiom at a deliberately tighter blur/offset — see that token's own
+ * comment for why: `--shadow-s`'s full 30px blur was measured crossing the
+ * pane's own unfixable scroll-container edge in a narrow pane.
+ *
+ * `opacity: 0.9` (up from the library's own default `.8`, previously
+ * restated here as `.85`): a lifted object reads more physical the more
+ * solid it is, and 0.9 keeps just enough transparency for the dragger to
+ * still aim at the drop slot underneath the clone.
+ *
+ * `rotate` is the standalone CSS property, not part of a `transform:`
+ * string — same reasoning as `scale` below: it composes with a `transform`
+ * a future EC version might set, where `transform: rotate(…)` would clobber
+ * it outright.
+ *
+ * On top of that opacity, a scale "lift" makes the pickup unmistakable: the
+ * pressed original grows to 105% under the pointer, the clone that takes
+ * over once a drag starts continues at that same 105% (now tilted), the
+ * original (turned ghost) visibly "gives up" its slot at 97%, and the block
+ * settles back to 100% at wherever it lands. `scale` (the standalone CSS
+ * property), never `transform: scale(…)`: EC never sets an inline
+ * `transform` on any event (confirmed — it positions everything with
+ * `inset-block-start`/`inset-inline-start`/`block-size`/`inline-size`/
+ * `margin-block-start` logical-property strings instead), so either would
+ * work today, but `scale` composes with a `transform` no matter which one a
+ * future EC version reaches for, where `transform: scale(…)` would just
+ * clobber it. Support floor: the container-query comment above (~line 781)
+ * already establishes this plugin's runtime floor at Chromium >= 106 / iOS
+ * 16.4+ WebKit — both years past `scale`'s own ship dates (Chromium 79,
+ * Safari 14.1), so no separate floor check is needed for it.
+ *
+ * - Press: `.ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active))`
+ *   (below) — plain `:active`, no EC involvement, so it fires immediately on
+ *   pointer/finger down rather than waiting for the drag threshold.
+ *   `:not(.ec-ghost)`: the moment ANY interaction starts (drag OR resize) EC
+ *   swaps the original's display to "ghost", and a still-held `:active` must
+ *   not keep that ghost inflated — this matters most for a resize, where the
+ *   ghost stays in place under the still-pressed pointer for the whole
+ *   gesture instead of being replaced by a preview clone. `:not(:has(.ec-
+ *   resizer:active))`: `.ec-resizer` (vendored, `@event-calendar/core/dist/
+ *   index.css`) is the resize-handle drag grip rendered as a CHILD of
+ *   `.ec-event` (confirmed against the event component's own template in
+ *   `@event-calendar/core/dist/index.js`), so pressing the handle also
+ *   `:active`s the event it belongs to — without this exclusion, grabbing an
+ *   edge to resize a block would lift the very block being stretched,
+ *   fighting the resize instead of getting out of its way. `:has()` is
+ *   already relied on elsewhere in this file (the time-grid title rule
+ *   below), so it's within this plugin's existing support floor. No tilt on
+ *   press: a straight lift reads as "raised" — the tilt is a *carry* cue and
+ *   joins only once the block is actually moving (the preview clone, below).
+ * - Pickup: `.ec-dragging .ec-preview` scoped, not plain `.ec-preview` — a
+ *   resize's own preview is a size change already in progress under the
+ *   pointer, and a simultaneous 105% scale on it would visibly fight the
+ *   dimension the drag is actively editing. `scale: 1.05; rotate: 0.6deg;
+ *   box-shadow: var(--obtask-lift-shadow)` are all static now, no `animation`: the
+ *   press rule above already brought the pressed original to this same
+ *   scale/shadow before the clone ever existed, so the clone just inherits
+ *   the lifted look on the same frame it's inserted — only `rotate` is new
+ *   on the clone, and it's meant to appear untransitioned (see beat 1 of the
+ *   arc above). A `transition` couldn't ease it in anyway — the clone is a
+ *   freshly inserted element with no prior computed style to ease from on
+ *   its first paint.
+ * - Ghost + landing: `.ec-dragging .ec-ghost` (same drag-only scoping, for
+ *   the same fight-the-resize reason) shrinks the original to 97% right
+ *   where it sits — it visibly "gives up" its slot the moment the clone is
+ *   picked up. Because drop removes `.ec-dragging` from the root and
+ *   `.ec-ghost` from the (possibly reused) element at the NEW slot in the
+ *   same update, that element's `scale` cascades back to the base
+ *   `.ec-event` value of 1 through the same transition — but that alone only
+ *   ever covered `scale`, and only for a REUSED element (a freshly created
+ *   one at the new slot never had `.ec-ghost` on it to revert from, and
+ *   neither had a shadow, since `.ec-preview` — the only thing that ever
+ *   carried one — is deleted, not moved, on drop). The actual "landing"
+ *   flourish, shadow included, is the explicit `.obtask-dropped` animation
+ *   below (beat 3), tagged on unconditionally by the drop/resize handler
+ *   regardless of whether EC reused or recreated the element; this `scale`
+ *   reversion still fires alongside it on a reused element, harmlessly
+ *   redundant with the animation already driving the same property.
+ */
+/*
+ * Lift geometry tokens — see the arc comment above for why these are
+ * variables rather than literals baked into each of the four rules that
+ * consume them (press-lift, preview, ghost, `obtask-set` keyframe). Defined
+ * here with the values that read right on a narrow column (week/3-day/
+ * month); `.ec-day-view` (below the ghost rule) overrides all three toward
+ * neutral for the full-pane-width case.
+ *
+ * `--obtask-lift-shadow`: the lift's cast shadow, deliberately tighter than
+ * `--shadow-s` (Obsidian's own floating-element shadow, `0 15px 30px` at its
+ * largest layer — measured via an in-app computed-style probe). The float is
+ * often flush against the PANE's own scroll container
+ * (`.bases-view.obtask-calendar-view`, `overflow: auto`, Obsidian's own —
+ * the one clipper this plugin cannot relax the way the day-view fix just
+ * below relaxes `.ec-main`, because pane scrolling and dragScroll both rely
+ * on it staying a scroller), and `.obtask-calendar`'s own `--size-4-4`
+ * padding (~16px) is the ENTIRE budget the shadow may paint into past a
+ * flush-against-the-edge block. `--shadow-s`'s 30px blur was measured
+ * crossing that pane edge in a narrow pane, where the hard clip line at
+ * `.bases-view`'s boundary read as the block being cut rather than a
+ * shadow fading out.
+ *
+ * Kept to an 8px blur + 2px y-offset (10px of paint past the block's own
+ * edge, plus a negligible 1px spread from the 0 x-offset/no-spread shape) so
+ * the total overhang stays inside that 16px budget even after the lift's
+ * own scale growth: at the current tokens (1.05 lift / 1.01 day-view lift,
+ * both below), scale growth is at most (1.05 - 1) / 2 = 2.5% of the
+ * element's own size per side, which for the widest realistic block (a
+ * full-pane day-view column, easily 300px+) is single-digit pixels but
+ * given a generous upper bound of ~3px/side — 3px (scale) + 10px (shadow) =
+ * 13px < 16px (padding), so the shadow never reaches the pane's clip edge.
+ * `--background-modifier-box-shadow` (probed in-app: resolves to
+ * `rgba(0, 0, 0, 0.3)`, the same color Obsidian's own shadow tokens use) —
+ * not a hardcoded rgba — keeps this themed like `--shadow-s` was.
+ */
+.obtask-calendar {
+	--obtask-lift-scale: 1.05;
+	--obtask-lift-tilt: 0.6deg;
+	--obtask-ghost-scale: 0.97;
+	--obtask-lift-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+}
+
+.obtask-calendar .ec-preview {
+	opacity: 0.9;
+}
+
+/*
+ * Press lift on the original event — see beat 0 of the arc comment above.
+ * Uses THIS rule's own transition (the destination state's — entering a
+ * state runs the transition declared on the rule being entered, per normal
+ * CSS transition semantics) rather than the base `.ec-event` rule's
+ * `--obtask-motion-settle`, so the grab reads snappier than the slower
+ * settle un-press/drop keeps: releasing removes the `:active` match, so the
+ * base rule's own (slower) transition governs the way back down instead.
+ */
+.obtask-calendar .ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active)) {
+	scale: var(--obtask-lift-scale);
+	box-shadow: var(--obtask-lift-shadow);
+	transition:
+		scale var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
+		box-shadow var(--obtask-motion, 160ms) ease;
+}
+
+/*
+ * "Set" landing animation — see beat 3 of the arc comment above. EC deletes
+ * the `.ec-preview` clone outright on drop, so it never hands the shadow it
+ * carried off to anything; the real element sitting at the new slot never
+ * had one of its own either. Rather than rely on a scale-only transition
+ * that only ever fired for a REUSED element (see the "Ghost + landing"
+ * bullet above), the drop/resize handler (`applyMove` in
+ * `event-calendar-renderer.ts`) tags the landed element with `.obtask-
+ * dropped` unconditionally, and this keyframe plays the whole landing
+ * explicitly on it.
+ *
+ * The `from` restates the preview's exact float state — `scale: 1.05;
+ * rotate: 0.6deg; box-shadow: var(--obtask-lift-shadow)` — so the clone's deletion
+ * hands off to the real element mid-air and the landing reads as one
+ * continuous motion rather than a cut: scale and tilt relax to their
+ * natural (unset) values while the shadow fades out, as if the block is
+ * descending and settling under its own weight over the course of the
+ * animation. No explicit `to` is needed — an omitted end state falls back to
+ * the element's own computed style, i.e. the base `.ec-event` rule (no
+ * `rotate`, `box-shadow: none`), which is exactly the rest state landing
+ * should arrive at.
+ *
+ * A running `animation` always outranks a property's own `transition` (the
+ * animation engine wins the cascade for any property it's actively
+ * animating), so this doesn't fight the base `.ec-event` rule's own `scale`
+ * transition (still doing its job for the ghost-shrink release on pickup,
+ * beat "Ghost + landing" above) or the time-grid base rule's `box-shadow:
+ * none` — both simply take back over once the animation ends.
+ *
+ * The spring bezier (same one used throughout this arc) gives the settle a
+ * brief compression below rest (scale dips under 1, box-shadow fully faded)
+ * before relaxing back up to the resting state — reads as the block
+ * absorbing its own landing impact rather than free-falling into place.
+ *
+ * Deliberately left on the element once finished rather than removed by a
+ * listener: a finished CSS animation is inert (its keyframe values stop
+ * applying once the fill mode's default, `none`, takes over at 100%), so an
+ * `animationend` listener would only ever be bookkeeping, not a visual
+ * fix — and the handler already needs a remove/reflow/add sequence to
+ * RESTART the animation on a same-frame re-drop regardless (a bare
+ * `classList.add` when the class is already present is a no-op, coalesced
+ * by the browser before it ever reaches layout).
+ *
+ * `--obtask-motion-settle` is the same duration token the pickup/release
+ * scale transition uses; under `prefers-reduced-motion` (see the
+ * `--obtask-motion` guard at the end of this file) it's 0s, so the landing
+ * resolves instantly rather than animating.
+ */
+@keyframes obtask-set {
+	from {
+		scale: var(--obtask-lift-scale);
+		rotate: var(--obtask-lift-tilt);
+		box-shadow: var(--obtask-lift-shadow);
+	}
+}
+
+.obtask-calendar .ec-event.obtask-dropped {
+	animation: obtask-set var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/*
+ * Preview continuity: no `@keyframes`/`animation` here (removed — see beat 1
+ * of the arc above). The clone spawns already at the lifted state the
+ * pressed original was showing; `rotate: 0.6deg` is the one value that's new
+ * on the clone versus the press-lift rule above, and it's deliberately
+ * static/untransitioned — it marks the moment the block starts travelling.
+ *
+ * Specificity is load-bearing: the clone also matches the time-grid base
+ * rule (`.obtask-calendar .ec-time-grid .ec-body .ec-event`, 0,4,0), whose
+ * `box-shadow: none` silently beat an earlier 3-class version of this
+ * selector the moment Event Calendar re-slotted the clone inside `.ec-body`
+ * — the reported "shadow disappears while dragging". `.ec.ec-dragging`
+ * (both classes sit on the same calendar root) and `.ec-event.ec-preview`
+ * (both on the clone) lift this to 0,5,0 so it wins on weight, not on
+ * source order.
+ */
+.obtask-calendar .ec.ec-dragging .ec-event.ec-preview {
+	scale: var(--obtask-lift-scale);
+	rotate: var(--obtask-lift-tilt);
+	box-shadow: var(--obtask-lift-shadow);
+}
+
+.obtask-calendar .ec-dragging .ec-ghost {
+	scale: var(--obtask-ghost-scale);
+}
+
+/*
+ * Day-view override of the lift geometry tokens above. `.ec-day-view` lands
+ * on the same calendar root as `.ec` itself (confirmed by the week-view
+ * rule further down in this file, which documents the mechanism:
+ * `themeView("ec-time-grid ec-day-view")` in
+ * `@event-calendar/core/dist/index.js`), so this single rule scopes the
+ * whole day view — including its all-day row — the same way `.ec-week-view`
+ * scopes week view there.
+ *
+ * Percentage `scale` is proportional to the element it's applied to: on a
+ * narrow week/3-day/month column (a fraction of the pane width) 105%/97%
+ * reads as a few pixels of lift/shrink, but on a day-view block spanning
+ * the FULL pane width, the same percentages are tens of pixels of actual
+ * horizontal growth or shrink — which reads as the block being resized, not
+ * lifted (the reported bugs: preview overflowing the column, ghost looking
+ * ~20px narrower). `rotate`'s apparent effect scales with width too — the
+ * corner rise a tilt produces is width × sin(angle) — so 0.6deg visibly
+ * lifts the corners of a very wide block even though it's imperceptible on
+ * a narrow one. At day-view widths the cast `box-shadow` alone (kept as-is,
+ * not width-dependent) carries the elevation cue, so the geometry backs off
+ * to near-neutral instead: barely-there scale, negligible tilt, and no
+ * ghost-shrink at all. Week/3-day/month keep the defaults above unchanged.
+ */
+.obtask-calendar .ec-day-view {
+	--obtask-lift-scale: 1.01;
+	--obtask-lift-tilt: 0.1deg;
+	--obtask-ghost-scale: 1;
+}
+
+/*
+ * Day-view drag clipping fix. Reported bug: the dragged `.ec-preview`
+ * block's slight scale growth and its `--shadow-s` cast shadow were
+ * visually cut off at the block's left/right edges in day view (week view
+ * was fine, since its narrower per-day columns leave the block away from
+ * the clipping edges).
+ *
+ * Confirmed by a mid-drag DOM probe (walking `.ec-preview`'s ancestor chain
+ * while `.ec.ec-dragging` was live, day view, one full-pane-width column):
+ * `.ec-body`/`.ec-events` directly above the preview are `overflow:
+ * visible`; the next ancestor up, `.ec-main` (vendored, `@event-calendar/
+ * core/dist/index.css` — EC's own time-grid scroller wrapper), is
+ * `overflow: auto`, and its measured right edge (993px in the probe) sat
+ * essentially flush against the preview's own right edge (991.8px) —
+ * the block occupies almost the full column width, so its `--shadow-s`
+ * layers (0 x-offset, up to a 30px blur radius) paint well past `.ec-main`
+ * on the side the pointer moves toward and get clipped there. Every
+ * ancestor further out (`.bases-view`, `.view-content`, the Obsidian
+ * workspace panes) is wide enough that the preview's painted extent never
+ * reaches them, so `.ec-main` — not Obsidian's own scroller — is the actual
+ * clipper.
+ *
+ * Still exceeds `.ec-main` today, even though both the shadow and the
+ * day-view lift have since shrunk from what the probe above measured:
+ * `--obtask-lift-shadow` (0 x-offset, 8px blur) alone paints 8px past the
+ * block's left/right edges, and `--obtask-lift-scale: 1.01` on a
+ * full-pane-width column (~900-1000px) adds another (1.01 − 1) / 2 ≈ 5px of
+ * scale growth per side — roughly 13px of painted overflow past the
+ * block's own edge. The block's margin to `.ec-main`'s edge is
+ * `--ec-event-col-gap / 2` (this file's own time-grid redefinition, 16px /
+ * 2 = 8px) plus the sub-pixel slack the probe above found between the
+ * column edge and `.ec-main`'s own edge (~1px) — call it 9px total. 13px of
+ * overflow against a 9px margin still clips, so this rule stays required;
+ * revisit this arithmetic if either `--obtask-lift-shadow` or
+ * `--ec-event-col-gap` changes again.
+ *
+ * Safe to relax: this plugin always mounts Event Calendar with `height:
+ * "auto"` (see the `height` option comment in
+ * `event-calendar-renderer.ts`) specifically so `.ec-main` never needs an
+ * internal scroller — the pane's own scroll does that job instead — so
+ * dropping its `overflow: auto` to `visible` costs no real scrolling
+ * behavior, only while `.ec-dragging` is live.
+ *
+ * Scoped to `.ec-day-view.ec-dragging`, not every view and not resize:
+ * week/3-day/month keep their narrower columns (unaffected already, per the
+ * bug report) and scoping to day view alone also avoids this rule ever
+ * outranking the vendored `.ec-main.ec-day-grid.ec-uniform { overflow:
+ * hidden }` compact-month rule (`@event-calendar/core/dist/index.css`),
+ * which still needs its own clipping to cap a busy day-grid cell's stack —
+ * this selector's higher specificity would otherwise beat it during any
+ * drag. A resize's preview never grows past `.ec-main` in the first place:
+ * the lift rules above (`.ec-dragging .ec-preview`, `.ec-event:active`) are
+ * deliberately NOT scoped to `.ec-resizing-x`/`.ec-resizing-y` (see the
+ * "Pickup" bullet in the drag-lift arc comment further up), so a resize's
+ * preview carries no extra scale or shadow to clip — hence no
+ * `.ec-resizing-x`/`.ec-resizing-y` variant of this rule is needed.
+ *
+ * Reverts the instant EC removes `.ec-dragging` from the root on drop, so
+ * the day header's `position: sticky` only ever repositions against a
+ * different scrolling ancestor (`.bases-view`/`.view-content`, both already
+ * scroll containers) for the transient duration of the drag itself.
+ */
+.obtask-calendar .ec.ec-day-view.ec-dragging .ec-main {
+	overflow: visible;
+}
+
+/*
+ * Uniform edge inset for timed blocks, matching the day-grid/all-day chips'
+ * `--size-4-1` breathing room (previous inset here was a bare `col-gap / 2`
+ * = 3px, visibly tighter than the chips' ~7px — measured via a live DOM
+ * probe on both). Getting there took a different mechanism than the chips,
+ * though, because timed blocks resolve their box very differently: a live
+ * probe of a real block's inline style reads
+ * `grid-column: 2; …; inset-inline-start: calc((100% - var(--ec-event-col-gap))
+ * / N * i); inline-size: calc((100% - var(--ec-event-col-gap)) / N * 1);`
+ * (`N`/`i` = overlap-group size/index, `1`/`0` when solo) — EC places each
+ * block with `grid-column` into `.ec-events`' subgridded column tracks
+ * (`.ec-events { grid-template: subgrid / subgrid }`, inheriting the exact
+ * day-column lines from `.ec-main`'s own `grid-template-columns`), so the
+ * `100%` in that formula is the SUBGRID COLUMN TRACK's width — a value
+ * `.ec-main` computes from ITS OWN box, not from any padding on an
+ * intermediate wrapper. `padding-inline` on `.ec-events`/`.ec-day` (the
+ * "pad the resolving container" approach that works for the day-grid/
+ * all-day chips, which get no inline position/size override at all) was
+ * tried and measured to do nothing here — the subgrid tracks stay put
+ * regardless of a subgrid item's own padding. `.ec-day` isn't even a safe
+ * padding target on its own merits: in the time grid it draws the hour/
+ * column gridlines as a `background-image` directly on itself (vendored
+ * `@event-calendar/core/dist/index.css`, `.ec-day` `.ec-time-grid .ec-body &`
+ * block) — padding it would misalign that background pattern from the
+ * real column border, a visible seam.
+ *
+ * The lever that DOES work: `var(--ec-event-col-gap)` inside that inline
+ * calc is EC's own custom property, read live off the cascade (the inline
+ * style is literally the text `var(--ec-event-col-gap)`, not a baked
+ * pixel number), so redefining it on an ancestor changes every block's
+ * resolved position/width without EC re-running any layout JS. The existing
+ * `margin-inline: calc(var(--ec-event-col-gap) / 2)` below already keys off
+ * the same variable, so bumping it here updates margin AND the inline calc
+ * in lockstep. For a solo block (`i` = 0) `inset-inline-start` is exactly 0
+ * (no shift from the box's own start-anchored grid position) and
+ * `inline-size` is `100% - gap`, so a margin of exactly `gap / 2` on both
+ * sides cancels out to a precisely symmetric inset of `gap / 2` — confirmed
+ * against the current 6px default (`.375rem`, vendored `:root`) yielding
+ * measured 3px/3px insets either side, matching the existing halved-margin
+ * rule exactly. The same cancellation holds for every member of an overlap
+ * group too: summed across `N` members the group still spans exactly
+ * `100% - gap`, so the same per-member `gap / 2` margin still lands each
+ * outer edge `gap / 2` from the column edge (and gives inner members a full
+ * `gap` gap between them) — this is why bumping the ONE variable, not the
+ * margin rule directly, is what keeps the overlap-group geometry e2e
+ * ("keeps an overlapping pair of timed blocks inside their day column")
+ * passing unmodified. Doubling the desired inset back out: for an
+ * `var(--size-4-2)` (8px) inset on each side, `--ec-event-col-gap` needs to
+ * be `var(--size-4-2) * 2` (16px) — measured after the change: 8px/8px,
+ * within a px of the chips' own ~7px (chips reach that off a totally
+ * different, grid-alignment-driven mechanism — see the day-grid/all-day
+ * rule above — so an exact match isn't available from a shared formula;
+ * 8px reads the same to the eye and stays on a clean spacing token rather
+ * than a composite one).
+ *
+ * Scoped to `.ec-body` specifically (not just `.ec-time-grid`) so this
+ * redefinition never leaks to `.ec-all-day` (a sibling of `.ec-body`, not a
+ * descendant) — the all-day row keeps reading the library's own unmodified
+ * `--ec-event-col-gap` default, which its own inset math (day-grid/all-day
+ * rule above) already accounts for.
+ *
+ * Critically, this also fixes the drag `.ec-preview`: EC gives the preview
+ * NO inline `inset-inline-start`/`inline-size` of its own (confirmed via a
+ * live mid-drag DOM probe — its inline style carries only `grid-column`/
+ * `inset-block-start`/`block-size`), so it falls back to the vendored
+ * default `.ec-event { inline-size: calc(100% - var(--ec-event-col-gap)) }`
+ * plus this same stylesheet's `margin-inline` rule below — both of which
+ * read the SAME redefined variable, so the preview's width tracks real
+ * blocks automatically with no separate preview-specific rule (and no
+ * stylesheet `inline-size` override here at all, which is what desynced the
+ * preview from real blocks before — see that landmine's history below).
+ */
+.obtask-calendar .ec-time-grid .ec-body {
+	--ec-event-col-gap: calc(var(--size-4-2) * 2);
+}
+
+/*
  * Uniform edge inset for timed blocks, same reasoning and same four-side
  * `margin` shorthand as the day-grid/all-day rule above. EC lays these out
  * with `inline-size: calc(100% - var(--ec-event-col-gap))` (left-aligned,
@@ -567,11 +1199,102 @@
  * inline-size — the drag `.ec-preview` — which a narrower calc here made
  * visibly smaller than the block being dragged (67px vs 75px, measured).
  * With no stylesheet override, the preview falls back to the library's own
- * base `.ec-event` width and matches real blocks exactly.
+ * base `.ec-event` width and matches real blocks exactly. `margin-inline`
+ * reads `--ec-event-col-gap` off the redefinition just above, not the
+ * library's own 6px default — see that rule's comment for the full
+ * derivation of why halving it keeps this exactly symmetric.
+ *
+ * `margin-block: var(--size-2-1)` (2px, not the day-grid/all-day rule's
+ * 4px) is deliberately the SMALLER portion of a matched pair with the
+ * base rule's `border-block-end: calc(var(--size-4-1) + 1px)` (5px)
+ * above: this is normal-flow margin, so it shifts the box's ENTIRE
+ * border-box down by 2px from where EC placed it (both edges move the
+ * same direction by the same amount — `margin-block-end` never pulls the
+ * bottom edge back up on its own), landing both raw edges 2px PAST their
+ * slot line before any border recede. The border then claws 5px of that
+ * back off the bottom only, netting painted-bottom = end line − 3px
+ * against painted-top = start line + 2px — a symmetric 2px gap off both
+ * lines once the gridline's own 1px thickness is accounted for (the END
+ * line sits in the 1px just above its boundary, so the 3px recede lands
+ * 2px above that line's own top edge, matching the START line's 2px gap
+ * below it). A 5px/5px split (border matching margin) would instead
+ * have under-shot the top: the pairing only comes out symmetric because
+ * the shift (2px) and the recede (5px) are a matched, not equal, pair —
+ * see the base rule's own comment for the full arithmetic and the
+ * resulting back-to-back gap.
  */
 .obtask-calendar .ec-time-grid .ec-body .ec-event {
-	margin-block: var(--size-4-1);
+	margin-block: var(--size-2-1);
 	margin-inline: calc(var(--ec-event-col-gap) / 2);
+}
+
+/*
+ * Visual gap BETWEEN members of an overlap group — they tile edge-to-edge
+ * via the inline `inset-inline-start`/`inline-size` calc described above
+ * (`(100% - var(--ec-event-col-gap)) / N * i`), and that split's geometry is
+ * guarded by the "keeps an overlapping pair … inside their day column" e2e,
+ * so this must add a gap WITHOUT touching either property or the box's
+ * outer edges at all.
+ *
+ * The lever: `border-inline-start` with a *transparent* color, plus
+ * `background-clip: padding-box`, shrinks only the PAINTED background
+ * inward from the box's start edge — `.ec-event` is confirmed
+ * `box-sizing: border-box` (live DOM probe), so the border is carved out of
+ * the existing border-box rather than added on top of it, and the box's own
+ * `getBoundingClientRect()` — what the overlap-geometry e2e measures — is
+ * completely unchanged. `overflow: hidden`/`container-type: size` on
+ * `.ec-event` don't interact: a border sits inside the border box, not in
+ * the overflow/containment path.
+ *
+ * Selector: `[style*="inset-inline-start"]` alone is NOT enough to mean
+ * "overlap member" — a live probe found EC inlines `inset-inline-start` on
+ * EVERY timed block now, solo included (`… / 1 * 0`), contradicting this
+ * file's older comments (written against an earlier EC build) that claimed
+ * solo blocks get no inline `inset-inline-start` at all. A solo block's
+ * `inline-size` calc is always `… / 1 * 1)` (group size 1, the only case
+ * where the denominator is 1), and a real overlap member's group size is
+ * always >= 2 — so excluding that exact substring reliably isolates true
+ * overlap members regardless of group size. The same probe found the drag
+ * `.ec-preview` clone carries NEITHER property (its inline style is only
+ * `grid-column`/`inset-block-start`/`block-size`), so it never matches this
+ * selector on its own merits — no `:not(.ec-preview)` needed.
+ *
+ * Side: a live probe of a runtime-created overlap ("Team sync" at i=0,
+ * "Standup" at i=1, N=2) showed BOTH members — including i=0 — carry
+ * `inset-inline-start` (`… / 2 * 0` and `… / 2 * 1`), so every member in a
+ * group matches this rule uniformly; `border-inline-start` was chosen (over
+ * `-end`) so the gap lands strictly BETWEEN members (before each one after
+ * the first) and the group's trailing edge stays exactly as flush as a solo
+ * block's — only the very first member gains a barely-there extra 2px start
+ * inset. It also keeps the priority pill (`::before`, `inset-inline-start:
+ * var(--size-4-1)`, positioned against the padding box) exactly 4px from
+ * the now-inset VISIBLE edge, since border-box sizing pushes the padding
+ * box in by the border's width — confirmed visually, no separate offset
+ * needed.
+ *
+ * Same padding-box corner-radius flattening as the base rule's
+ * `border-end-*-radius` compensation (see that rule's comment for the
+ * general mechanism), on the two corners adjacent to THIS border-inline-
+ * start (2px): the START-side corners, top-start and bottom-start.
+ * Top-start (`border-start-start-radius`) is adjacent to no block-start
+ * border (0 width there), so only its horizontal component is squashed by
+ * this 2px border — compensated on the horizontal component ALONE via the
+ * two-value form (an earlier single-value version also inflated the
+ * unclipped vertical component, the same "melted corner" ellipse bug the
+ * base rule's comment documents).
+ * Bottom-start (`border-end-start-radius`) is the one corner shared with
+ * the base rule's OWN compensation: it sits adjacent to both this 2px
+ * inline border AND the base rule's 5px `border-block-end`, so it needs
+ * BOTH corrections at once, one per axis — the two-value
+ * `<horizontal> <vertical>` form is
+ * required here specifically so the two borders' different widths don't
+ * get cross-applied to the wrong axis.
+ */
+.obtask-calendar .ec-time-grid .ec-body .ec-event[style*="inset-inline-start"]:not([style*="/ 1 * 1)"]) {
+	border-inline-start: var(--size-2-1) solid transparent;
+	background-clip: padding-box;
+	border-start-start-radius: calc(var(--radius-s) + var(--size-2-1)) var(--radius-s);
+	border-end-start-radius: calc(var(--radius-s) + var(--size-2-1)) calc(var(--radius-s) + var(--size-4-1) + 1px);
 }
 
 /*
@@ -722,6 +1445,26 @@
  * doesn't accidentally hide the time line in a block that actually has room
  * for it) is comfortably between a 1-hour block (32px, must hide) and a
  * 2-hour block (64px, must show) either way.
+ *
+ * `border-block-end: calc(var(--size-4-1) + 1px)` (5px — grown from 2px,
+ * then by a further 1px to also compensate the slot gridline's own 1px
+ * thickness, see the base rule's own comment for the geometry and the
+ * vendored `@event-calendar/core/dist/index.css` gradient it cites) shaves
+ * a little more off the margin either side of that threshold: a CSS size
+ * container query reads the container's own CONTENT box, and since
+ * `.ec-event` is `box-sizing: border-box` that border is carved OUT of the
+ * same border-box the inline `block-size` sets — so for any given
+ * block-size, the queried content-box height is now ~5px (0.417em at this
+ * 12px base) smaller than before this border existed, on top of the
+ * padding already subtracted above. Re-run against the two concrete cases:
+ * a 1-hour block (32px block-size) now queries at 32 - 2 (padding-top) - 2
+ * (padding-bottom) - 5 (this border) = 23px (~1.92em), still comfortably
+ * under 3.05em — hides, as required; a 2-hour block (64px block-size) now
+ * queries at 64 - 2 - 2 - 5 = 55px (~4.58em), still comfortably over —
+ * shows, as required. A 1px shift this small never comes close to
+ * flipping either case; only a block within ~1px of the 3.05em line
+ * itself would need re-checking, and none of this plugin's fixed slot
+ * durations (15/30/60/120min at `slotHeight: 32`) land there.
  *
  * Container size queries are supported by every runtime this plugin ships
  * on: Obsidian desktop (Electron >= 28 / Chromium >= 106, well past
@@ -1178,4 +1921,22 @@
  */
 .obtask-calendar.obtask-calendar--compact .ec-day-foot {
 	display: none;
+}
+
+/*
+ * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` AND
+ * `var(--obtask-motion-settle, 240ms)` transition/animation above. Both
+ * custom properties inherit, so zeroing them once here collapses every
+ * transition beneath `.obtask-calendar` — pickup and settle alike — to 0s
+ * with no `!important` and no per-rule media query. The feed's own
+ * equivalent guard (styles/obtask.css) covers the other view; the feed
+ * list's move/enter/exit animation (auto-animate) already gates itself on
+ * this same media feature, so this keeps the whole plugin consistent with
+ * it.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.obtask-calendar {
+		--obtask-motion: 0s;
+		--obtask-motion-settle: 0s;
+	}
 }
