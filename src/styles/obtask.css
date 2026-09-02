@@ -28,12 +28,12 @@
  * again. `--obtask-feed-meta-columns` is still set on `.obtask-feed` (the
  * view container) and reaches this rule by inheritance.
  *
- * Leading `max-content` track is the project-color dot (`.obtask-feed__dot`,
- * `feed-view.ts`'s `renderDot` — the row's actual first DOM child), ahead
- * of the pre-existing status/title/meta tracks. Wide mode has no explicit
- * `grid-column` anywhere on a row's children — this template's column
- * order and each row's DOM order (dot, status, title, meta) just have to
- * keep matching.
+ * Two leading tracks are status and title, ahead of the meta columns — the
+ * project color no longer gets a leading dot track of its own (removed in
+ * favor of coloring the project label's text, `.obtask-feed__project`
+ * below). Wide mode has no explicit `grid-column` anywhere on a row's
+ * children — this template's column order and each row's DOM order
+ * (status, title, meta) just have to keep matching.
  *
  * `position: relative`: auto-animate inline-sets this on a static animation
  * parent (its absolute-positioned exit clones need a positioned ancestor)
@@ -42,14 +42,14 @@
  */
 .obtask-feed__list {
 	display: grid;
-	grid-template-columns: max-content max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
+	grid-template-columns: max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
 	column-gap: var(--size-4-2);
 	position: relative;
 }
 
 /* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. Leading track matches `.obtask-feed__list`'s own (see the comment there). */
 .obtask-feed--no-meta .obtask-feed__list {
-	grid-template-columns: max-content max-content minmax(0, 1fr);
+	grid-template-columns: max-content minmax(0, 1fr);
 }
 
 .obtask-feed__group,
@@ -122,25 +122,6 @@
 	gap: var(--size-4-2);
 	align-items: baseline;
 	color: var(--text-error);
-}
-
-/*
- * The project-color dot (`feed-view.ts`'s `renderDot`) — the row's first
- * DOM child, occupying the leading `max-content` track `.obtask-feed`/
- * `.obtask-feed--no-meta` reserve for it. Renders on every row, including
- * project-less ones (a plain neutral dot, `--obtask-dot-color` unset),
- * so every row's later columns stay aligned regardless of whether a given
- * task has a project. `--obtask-dot-color` itself comes from one of the
- * `.obtask-color-*` classes below (palette) or is set directly on this
- * element via `setCssProps` (`feed-view.ts`'s `renderDot`, for a hex
- * color) — same custom property the calendar's dot/ring/pill already key
- * off (`styles/calendar.css`).
- */
-.obtask-feed__dot {
-	inline-size: 7px;
-	block-size: 7px;
-	border-radius: 50%;
-	background-color: var(--obtask-dot-color, var(--text-faint));
 }
 
 /*
@@ -361,9 +342,9 @@
  * Project-color palette -> theme colour mapping
  * (domain/project-color.ts#PALETTE/#paletteColorClass). Sets
  * `--obtask-dot-color`, not a direct `color`/`background-color` — every
- * actual dot/ring/pill/bar rule (the feed's `.obtask-feed__dot` above,
- * and `styles/calendar.css`'s month dot/due-ring/time-grid pill) reads
- * that custom property, inherited down from whichever of these classes an
+ * actual dot/ring/pill/bar/label rule (the feed's `.obtask-feed__project`
+ * below, and `styles/calendar.css`'s month dot/due-ring/time-grid pill)
+ * reads that custom property, inherited down from whichever of these classes an
  * ancestor element carries, with a `var(--text-faint)` fallback of its own
  * for a project-less (`neutral`) task. Not scoped under `.obtask-feed`: the
  * calendar reuses these same 8 classes on its own event root
@@ -416,7 +397,7 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	color: var(--text-accent);
+	color: var(--obtask-dot-color, var(--text-accent));
 	font-size: var(--font-ui-small);
 }
 
@@ -495,35 +476,27 @@
  * into. Left on its own pre-existing `.obtask-feed__row--invalid` flex rule
  * rather than picking up this grid.
  *
- * Three explicit columns, not two: the dot (`.obtask-feed__dot`) gets its
- * own leading track, spanning both rows (`grid-row: 1 / -1` below) so it
- * sits centred against the whole two-line row rather than pinned to just
- * the first line. Every other child gets an explicit `grid-column`/
- * `grid-row` too (rather than leaning on auto-placement, which — with the
- * dot now a 4th row child ahead of status/title/meta — would otherwise
- * shuffle status/title/meta across the two lines instead of leaving the
- * original "status + title on line 1, meta wrapped on line 2" shape alone).
+ * Two explicit columns: status stays pinned to line 1 (`grid-row: 1`
+ * below) while title and the wrapped meta chips share column 2, title on
+ * row 1 and meta on row 2 — no leading dot track any more (the project
+ * color now lives in the meta line's own `.obtask-feed__project` label
+ * instead of a separate leading element).
  */
 .obtask-feed--compact .obtask-feed__row:not(.obtask-feed__row--invalid) {
 	display: grid;
-	grid-template-columns: max-content max-content minmax(0, 1fr);
+	grid-template-columns: max-content minmax(0, 1fr);
 	column-gap: var(--size-4-2);
 	row-gap: var(--size-4-1);
 	align-items: center;
 }
 
-.obtask-feed--compact .obtask-feed__dot {
-	grid-column: 1;
-	grid-row: 1 / -1;
-}
-
 .obtask-feed--compact .obtask-feed__status {
-	grid-column: 2;
+	grid-column: 1;
 	grid-row: 1;
 }
 
 .obtask-feed--compact .obtask-feed__title {
-	grid-column: 3;
+	grid-column: 2;
 	grid-row: 1;
 }
 
@@ -532,7 +505,7 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--size-4-1) var(--size-4-2);
-	grid-column: 3;
+	grid-column: 2;
 	grid-row: 2;
 }
 

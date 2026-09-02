@@ -150,12 +150,12 @@ export class FeedBasesView extends BasesView {
 	private readonly rendered = new Map<string, RenderedItem>();
 
 	/**
-	 * Vault-relative paths of every project note the last render's dots
-	 * resolved a color against — rebuilt from scratch at the top of every
-	 * `onDataUpdated` (`renderDot` repopulates it as rows render). Backs the
-	 * `metadataCache` `changed` listener below: editing a project note's own
-	 * `color` doesn't touch any task note, so nothing else would trigger a
-	 * re-render.
+	 * Vault-relative paths of every project note the last render's project
+	 * labels resolved a color against — rebuilt from scratch at the top of
+	 * every `onDataUpdated` (`renderProjectLink` repopulates it as rows
+	 * render). Backs the `metadataCache` `changed` listener below: editing a
+	 * project note's own `color` doesn't touch any task note, so nothing
+	 * else would trigger a re-render.
 	 */
 	private lastProjectPaths = new Set<string>();
 
@@ -198,13 +198,14 @@ export class FeedBasesView extends BasesView {
 		refreshAfterMetadataResolved(this, this.deps.app);
 
 		// A project note's `color` frontmatter changing must re-render every
-		// task whose dot depends on it — no task note itself changed, so
-		// Bases' own re-query (which fires off *its* file-change tracking)
-		// never re-runs `onDataUpdated` for this. No rename handling: per
-		// `docs/DOMAIN-MODEL.md`, `metadataCache` fires no `changed` on
-		// rename, and a project rename doesn't change its `color` — the
-		// dot's hashed-fallback color (if any) simply follows the new name
-		// on the next render that happens to touch this view anyway.
+		// task whose project label depends on it — no task note itself
+		// changed, so Bases' own re-query (which fires off *its* file-change
+		// tracking) never re-runs `onDataUpdated` for this. No rename
+		// handling: per `docs/DOMAIN-MODEL.md`, `metadataCache` fires no
+		// `changed` on rename, and a project rename doesn't change its
+		// `color` — the label's hashed-fallback color (if any) simply
+		// follows the new name on the next render that happens to touch
+		// this view anyway.
 		this.registerEvent(
 			this.deps.app.metadataCache.on("changed", (file) => {
 				if (this.lastProjectPaths.has(file.path)) {
@@ -270,8 +271,9 @@ export class FeedBasesView extends BasesView {
 		const firstDay = this.deps.getWeekStart();
 		const options = parseFeedViewOptions(this.config);
 		const columns = feedRowColumns(this.config.getOrder(), keys);
-		// Rebuilt below as rows render (`renderDot`) — see the field's doc
-		// comment for why this can't just be computed once up front.
+		// Rebuilt below as rows render (`renderProjectLink`) — see the
+		// field's doc comment for why this can't just be computed once up
+		// front.
 		this.lastProjectPaths = new Set<string>();
 		this.viewContainerEl.setCssProps({ "--obtask-feed-meta-columns": String(columns.length) });
 		this.viewContainerEl.toggleClass(cssClass("feed--no-meta"), columns.length === 0);
@@ -432,7 +434,6 @@ export class FeedBasesView extends BasesView {
 
 		const { task, entry } = row;
 
-		this.renderDot(rowEl, task);
 		this.renderStatusControl(comp, rowEl, task, statuses);
 
 		const link = rowEl.createEl("a", {
@@ -605,6 +606,18 @@ export class FeedBasesView extends BasesView {
 	 * projects render as plain text (no dead-link click). Always appends
 	 * exactly one top-level element (an empty placeholder span when there is
 	 * no project) so the grid's project column stays aligned across rows.
+	 *
+	 * Colored in the project's resolved color
+	 * (`domain/project-color.ts#resolveDotColor`) — the palette class or a
+	 * scoped `--obtask-dot-color` custom property for a hex color, same
+	 * mechanism the calendar's own dot/ring/pill use — on both the resolved
+	 * link and the unresolved plain-text span, so every project label is
+	 * colored regardless of link resolution. The row no longer carries a
+	 * separate leading dot for this (removed in favor of coloring this
+	 * label directly). Also the one place `lastProjectPaths` — this
+	 * render's set of project notes a re-render must watch for a `color`
+	 * edit on — gets populated (`projectFilePath` naturally no-ops for an
+	 * unresolved project, so only a resolved dest ever contributes).
 	 */
 	private renderProjectLink(comp: Component, parent: HTMLElement, task: Task): void {
 		const project = task.project;
@@ -613,17 +626,37 @@ export class FeedBasesView extends BasesView {
 			return;
 		}
 
+		const rawColor = projectRawColor(this.deps.app, project, task.path);
+		const dotColor = resolveDotColor(rawColor, project);
+		const colorClasses = dotColorClasses(dotColor);
+
+		const projectPath = projectFilePath(this.deps.app, project, task.path);
+		if (projectPath !== undefined) {
+			this.lastProjectPaths.add(projectPath);
+		}
+
 		const dest = this.deps.app.metadataCache.getFirstLinkpathDest(project, task.path);
 		if (dest === null) {
-			parent.createSpan({ text: project, cls: cssClass("feed__project") });
+			const span = parent.createSpan({ text: project, cls: [cssClass("feed__project"), ...colorClasses] });
+			// A hex color has no static class (`dotColorClasses`'s doc
+			// comment) — applied directly as a scoped custom property via
+			// Obsidian's own `setCssProps`, same as the calendar's
+			// `eventDidMount` (`event-calendar-renderer.ts`) does for its own
+			// `.ec-event` root.
+			if (dotColor.kind === "hex") {
+				span.setCssProps({ "--obtask-dot-color": dotColor.value });
+			}
 			return;
 		}
 
 		const link = parent.createEl("a", {
 			text: project,
-			cls: ["internal-link", cssClass("feed__project")],
+			cls: ["internal-link", cssClass("feed__project"), ...colorClasses],
 			href: project,
 		});
+		if (dotColor.kind === "hex") {
+			link.setCssProps({ "--obtask-dot-color": dotColor.value });
+		}
 		comp.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();
 			void this.deps.app.workspace.openLinkText(project, task.path, false);
@@ -696,37 +729,6 @@ export class FeedBasesView extends BasesView {
 		const chip = parent.createSpan({ cls: cssClass("feed__generic") });
 		chip.createSpan({ text: this.config.getDisplayName(propertyId as BasesPropertyId), cls: cssClass("feed__generic-label") });
 		chip.createSpan({ text, cls: cssClass("feed__generic-value") });
-	}
-
-	/**
-	 * Leading dot: the very first element of every row (including
-	 * project-less ones, which render a plain neutral dot rather than
-	 * skipping it) so every row's other columns line up regardless of
-	 * whether a given task has a project. Color comes from the task's
-	 * project (`domain/project-color.ts#resolveDotColor`); a project-less
-	 * task skips the metadata-cache lookup entirely rather than resolving
-	 * against `undefined`. Also the one place `lastProjectPaths` — this
-	 * render's set of project notes a re-render must watch for a `color`
-	 * edit on — gets populated.
-	 */
-	private renderDot(row: HTMLElement, task: Task): void {
-		const project = task.project;
-		const rawColor = project === undefined ? undefined : projectRawColor(this.deps.app, project, task.path);
-		const dotColor = resolveDotColor(rawColor, project);
-		if (project !== undefined) {
-			const projectPath = projectFilePath(this.deps.app, project, task.path);
-			if (projectPath !== undefined) {
-				this.lastProjectPaths.add(projectPath);
-			}
-		}
-		const dotEl = row.createSpan({ cls: [cssClass("feed__dot"), ...dotColorClasses(dotColor)] });
-		// A hex color has no static class (`dotColorClasses`'s doc comment) —
-		// applied directly as a scoped custom property via Obsidian's own
-		// `setCssProps` instead, same as the calendar's `eventDidMount`
-		// (`event-calendar-renderer.ts`) does for its own `.ec-event` root.
-		if (dotColor.kind === "hex") {
-			dotEl.setCssProps({ "--obtask-dot-color": dotColor.value });
-		}
 	}
 
 	/**

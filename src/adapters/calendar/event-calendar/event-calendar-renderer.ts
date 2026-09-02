@@ -315,9 +315,10 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// (Obsidian's plugin guidelines forbid a plugin registering its own
 				// stylesheet rules at runtime). `setCssProps` (Obsidian's own
 				// per-element custom-property helper, not a raw `style=` write) is
-				// the same mechanism `feed-view.ts#renderDot` uses for the feed's
-				// own hex dots. `info.el` is Event Calendar's own event root — the
-				// same element `classNames` above is applied to (confirmed against
+				// the same mechanism `feed-view.ts#renderProjectLink` uses for the
+				// feed's own hex-colored project labels. `info.el` is Event
+				// Calendar's own event root — the same element `classNames` above
+				// is applied to (confirmed against
 				// the vendored `@event-calendar/core@5.12.0/dist/index.js`'s
 				// `BaseEvent` component) — so `--obtask-dot-color` reaches
 				// `.ec-event-body::before` the same way a `.obtask-color-*` class's
