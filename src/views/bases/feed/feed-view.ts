@@ -43,13 +43,13 @@ import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
 /**
  * How long the status control's optimistic UI (`renderStatusControl`) holds
- * before actually writing the new status — long enough for the check-pop/
- * draw/ripple/strike-sweep CSS animations (`styles/obtask.css`) to play out.
- * Reopening skips the ripple/strike and just fades the fill, so it gets a
+ * before actually writing the new status — long enough for the ink fill and
+ * halo (`styles/obtask.css`) to land, so the row's move (ADR 0016) starts
+ * right as the fill completes. Reopening just shrinks the fill, so it gets a
  * shorter hold. Both are skipped (delay 0) under
  * `prefers-reduced-motion: reduce`.
  */
-const COMPLETE_ANIMATION_MS = 380;
+const COMPLETE_ANIMATION_MS = 200;
 const REOPEN_ANIMATION_MS = 160;
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook (see below) — mirrors the shape read off `BasesView` instances in the Bases toolbar bundle, not exported by `obsidian.d.ts`. */
@@ -731,7 +731,7 @@ export class FeedBasesView extends BasesView {
 	 * The visual toggle is optimistic: it flips immediately, then the actual
 	 * `setStatus` write is delayed behind the completion/reopen animation
 	 * (`COMPLETE_ANIMATION_MS`/`REOPEN_ANIMATION_MS`, skipped entirely under
-	 * reduced motion) so the ring/check/ripple/strike animation has time to
+	 * reduced motion) so the ink fill and halo have time to
 	 * play before Bases re-renders the row from the new frontmatter. `pending`
 	 * guards against a second toggle landing mid-animation. On failure the
 	 * optimistic classes are rolled back by hand — a success instead relies on
@@ -756,9 +756,6 @@ export class FeedBasesView extends BasesView {
 
 		const check = control.createSpan({ cls: cssClass("feed__check") });
 		setIcon(check, kind === "cancelled" ? "x" : "check");
-		for (const path of check.querySelectorAll("svg path")) {
-			path.setAttribute("pathLength", "1");
-		}
 
 		// `row` is reused across re-renders (`fillRow` only empties its
 		// children), so the done/completing modifiers must be set both ways
