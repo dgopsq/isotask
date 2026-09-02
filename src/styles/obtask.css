@@ -321,10 +321,17 @@
 .obtask-feed__priority {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	/* The one cell that's centred in its track: a 1–2 glyph mark (or the
 	 * "no priority" icon) reads better centred under the column than
-	 * hugging its left edge like the text cells do. */
+	 * hugging its left edge like the text cells do. Fixed square footprint
+	 * so `!`, `!!` and the icon all share one hit area and column width
+	 * (overrides `clickable-icon`'s content-driven padding). */
 	justify-self: center;
+	inline-size: var(--size-4-6);
+	block-size: var(--size-4-6);
+	padding: 0;
+	box-sizing: border-box;
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-semibold);
 	cursor: pointer;
@@ -456,6 +463,26 @@
 .obtask-feed__project--empty,
 .obtask-feed__tags--empty {
 	cursor: pointer;
+}
+
+/*
+ * Hover state for the plain-text click targets (date chip, "Set project",
+ * "Set tags"): the text brightens from faint to normal, no background —
+ * the row's own hover tint is the only surface change.
+ */
+.obtask-feed__date,
+.obtask-feed__project--empty,
+.obtask-feed__tags--empty {
+	/* `transform` kept for the date chip's press feedback below. */
+	transition:
+		color var(--obtask-motion, 120ms) ease,
+		transform var(--obtask-motion, 120ms) ease;
+}
+
+.obtask-feed__date:hover,
+.obtask-feed__project--empty:hover,
+.obtask-feed__tags--empty:hover {
+	color: var(--text-normal);
 }
 
 /*
