@@ -524,7 +524,7 @@ export class FeedBasesView extends BasesView {
 		const initial: Option<TaskDate> = anchor.some ? some(anchor.value.value) : none();
 
 		const chip = parent.createSpan({
-			cls: [cssClass("feed__date"), "clickable-icon"],
+			cls: cssClass("feed__date"),
 			attr: { role: "button", tabindex: "0" },
 		});
 		chip.setText(anchor.some ? `${DATE_FIELD_LABELS[anchor.value.field]}: ${anchor.value.value}` : "Set date");
@@ -629,7 +629,7 @@ export class FeedBasesView extends BasesView {
 		const project = task.project;
 		if (project === undefined) {
 			const placeholder = parent.createSpan({
-				cls: [cssClass("feed__project"), cssClass("feed__project--empty"), "clickable-icon"],
+				cls: [cssClass("feed__project"), cssClass("feed__project--empty")],
 				attr: { role: "button", tabindex: "0" },
 				text: "Set project",
 			});
@@ -708,7 +708,7 @@ export class FeedBasesView extends BasesView {
 	private renderTags(comp: Component, parent: HTMLElement, task: Task): void {
 		if (task.tags.length === 0) {
 			const placeholder = parent.createSpan({
-				cls: [cssClass("feed__tags"), cssClass("feed__tags--empty"), "clickable-icon"],
+				cls: [cssClass("feed__tags"), cssClass("feed__tags--empty")],
 				attr: { role: "button", tabindex: "0" },
 				text: "Set tags",
 			});

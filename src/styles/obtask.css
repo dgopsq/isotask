@@ -100,9 +100,9 @@
  * Horizontal padding insets every cell from the row's edges (a subgrid
  * applies its padding to its first/last tracks) so the hover tint reads
  * as a card rather than a hairline, and `justify-items: start` pins each
- * cell's content to the left — Obsidian's `clickable-icon` (on the date
- * and priority chips) is a `justify-content: center` flex box, which would
- * otherwise float a short value in the middle of its `max-content` track.
+ * cell's content to the left (the priority control's `clickable-icon` is a
+ * `justify-content: center` flex box, and stretched cells would otherwise
+ * float a short value in the middle of their `max-content` track).
  * The group/bucket headings below get the same inline padding so their
  * text lines up with the checkbox column. The cells that truncate with an
  * ellipsis (title, project, tags, generic) opt back into `stretch` below:
@@ -447,20 +447,15 @@
 }
 
 /*
- * The "Set project"/"Set tags" placeholders carry Obsidian's `clickable-icon`
- * (whose horizontal padding would nudge their text right of a populated
- * cell's, which has none). Own padding + equal negative margin keeps the
- * hit area while the text's left edge lines up with a real project link or
- * tag in the rows above and below — same trick `.obtask-feed__status` uses.
- * `clickable-icon` is also a centering flex box, and these cells stretch to
- * their track (so they can ellipsize), so the text has to be pinned to the
- * start explicitly or it floats to the middle of the column.
+ * Plain clickable text, not a button: the date chip and the "Set project"/
+ * "Set tags" placeholders deliberately do NOT carry Obsidian's
+ * `clickable-icon` (no padding, no hover background) — only the priority
+ * control, which is an icon/mark, keeps that chrome. `cursor: pointer` is
+ * the whole affordance, same as `.obtask-feed__date`.
  */
 .obtask-feed__project--empty,
 .obtask-feed__tags--empty {
-	justify-content: flex-start;
-	padding-inline: var(--size-2-3);
-	margin-inline: calc(var(--size-2-3) * -1);
+	cursor: pointer;
 }
 
 /*
