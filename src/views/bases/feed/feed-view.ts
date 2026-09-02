@@ -49,8 +49,8 @@ import { buildTaskEditMenu } from "@/ui/task-edit-menu";
  * shorter hold. Both are skipped (delay 0) under
  * `prefers-reduced-motion: reduce`.
  */
-const COMPLETE_ANIMATION_MS = 200;
-const REOPEN_ANIMATION_MS = 160;
+const COMPLETE_ANIMATION_MS = 150;
+const REOPEN_ANIMATION_MS = 120;
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook (see below) — mirrors the shape read off `BasesView` instances in the Bases toolbar bundle, not exported by `obsidian.d.ts`. */
 interface BasesViewAction {
