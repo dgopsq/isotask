@@ -10,6 +10,7 @@ import { taskToPatch } from "@/domain/frontmatter";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { parseRRule } from "@/domain/recurrence";
 import { isNone, isSome } from "@/domain/result";
+import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
 import { applyStatusChange, seriesTitle, spawnBasename } from "@/domain/transitions";
 import type { StatusChangeInput } from "@/domain/transitions";
@@ -35,17 +36,8 @@ function rule(body: string): RRuleString {
 	return result.value;
 }
 
-// Local four-status list, since DEFAULT_STATUSES no longer configures in-progress/cancelled —
-// most of this file's transition tests need both present as configured statuses.
-const FOUR_STATUSES: readonly StatusConfig[] = [
-	{ id: "todo" as StatusId, label: "To do", kind: "open" },
-	{ id: "in-progress" as StatusId, label: "In progress", kind: "active" },
-	{ id: "done" as StatusId, label: "Done", kind: "done" },
-	{ id: "cancelled" as StatusId, label: "Cancelled", kind: "cancelled" },
-];
-
 function statusOf(id: string): StatusConfig {
-	const found = FOUR_STATUSES.find((s) => s.id === id);
+	const found = DEFAULT_STATUSES.find((s) => s.id === id);
 	if (found === undefined) {
 		throw new Error(`unreachable: missing status ${id}`);
 	}
@@ -53,9 +45,7 @@ function statusOf(id: string): StatusConfig {
 }
 
 const TODO = statusOf("todo");
-const IN_PROGRESS = statusOf("in-progress");
 const DONE = statusOf("done");
-const CANCELLED = statusOf("cancelled");
 const NOW = iso("2026-09-02T10:00");
 
 function task(overrides: Partial<Task> & { readonly title: string }): Task {
@@ -81,7 +71,7 @@ function inputFor(t: Task, to: StatusConfig, overrides: Partial<StatusChangeInpu
 		raw: rawFor(t),
 		basename: t.title,
 		to,
-		statuses: FOUR_STATUSES,
+		statuses: DEFAULT_STATUSES,
 		keys: DEFAULT_PROPERTY_KEYS,
 		now: NOW,
 		spawnTemplate: "{{title}} {{due}}",
@@ -129,34 +119,16 @@ describe("applyStatusChange — patch", () => {
 		expect(isNone(result.spawn)).toBe(true);
 	});
 
-	it("open -> active: status only, no completed field", () => {
-		const t = task({ title: "Buy milk", status: "todo" as StatusId });
-		const result = applyStatusChange(inputFor(t, IN_PROGRESS));
-		expect(result.patch).toEqual({ status: "in-progress" });
-	});
-
 	it("open -> done: sets completed to now", () => {
 		const t = task({ title: "Buy milk", status: "todo" as StatusId });
 		const result = applyStatusChange(inputFor(t, DONE));
 		expect(result.patch).toEqual({ status: "done", completed: NOW });
 	});
 
-	it("open -> cancelled: also sets completed to now", () => {
-		const t = task({ title: "Buy milk", status: "todo" as StatusId });
-		const result = applyStatusChange(inputFor(t, CANCELLED));
-		expect(result.patch).toEqual({ status: "cancelled", completed: NOW });
-	});
-
 	it("done -> open (reopen): clears completed", () => {
 		const t = task({ title: "Buy milk", status: "done" as StatusId, completed: date("2026-08-01T09:00") });
 		const result = applyStatusChange(inputFor(t, TODO));
 		expect(result.patch).toEqual({ status: "todo", completed: null });
-	});
-
-	it("done -> cancelled: entering-terminal (now) wins over leaving-terminal (null)", () => {
-		const t = task({ title: "Buy milk", status: "done" as StatusId, completed: date("2026-08-01T09:00") });
-		const result = applyStatusChange(inputFor(t, CANCELLED));
-		expect(result.patch).toEqual({ status: "cancelled", completed: NOW });
 	});
 });
 
@@ -170,17 +142,6 @@ describe("applyStatusChange — spawn", () => {
 	it("repeat but no anchor (no due, no scheduled): no spawn", () => {
 		const t = task({ title: "Buy milk", status: "todo" as StatusId, repeat: rule("FREQ=WEEKLY") });
 		const result = applyStatusChange(inputFor(t, DONE));
-		expect(isNone(result.spawn)).toBe(true);
-	});
-
-	it("cancelled never spawns, even with repeat and an anchor", () => {
-		const t = task({
-			title: "Buy milk",
-			status: "todo" as StatusId,
-			due: date("2026-09-02"),
-			repeat: rule("FREQ=WEEKLY"),
-		});
-		const result = applyStatusChange(inputFor(t, CANCELLED));
 		expect(isNone(result.spawn)).toBe(true);
 	});
 
@@ -202,7 +163,7 @@ describe("applyStatusChange — spawn", () => {
 			due: date("2026-09-02"),
 			repeat: rule("FREQ=WEEKLY"),
 		});
-		const noOpenStatuses = FOUR_STATUSES.filter((s) => s.kind !== "open");
+		const noOpenStatuses = DEFAULT_STATUSES.filter((s) => s.kind !== "open");
 		const result = applyStatusChange(inputFor(t, DONE, { statuses: noOpenStatuses }));
 		expect(isNone(result.spawn)).toBe(true);
 	});

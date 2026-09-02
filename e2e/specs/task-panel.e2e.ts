@@ -119,9 +119,9 @@ async function panelFieldNames(): Promise<string[]> {
 	}, cssClass("panel"));
 }
 
-/** The `<select>` element inside the panel's `Setting` row named `name` (e.g. "Status"), found by matching each row's `.setting-item-name` text — same "find by visible label" technique as `views.e2e.ts`'s `clickFeedDateChip`/`clickFeedPriorityControl`. */
-async function panelDropdownFor(name: string): Promise<WebdriverIO.Element> {
-	const index = await browser.execute(
+/** The panel's own row-lookup-by-label logic, factored out of `panelDropdownFor`/`panelToggleFor`: the index (in DOM order) of the `Setting` row named `name`, or -1 if there is none. */
+async function panelRowIndex(name: string): Promise<number> {
+	return browser.execute(
 		(panelCls, wanted) => {
 			const root = document.querySelector(`.${panelCls}`);
 			if (root === null) {
@@ -133,6 +133,11 @@ async function panelDropdownFor(name: string): Promise<WebdriverIO.Element> {
 		cssClass("panel"),
 		name,
 	);
+}
+
+/** The `.checkbox-container` toggle control inside the panel's `Setting` row named `name` (e.g. "Done"); see `panelToggleChecked` for how its on/off state is read. */
+async function panelToggleFor(name: string): Promise<WebdriverIO.Element> {
+	const index = await panelRowIndex(name);
 	if (index < 0) {
 		throw new Error(`"${name}" row not found in the task panel`);
 	}
@@ -141,11 +146,18 @@ async function panelDropdownFor(name: string): Promise<WebdriverIO.Element> {
 	if (row === undefined) {
 		throw new Error(`"${name}" row element missing at index ${String(index)}`);
 	}
-	const select = await row.$("select").getElement();
-	if (!(await select.isExisting())) {
-		throw new Error(`"${name}" row has no <select> element`);
+	const toggle = await row.$(".checkbox-container").getElement();
+	if (!(await toggle.isExisting())) {
+		throw new Error(`"${name}" row has no .checkbox-container toggle`);
 	}
-	return select;
+	return toggle;
+}
+
+/** Whether the panel's `Setting` row named `name` is a checked toggle — Obsidian's `ToggleComponent` renders `<label class="checkbox-container">` and adds `is-enabled` when on, rather than setting the underlying (visually hidden) checkbox input's `checked` property. */
+async function panelToggleChecked(name: string): Promise<boolean> {
+	const toggle = await panelToggleFor(name);
+	const classAttr = await toggle.getAttribute("class");
+	return classAttr.split(/\s+/).includes("is-enabled");
 }
 
 /** The "Convert to task" button's visible text, if the panel is currently showing the convert prompt. */
@@ -189,7 +201,7 @@ describe("Task panel", function () {
 		expect(await panelTitleText()).toEqual(task.title);
 
 		const fieldNames = await panelFieldNames();
-		expect(fieldNames).toEqual(["Status", "Priority", "Due", "Scheduled", "Duration", "Repeat", "Project", "Tags"]);
+		expect(fieldNames).toEqual(["Done", "Priority", "Due", "Scheduled", "Duration", "Repeat", "Project", "Tags"]);
 
 		// Taken here, not after the later tests in this file switch the panel
 		// to a non-task note: the Bases containerEl-reuse pitfall (a screenshot
@@ -201,12 +213,12 @@ describe("Task panel", function () {
 		}
 	});
 
-	it("changes status via the panel's Status dropdown and writes it to frontmatter", async function () {
+	it("toggles Done via the panel's checkbox and writes it to frontmatter", async function () {
 		try {
-			const statusDropdown = await panelDropdownFor("Status");
-			expect(await statusDropdown.getValue()).toEqual("todo");
+			expect(await panelToggleChecked("Done")).toBe(false);
 
-			await statusDropdown.selectByVisibleText("Done");
+			const toggle = await panelToggleFor("Done");
+			await toggle.click();
 
 			await waitForFrontmatter(path, "status", (v) => v === "done", `${path} status never became done via the task panel`);
 			const fm = await frontmatterOf(path);
@@ -215,14 +227,11 @@ describe("Task panel", function () {
 
 			// The panel re-renders from the metadata cache's debounced `changed`
 			// subscription (`REFRESH_DEBOUNCE_MS`, `task-panel-view.ts`) — poll
-			// its own dropdown value rather than reading it once immediately.
-			await browser.waitUntil(
-				async () => {
-					const dropdown = await panelDropdownFor("Status");
-					return (await dropdown.getValue()) === "done";
-				},
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: "task panel's Status dropdown never re-rendered as Done" },
-			);
+			// its own toggle state rather than reading it once immediately.
+			await browser.waitUntil(async () => panelToggleChecked("Done"), {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "task panel's Done toggle never re-rendered as checked",
+			});
 		} finally {
 			await restoreFixtureNote(path, task.frontmatter, task.body);
 			await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never restored to its fixture value`);

@@ -9,15 +9,14 @@ import type { Task, TaskPath } from "@/domain/task";
 const path = "Tasks/Buy milk.md" as TaskPath;
 const keys = DEFAULT_PROPERTY_KEYS;
 
-// Local four-status list (todo/in-progress/done/cancelled), since DEFAULT_STATUSES no longer
-// configures in-progress/cancelled — most tests below round-trip through them.
-const FOUR_STATUSES: readonly StatusConfig[] = [
+// Local three-status list (todo/waiting/done), since DEFAULT_STATUSES no longer configures
+// a second open-kind status — most tests below round-trip through them.
+const THREE_STATUSES: readonly StatusConfig[] = [
 	{ id: "todo" as Task["status"], label: "To do", kind: "open" },
-	{ id: "in-progress" as Task["status"], label: "In progress", kind: "active" },
+	{ id: "waiting" as Task["status"], label: "Waiting", kind: "open" },
 	{ id: "done" as Task["status"], label: "Done", kind: "done" },
-	{ id: "cancelled" as Task["status"], label: "Cancelled", kind: "cancelled" },
 ];
-const statuses = FOUR_STATUSES;
+const statuses = THREE_STATUSES;
 
 describe("isTaskNote", () => {
 	it("is true when the marker key/value match", () => {
@@ -48,7 +47,7 @@ describe("parseTask", () => {
 	it("parses a fully populated task", () => {
 		const raw = {
 			type: "task",
-			status: "in-progress",
+			status: "waiting",
 			priority: "high",
 			due: "2026-09-05",
 			scheduled: "2026-09-03T09:00",
@@ -199,10 +198,10 @@ describe("parseTask — lenient parse, canonical write", () => {
 	});
 
 	it("accepts a status label in place of its id", () => {
-		const result = parseTask(path, "Buy milk", { type: "task", status: "In progress" }, keys, statuses);
+		const result = parseTask(path, "Buy milk", { type: "task", status: "Waiting" }, keys, statuses);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value.status).toBe("in-progress");
+			expect(result.value.status).toBe("waiting");
 		}
 	});
 

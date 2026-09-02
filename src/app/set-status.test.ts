@@ -8,7 +8,6 @@ import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
 import type { ObtaskSettings } from "@/domain/settings";
 import { DEFAULT_STATUSES } from "@/domain/status";
-import type { StatusConfig } from "@/domain/status";
 import type { StatusId, TaskPath } from "@/domain/task";
 
 function path(value: string): TaskPath {
@@ -18,15 +17,6 @@ function path(value: string): TaskPath {
 function statusId(value: string): StatusId {
 	return value as StatusId;
 }
-
-// Local four-status list, since DEFAULT_STATUSES no longer configures cancelled — the
-// "cancelled never spawns" test needs it as a valid target status.
-const FOUR_STATUSES: readonly StatusConfig[] = [
-	{ id: statusId("todo"), label: "To do", kind: "open" },
-	{ id: statusId("in-progress"), label: "In progress", kind: "active" },
-	{ id: statusId("done"), label: "Done", kind: "done" },
-	{ id: statusId("cancelled"), label: "Cancelled", kind: "cancelled" },
-];
 
 function makeDeps(overrides: Partial<ObtaskSettings> = {}): {
 	readonly deps: AppDeps;
@@ -117,16 +107,17 @@ describe("makeSetStatus", () => {
 		expect(notifier.infoMessages).toEqual(["Next occurrence already exists: Tasks/Buy milk 2026-09-09.md"]);
 	});
 
-	it("cancelled never spawns even with a repeat set", async () => {
-		const { deps, store, notifier } = makeDeps({ statuses: FOUR_STATUSES });
+	it("reopening a done task never spawns, even with a repeat set", async () => {
+		const { deps, store, notifier } = makeDeps();
 		store.seed(path("Tasks/Buy milk 2026-09-02.md"), {
 			type: "task",
-			status: "todo",
+			status: "done",
 			due: "2026-09-02",
 			repeat: "FREQ=WEEKLY",
+			completed: "2026-08-26T10:00",
 		});
 		const setStatus = makeSetStatus(deps);
-		const result = await setStatus(path("Tasks/Buy milk 2026-09-02.md"), statusId("cancelled"));
+		const result = await setStatus(path("Tasks/Buy milk 2026-09-02.md"), statusId("todo"));
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {

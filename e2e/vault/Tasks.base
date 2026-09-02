@@ -2,7 +2,6 @@ filters:
   and:
     - type == "task"
     - status != "done"
-    - status != "cancelled"
 views:
   - type: obtask-feed
     name: Feed

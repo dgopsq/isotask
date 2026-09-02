@@ -27,16 +27,16 @@ describe("renderTasksBase", () => {
 		expect(actual).toBe(EXPECTED_DEFAULT_BASE);
 	});
 
-	it("emits one exclusion filter per terminal-kind status, in configured order", () => {
+	it("emits one exclusion filter per done-kind status, in configured order", () => {
 		const statuses: readonly StatusConfig[] = [
 			{ id: "todo" as StatusId, label: "To do", kind: "open" },
+			{ id: "waiting" as StatusId, label: "Waiting", kind: "open" },
 			{ id: "archived" as StatusId, label: "Archived", kind: "done" },
-			{ id: "dropped" as StatusId, label: "Dropped", kind: "cancelled" },
 		];
 		const result = renderTasksBase(DEFAULT_PROPERTY_KEYS, statuses, viewTypes, "Tasks");
 		expect(result).toContain('    - status != "archived"');
-		expect(result).toContain('    - status != "dropped"');
 		expect(result).not.toContain('status != "todo"');
+		expect(result).not.toContain('status != "waiting"');
 	});
 
 	it("uses the configured property keys throughout", () => {

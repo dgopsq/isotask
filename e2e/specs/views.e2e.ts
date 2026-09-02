@@ -358,8 +358,9 @@ async function inputAt(modalCls: string, type: string, index: number): Promise<W
 
 /**
  * Polls the shared `.suggestion-item` popover (used by both `FuzzySuggestModal`
- * and `AbstractInputSuggest`, see "Set status via suggest modal" above) for an
- * item whose text contains `text`, returning it once found and displayed.
+ * and `AbstractInputSuggest`, see the "Create task modal" describe's Project
+ * suggester test below) for an item whose text contains `text`, returning it
+ * once found and displayed.
  */
 async function waitForSuggestionItem(text: string): Promise<WebdriverIO.Element> {
 	let found: WebdriverIO.Element | undefined;
@@ -3329,10 +3330,11 @@ describe("Views", function () {
  * suite's wall time for no isolation benefit.
  *
  * Tests below intentionally chain: several reuse and build on the mutated
- * state left by an earlier test in this same file (e.g. "Cycle status" and
- * "Set status via suggest modal" both act on `Tasks/Today task.md`, in that
- * order) rather than each resetting the fixture — this mirrors a real
- * editing session and halves the number of `openFile` round-trips. Each
+ * state left by an earlier test in this same file (e.g. "Settings
+ * round-trip" acts on `Tasks/Today task.md`, still at its fixture default of
+ * status=todo at that point) rather than each resetting the fixture — this
+ * mirrors a real editing session and halves the number of `openFile`
+ * round-trips. Each
  * `before` still explicitly (re)opens the file it needs rather than
  * assuming it's already active, so reordering `it`s within a block (mocha
  * doesn't guarantee `it` order under some reporters/retries) can't silently
@@ -3420,34 +3422,6 @@ describe("Actions", function () {
 				app.vault.getMarkdownFiles().filter((f) => f.path.startsWith("Tasks/Recurring task")).length,
 			);
 			expect(count).toEqual(2);
-		});
-	});
-
-	describe("Cycle status", function () {
-		const path = "Tasks/Today task.md";
-
-		before(async function () {
-			await openFile(path);
-		});
-
-		/**
-		 * `nextStatusInCycle` (domain/status.ts) walks statuses in *configured*
-		 * (array) order — confirmed both by the source doc comment and its
-		 * table-driven unit test (`domain/status.test.ts`). With the default
-		 * statuses (just `todo` and `done`), the cycle is todo -> done -> todo.
-		 */
-		it("cycles through every status in configured order, setting/clearing completed at terminal transitions", async function () {
-			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done after 1st cycle");
-			let fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("done");
-			expect(typeof fm?.["completed"]).toEqual("string");
-
-			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "todo", "expected status=todo after 2nd cycle");
-			fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("todo");
-			expect(fm?.["completed"]).toBeUndefined();
 		});
 	});
 
@@ -3570,43 +3544,24 @@ describe("Actions", function () {
 		});
 	});
 
-	describe("Set status via suggest modal", function () {
-		const path = "Tasks/Today task.md";
-
-		before(async function () {
-			// Continues from "Cycle status" above, which leaves this note at
-			// status=todo.
-			await openFile(path);
-		});
-
-		it('sets status to "done" via fuzzy search', async function () {
-			await browser.executeObsidianCommand("obtask:set-status");
-			const input = browser.$(".prompt-input");
-			await input.waitForExist({ timeout: SELECT_TIMEOUT });
-			await input.setValue("don");
-			await browser.$(".suggestion-item").waitForExist({ timeout: SELECT_TIMEOUT });
-			await browser.keys("Enter");
-
-			await waitForFrontmatter(path, "status", (v) => v === "done", 'expected status="done" via suggest modal');
-			const fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("done");
-			expect(typeof fm?.["completed"]).toEqual("string");
-		});
-	});
-
 	describe("Settings round-trip", function () {
 		const path = "Tasks/Today task.md";
 
 		before(async function () {
-			// Continues from "Set status via suggest modal" above, which leaves
-			// this note at status=done.
+			// Still at its fixture default, status=todo — nothing earlier in
+			// this describe touches "Today task.md".
 			await openFile(path);
 		});
 
 		it("picks up a status added to settings after a plugin reload", async function () {
+			// "waiting" (open-kind) is inserted BEFORE "todo", so — if picked up
+			// — it becomes `firstOpenStatus`, the toggle's reopen target
+			// (`domain/status.ts#toggleStatus`), letting this test tell "settings
+			// re-read after reload" apart from "still running on the old,
+			// cached list".
 			const newSettings: ObtaskSettings = {
 				...DEFAULT_SETTINGS,
-				statuses: [...DEFAULT_STATUSES, { id: "waiting" as StatusId, label: "Waiting", kind: "open" }],
+				statuses: [{ id: "waiting" as StatusId, label: "Waiting", kind: "open" }, ...DEFAULT_STATUSES],
 			};
 
 			// ObtaskPlugin exposes no public settings setter (`saveSettings` is
@@ -3639,16 +3594,17 @@ describe("Actions", function () {
 			// note so it's the active file again before dispatching a command.
 			await openFile(path);
 
-			await browser.executeObsidianCommand("obtask:set-status");
-			const input = browser.$(".prompt-input");
-			await input.waitForExist({ timeout: SELECT_TIMEOUT });
-			await input.setValue("wait");
-			await browser.$(".suggestion-item").waitForExist({ timeout: SELECT_TIMEOUT });
-			await browser.keys("Enter");
+			// Complete, then reopen: the reopen step is the one that resolves
+			// `firstOpenStatus`, so its result is what actually proves the
+			// reloaded list (with "waiting" first) was read.
+			await browser.executeObsidianCommand("obtask:complete-task");
+			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done before reopening");
 
+			await browser.executeObsidianCommand("obtask:toggle-done");
 			await waitForFrontmatter(path, "status", (v) => v === "waiting", 'expected status="waiting" after reload');
 			const fm = await frontmatterOf(path);
 			expect(fm?.["status"]).toEqual("waiting");
+			expect(fm?.["completed"]).toBeUndefined();
 		});
 	});
 

@@ -458,7 +458,6 @@ export class CalendarBasesView extends BasesView {
 		new CreateTaskModal(this.deps.app, {
 			app: this.deps.app,
 			createTask: this.deps.createTask,
-			getStatuses: this.deps.getStatuses,
 			getDefaultFolder: this.deps.getTaskFolder,
 			...(initial !== undefined ? { initial } : {}),
 		}).open();

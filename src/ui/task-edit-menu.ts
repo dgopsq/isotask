@@ -19,7 +19,7 @@ import { DurationModal } from "@/ui/duration-modal";
 import { buildPriorityMenu } from "@/ui/priority-menu";
 import { ProjectModal } from "@/ui/project-modal";
 import { RecurrenceModal } from "@/ui/recurrence-modal";
-import { buildStatusMenu } from "@/ui/status-menu";
+import { addDoneMenuItem } from "@/ui/status-menu";
 import { TagsModal } from "@/ui/tags-modal";
 
 export interface TaskEditMenuCtx {
@@ -53,8 +53,7 @@ function report(notifier: Notifier, result: Result<unknown, AppError>): void {
  * (`adapters/obsidian/menus.ts`).
  */
 export function buildTaskEditMenu(menu: Menu, task: Task, ctx: TaskEditMenuCtx): void {
-	menu.addItem((item) => item.setTitle("Status").setIsLabel(true));
-	buildStatusMenu(menu, ctx.statuses, task.status, (status) => {
+	addDoneMenuItem(menu, task, ctx.statuses, (status) => {
 		void ctx.setStatus(task.path, status.id).then((result) => {
 			report(ctx.notifier, result);
 		});

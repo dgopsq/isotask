@@ -115,7 +115,7 @@ export function applyStatusChange(input: StatusChangeInput): StatusChangeResult 
 				: {}),
 	};
 
-	// Only entering a `done`-kind status spawns; `cancelled` ends the series.
+	// Only entering a `done`-kind status spawns a recurrence occurrence.
 	const spawn = to.kind === "done" ? planSpawn(input) : none();
 
 	return { patch, spawn };

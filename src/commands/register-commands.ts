@@ -3,7 +3,6 @@ import { normalizePath } from "obsidian";
 
 import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
-import type { makeCycleStatus } from "@/app/cycle-status";
 import type { AppError } from "@/app/errors";
 import type { makeToggleDone } from "@/app/toggle-done";
 import { describeAppError, storeError } from "@/app/errors";
@@ -30,7 +29,6 @@ import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurr
 import { NoteSuggestModal } from "@/ui/note-suggest-modal";
 import { PrioritySuggestModal } from "@/ui/priority-suggest-modal";
 import { ProjectColorModal } from "@/ui/project-color-modal";
-import { StatusSuggestModal } from "@/ui/status-suggest-modal";
 import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
 
 export interface RegisterCommandsDeps {
@@ -44,7 +42,6 @@ export interface RegisterCommandsDeps {
 	readonly createTask: ReturnType<typeof makeCreateTask>;
 	readonly convertNote: ReturnType<typeof makeConvertNote>;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
-	readonly cycleStatus: ReturnType<typeof makeCycleStatus>;
 	readonly toggleDone: ReturnType<typeof makeToggleDone>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
@@ -184,7 +181,6 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			new CreateTaskModal(deps.app, {
 				app: deps.app,
 				createTask: deps.createTask,
-				getStatuses: deps.getStatuses,
 				getDefaultFolder: deps.getTaskFolder,
 			}).open();
 		},
@@ -200,24 +196,6 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			}
 			if (!checking) {
 				void deps.convertNote(file.path as TaskPath).then(report);
-			}
-			return true;
-		},
-	});
-
-	plugin.addCommand({
-		id: "set-status",
-		name: "Set status…",
-		checkCallback: (checking) => {
-			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
-			if (file === null) {
-				return false;
-			}
-			if (!checking) {
-				const path = file.path as TaskPath;
-				new StatusSuggestModal(deps.app, deps.getStatuses(), (status) => {
-					void deps.setStatus(path, status.id).then(report);
-				}).open();
 			}
 			return true;
 		},
@@ -240,21 +218,6 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			}
 			if (!checking) {
 				void deps.setStatus(file.path as TaskPath, doneStatus.id).then(report);
-			}
-			return true;
-		},
-	});
-
-	plugin.addCommand({
-		id: "cycle-status",
-		name: "Cycle status",
-		checkCallback: (checking) => {
-			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
-			if (file === null) {
-				return false;
-			}
-			if (!checking) {
-				void deps.cycleStatus(file.path as TaskPath).then(report);
 			}
 			return true;
 		},

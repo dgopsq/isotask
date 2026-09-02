@@ -9,8 +9,7 @@ import { isDateTime, parseTaskDate } from "@/domain/dates";
 import { projectFromWikilink } from "@/domain/frontmatter";
 import { describeRRule, parseRRule, RECURRENCE_PRESETS } from "@/domain/recurrence";
 import type { Result } from "@/domain/result";
-import type { StatusConfig } from "@/domain/status";
-import type { Minutes, Priority, RRuleString, StatusId, TaskPath } from "@/domain/task";
+import type { Minutes, Priority, RRuleString, TaskPath } from "@/domain/task";
 import { PRIORITIES, priorityLabel } from "@/domain/task";
 import { cssClass } from "@/plugin-id";
 import { FolderSuggest } from "@/ui/suggest/folder-suggest";
@@ -20,7 +19,6 @@ import { TagSuggest } from "@/ui/suggest/tag-suggest";
 export interface CreateTaskModalDeps {
 	readonly app: App;
 	readonly createTask: (draft: TaskDraft) => Promise<Result<TaskPath, AppError>>;
-	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getDefaultFolder: () => string;
 	/** Prefill (M4's calendar "click empty slot" flow passes a clicked date this way). */
 	readonly initial?: Partial<TaskDraft>;
@@ -76,7 +74,6 @@ function toggleDateFieldTime(field: DateFieldState): DateFieldState {
 function hasMoreOptionsPrefill(initial: Partial<TaskDraft>): boolean {
 	return (
 		initial.folder !== undefined ||
-		initial.status !== undefined ||
 		initial.scheduled !== undefined ||
 		initial.duration !== undefined ||
 		initial.project !== undefined ||
@@ -93,15 +90,15 @@ function hasMoreOptionsPrefill(initial: Partial<TaskDraft>): boolean {
  *
  * Kept short (default: Title, Due, Priority, Repeat, More options toggle,
  * buttons) so Obsidian doesn't render its full-height scrollbar on a `Modal`
- * taller than the viewport; the rarer fields (Folder, Status, Scheduled,
- * Duration, Project, Tags) live behind "More options".
+ * taller than the viewport; the rarer fields (Folder, Scheduled, Duration,
+ * Project, Tags) live behind "More options". A new task always gets the
+ * first configured open status — there's no status field here.
  */
 export class CreateTaskModal extends Modal {
 	private readonly deps: CreateTaskModalDeps;
 
 	private title: string;
 	private folder: string;
-	private statusId: StatusId | undefined;
 	private priority: Priority;
 	private due: DateFieldState;
 	private scheduled: DateFieldState;
@@ -120,7 +117,6 @@ export class CreateTaskModal extends Modal {
 		const initial = deps.initial ?? {};
 		this.title = initial.title ?? "";
 		this.folder = initial.folder ?? deps.getDefaultFolder();
-		this.statusId = initial.status;
 		this.priority = initial.priority ?? "normal";
 		this.due = dateFieldFrom(initial.due);
 		this.scheduled = dateFieldFrom(initial.scheduled);
@@ -158,7 +154,7 @@ export class CreateTaskModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("More options")
-			.setDesc("Folder, status, schedule, project, tags.")
+			.setDesc("Folder, schedule, project, tags.")
 			.addToggle((toggle) =>
 				toggle.setValue(this.moreOptionsOpen).onChange((checked) => {
 					this.moreOptionsOpen = checked;
@@ -197,8 +193,6 @@ export class CreateTaskModal extends Modal {
 				});
 				new FolderSuggest(this.deps.app, text.inputEl);
 			});
-
-		this.renderStatusField(container);
 
 		this.renderDateField(container, "Scheduled", "When you plan to do it.", this.scheduled, (next) => {
 			this.scheduled = next;
@@ -262,26 +256,6 @@ export class CreateTaskModal extends Modal {
 				void this.submit();
 			}
 		});
-	}
-
-	private renderStatusField(container: HTMLElement): void {
-		const statuses = this.deps.getStatuses();
-		const options: Record<string, string> = {};
-		for (const status of statuses) {
-			options[status.id] = status.label;
-		}
-		const firstStatusId = statuses[0]?.id;
-		new Setting(container)
-			.setName("Status")
-			.setDesc("Initial status of the task.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(options)
-					.setValue(this.statusId ?? firstStatusId ?? "")
-					.onChange((value) => {
-						this.statusId = value as StatusId;
-					}),
-			);
 	}
 
 	private renderPriorityField(container: HTMLElement): void {
@@ -449,7 +423,6 @@ export class CreateTaskModal extends Modal {
 			title: trimmedTitle,
 			priority: this.priority,
 			...(trimmedFolder.length > 0 ? { folder: trimmedFolder } : {}),
-			...(this.statusId !== undefined ? { status: this.statusId } : {}),
 			...(due !== undefined ? { due } : {}),
 			...(scheduled !== undefined ? { scheduled } : {}),
 			...(duration !== undefined ? { duration } : {}),

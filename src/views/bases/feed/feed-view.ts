@@ -219,7 +219,6 @@ export class FeedBasesView extends BasesView {
 		new CreateTaskModal(this.deps.app, {
 			app: this.deps.app,
 			createTask: this.deps.createTask,
-			getStatuses: this.deps.getStatuses,
 			getDefaultFolder: this.deps.getTaskFolder,
 			...(baseFileName !== undefined ? { initial: { title: baseFileName } } : {}),
 		}).open();
@@ -755,7 +754,7 @@ export class FeedBasesView extends BasesView {
 		});
 
 		const check = control.createSpan({ cls: cssClass("feed__check") });
-		setIcon(check, kind === "cancelled" ? "x" : "check");
+		setIcon(check, "check");
 
 		// `row` is reused across re-renders (`fillRow` only empties its
 		// children), so the done/completing modifiers must be set both ways

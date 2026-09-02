@@ -43,27 +43,31 @@ Configurable list; default:
 | `todo` | To do  | `open` |
 | `done` | Done   | `done` |
 
-`kind` is the semantic the plugin reasons about (`open`, `active`, `done`, `cancelled` — a user
-could add more statuses per kind, but not more kinds; kinds are TBD (M1) for the exact closed set
-beyond these four). `id`/`label`/`icon` are user-facing and configurable. Additional statuses —
-e.g. an `active`-kind "In progress" or a `cancelled`-kind "Cancelled" — can be added in settings
-(`StatusesModal`) and set on a task via the file/edit menu's "Set status" entries, the task panel,
-or the "Set status…" command.
+`kind` is the semantic the plugin reasons about, and it is a closed set of exactly two:
+`open`/`done` (ADR 0017). `id`/`label`/`icon` are user-facing but there is currently no UI to edit
+them — the status list is data-only, kept as settings so the domain abstraction (a `StatusConfig`
+list with `kind`) survives for a possible future extension, but the plugin ships and only exposes
+the two defaults above. `StatusConfigSchema.kind` in `domain/settings.ts` accepts only `"open"` or
+`"done"`; a persisted list with any other kind (e.g. a pre-0017 `active`/`cancelled` entry) fails
+validation as a whole and falls back to `DEFAULT_STATUSES`.
 
-- Terminal kinds: `done`, `cancelled`.
-- Entering any terminal-kind status sets `completed` to now; leaving a terminal-kind status
-  (reopen) clears `completed`.
-- Only entering a `done`-kind status triggers recurrence spawning. Entering `cancelled` ends the
-  series — no spawn.
-- The "Cycle status" command walks the configured status list in order.
+There is no way to pick or configure a status by hand anywhere in the UI — no status dropdown, no
+settings modal, no "Set status…"/"Cycle status" command. The only status-changing affordance is a
+single done/reopen toggle: the feed row's status circle, the file/edit menu's "Mark as
+done"/"Reopen" item (`ui/status-menu.ts#addDoneMenuItem`), the task panel's "Done" toggle, and the
+"Toggle done" command, all driven by `domain/status.ts#toggleStatus`. Plus a direct "Complete task"
+command that sets the first configured `done`-kind status without going through the toggle.
+
+- Entering a `done`-kind status sets `completed` to now; leaving one (reopen) clears `completed`.
+- Only entering a `done`-kind status triggers recurrence spawning.
 - The feed row's status circle toggles rather than opening a menu
   (`views/bases/feed/feed-view.ts#renderStatusControl`, `domain/status.ts#toggleStatus`): a
-  terminal status (`done`/`cancelled`) toggles to the first configured `open` status (reopen); any
-  other status (open, active, or unconfigured) toggles to the first configured `done` status (mark
-  as done). The "Toggle done" command does the same for the active note.
+  `done`-kind status toggles to the first configured `open` status (reopen); any other status
+  (open, or unconfigured) toggles to the first configured `done` status (mark as done). The
+  "Toggle done" command does the same for the active note.
 - Bases filters operate on the raw `status` value, not `kind`. The generated `Tasks.base` filters
-  out every terminal-kind status (with the two defaults, just `status != "done"`) and is
-  regenerated from settings when the status list changes.
+  out every `done`-kind status (with the two defaults, just `status != "done"`) and is regenerated
+  from settings when the status list changes.
 - A missing or empty `status` parses as the first configured `open`-kind status rather than
   failing (ADR 0012) — this is what makes a note created by the Bases toolbar's `+ New` button
   (see "New (Bases toolbar)" below) parse as a normal open task instead of an invalid row. Parsing

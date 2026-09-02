@@ -252,28 +252,6 @@
 	transition: opacity var(--obtask-motion-check-tail, 70ms) ease var(--obtask-motion-check-delay, 90ms);
 }
 
-.obtask-feed__status--cancelled.obtask-feed__status--checked .obtask-feed__check {
-	border-color: var(--text-faint);
-}
-
-.obtask-feed__status--cancelled.obtask-feed__status--checked .obtask-feed__check::before {
-	background-color: var(--text-faint);
-}
-
-/*
- * `active` (in-progress) kind, unchecked: a half-filled ring rather than a
- * fully empty one, so an in-progress task's control reads as "started" at a
- * glance without needing the row's status label. Uses `::after` since
- * `::before` is the ink disc.
- */
-.obtask-feed__status--active:not(.obtask-feed__status--checked) .obtask-feed__check::after {
-	content: "";
-	position: absolute;
-	inset: 2px;
-	border-radius: 50%;
-	background: linear-gradient(90deg, var(--text-muted) 50%, transparent 50%);
-}
-
 /*
  * The one flourish on completion: a single soft halo ring expanding from the
  * edge and fading, played only while `--completing` is present
@@ -580,13 +558,6 @@
 .obtask-create-task-modal-repeat-description {
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
-}
-
-.obtask-statuses-modal-icon-preview {
-	display: inline-flex;
-	align-items: center;
-	margin-left: var(--size-4-2);
-	color: var(--text-muted);
 }
 
 .obtask-suggest-path {

@@ -33,7 +33,7 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 ## M1 — Core actions
 
 - [x] `app` layer: use-cases as factory functions over ports (`createTask`, `setStatus`,
-      `cycleStatus`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the pure
+      `toggleDone`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the pure
       `generateBase#renderTasksBase`), each tested against in-memory fakes (`app/test/fakes.ts`).
       `rescheduleTask` is deferred to M4, where the calendar drag/resize interaction that needs it
       lands.
@@ -42,16 +42,18 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 - [x] `TaskStore` adapter (`adapters/obsidian/task-store.ts`) over Vault/MetadataCache/
       `processFrontMatter`.
 - [x] `ui/` modals and menus: `CreateTaskModal`, `DateModal`, `RecurrenceModal`,
-      `StatusSuggestModal`, `status-menu.ts#buildStatusMenu`.
+      `status-menu.ts#addDoneMenuItem`.
 - [x] Create task / convert note to task commands.
-- [x] Set status / complete task / cycle status / toggle done commands.
+- [x] Complete task / toggle done commands.
 - [x] Set due date / set scheduled date / set recurrence commands.
 - [x] Completion-triggers-spawn wired end to end (`app/set-status.ts` -> `domain/transitions.ts`
       -> `TaskStore.create`).
-- [x] Status list is user-configurable in `SettingsTab` (`StatusesModal`: add/edit/reorder/delete).
-- [x] File-menu "Set status" entries (`Menu` + `buildStatusMenu`) for task notes; the feed row's
-      status circle toggles between done and open directly (`domain/status.ts#toggleStatus`)
-      rather than opening a menu.
+- [x] File-menu "Mark as done"/"Reopen" entry (`Menu` + `addDoneMenuItem`) for task notes; the feed
+      row's status circle toggles between done and open directly
+      (`domain/status.ts#toggleStatus`) rather than opening a menu. (ADR 0017, 2026-09-02: the
+      status list and kinds are collapsed to `open`/`done` data with no picker UI — the earlier
+      `StatusesModal` settings editor and the "Set status…"/"Cycle status" commands and
+      `StatusSuggestModal` are removed.)
 - [x] "Create tasks base" / "Open tasks base" commands (`app/generate-base.ts#renderTasksBase`).
 
 ## M2 — Feed view

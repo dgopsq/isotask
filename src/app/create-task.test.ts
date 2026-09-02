@@ -10,8 +10,7 @@ import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
 import type { ObtaskSettings } from "@/domain/settings";
 import { DEFAULT_STATUSES } from "@/domain/status";
-import type { StatusConfig } from "@/domain/status";
-import type { Minutes, RRuleString, StatusId, TaskPath } from "@/domain/task";
+import type { Minutes, RRuleString, TaskPath } from "@/domain/task";
 
 function date(value: string): TaskDate {
 	const result = parseTaskDate(value);
@@ -24,19 +23,6 @@ function date(value: string): TaskDate {
 function path(value: string): TaskPath {
 	return value as TaskPath;
 }
-
-function statusId(value: string): StatusId {
-	return value as StatusId;
-}
-
-// Local four-status list, since DEFAULT_STATUSES no longer configures in-progress/cancelled —
-// this file's explicit-status test needs "in-progress" to validate.
-const FOUR_STATUSES: readonly StatusConfig[] = [
-	{ id: statusId("todo"), label: "To do", kind: "open" },
-	{ id: statusId("in-progress"), label: "In progress", kind: "active" },
-	{ id: statusId("done"), label: "Done", kind: "done" },
-	{ id: statusId("cancelled"), label: "Cancelled", kind: "cancelled" },
-];
 
 function makeDeps(overrides: Partial<ObtaskSettings> = {}): {
 	readonly deps: AppDeps;
@@ -132,21 +118,12 @@ describe("makeCreateTask", () => {
 		}
 	});
 
-	it("uses an explicit status, validating it against the configured list", async () => {
-		const { deps, store } = makeDeps({ statuses: FOUR_STATUSES });
-		const result = await makeCreateTask(deps)({ title: "Buy milk", status: statusId("in-progress") });
-		expect(result.ok).toBe(true);
-		if (result.ok) {
-			expect(store.notes.get(result.value)?.frontmatter["status"]).toBe("in-progress");
-		}
-	});
-
-	it("fails on an unknown explicit status", async () => {
-		const { deps } = makeDeps();
-		const result = await makeCreateTask(deps)({ title: "Buy milk", status: statusId("nope") });
+	it("fails with no-status-configured when no open status is configured", async () => {
+		const { deps } = makeDeps({ statuses: DEFAULT_STATUSES.filter((s) => s.kind !== "open") });
+		const result = await makeCreateTask(deps)({ title: "Buy milk" });
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error).toEqual({ kind: "unknown-status", statusId: "nope" });
+			expect(result.error).toEqual({ kind: "no-status-configured" });
 		}
 	});
 

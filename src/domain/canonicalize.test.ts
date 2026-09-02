@@ -7,15 +7,14 @@ import type { StatusId } from "@/domain/task";
 
 const keys = DEFAULT_PROPERTY_KEYS;
 
-// Local four-status list (todo/in-progress/done/cancelled), since DEFAULT_STATUSES no longer
-// configures in-progress/cancelled — several tests below canonicalize against those labels/ids.
-const FOUR_STATUSES: readonly StatusConfig[] = [
+// Local three-status list (todo/waiting/done), since DEFAULT_STATUSES no longer configures
+// a second open-kind status — several tests below canonicalize against those labels/ids.
+const THREE_STATUSES: readonly StatusConfig[] = [
 	{ id: "todo" as StatusId, label: "To do", kind: "open" },
-	{ id: "in-progress" as StatusId, label: "In progress", kind: "active" },
+	{ id: "waiting" as StatusId, label: "On hold", kind: "open" },
 	{ id: "done" as StatusId, label: "Done", kind: "done" },
-	{ id: "cancelled" as StatusId, label: "Cancelled", kind: "cancelled" },
 ];
-const statuses = FOUR_STATUSES;
+const statuses = THREE_STATUSES;
 
 describe("canonicalizeFrontmatter", () => {
 	describe("status", () => {
@@ -38,15 +37,15 @@ describe("canonicalizeFrontmatter", () => {
 		});
 
 		it("resolves a status label to its id", () => {
-			const result = canonicalizeFrontmatter({ status: "In progress" }, keys, statuses);
-			expect(result.frontmatter['status']).toBe("in-progress");
-			expect(result.fixes).toEqual([{ key: "status", from: "In progress", to: "in-progress", reason: "status-label" }]);
+			const result = canonicalizeFrontmatter({ status: "On hold" }, keys, statuses);
+			expect(result.frontmatter['status']).toBe("waiting");
+			expect(result.fixes).toEqual([{ key: "status", from: "On hold", to: "waiting", reason: "status-label" }]);
 		});
 
 		it("resolves a case-mismatched label", () => {
-			const result = canonicalizeFrontmatter({ status: "in progress" }, keys, statuses);
-			expect(result.frontmatter['status']).toBe("in-progress");
-			expect(result.fixes).toEqual([{ key: "status", from: "in progress", to: "in-progress", reason: "status-label" }]);
+			const result = canonicalizeFrontmatter({ status: "ON HOLD" }, keys, statuses);
+			expect(result.frontmatter['status']).toBe("waiting");
+			expect(result.fixes).toEqual([{ key: "status", from: "ON HOLD", to: "waiting", reason: "status-label" }]);
 		});
 
 		it("prefers an id match over a label match when both could apply", () => {
@@ -55,7 +54,7 @@ describe("canonicalizeFrontmatter", () => {
 			// status rather than the second.
 			const collidingStatuses: readonly StatusConfig[] = [
 				{ id: "done" as StatusId, label: "Complete", kind: "done" },
-				{ id: "archived" as StatusId, label: "done", kind: "cancelled" },
+				{ id: "archived" as StatusId, label: "done", kind: "open" },
 			];
 			const result = canonicalizeFrontmatter({ status: "Done" }, keys, collidingStatuses);
 			expect(result.frontmatter['status']).toBe("done");
@@ -242,7 +241,7 @@ describe("canonicalizeFrontmatter", () => {
 		it("is idempotent: canonicalizing already-canonical frontmatter yields zero fixes", () => {
 			const raw = {
 				type: "task",
-				status: "in-progress",
+				status: "waiting",
 				priority: "high",
 				due: "2026-09-05T09:00",
 				scheduled: "2026-09-03",

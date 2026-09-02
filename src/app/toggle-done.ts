@@ -9,10 +9,10 @@ import { toggleStatus } from "@/domain/status";
 import type { TaskPath } from "@/domain/task";
 
 /**
- * Toggles a task between done and open, via `setStatus`: a terminal status
- * (`done`/`cancelled`) reopens to the first configured `open` status; any
- * other status (open, active, or an unknown id) advances to the first
- * configured `done` status. See `domain/status.ts#toggleStatus`.
+ * Toggles a task between done and open, via `setStatus`: a `done`-kind
+ * status reopens to the first configured `open` status; any other status
+ * (open, or an unknown id) advances to the first configured `done` status.
+ * See `domain/status.ts#toggleStatus`.
  */
 export function makeToggleDone(deps: AppDeps) {
 	const setStatus = makeSetStatus(deps);
