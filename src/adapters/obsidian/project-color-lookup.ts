@@ -23,9 +23,10 @@ export function projectRawColor(app: App, project: string, sourcePath: string): 
 
 /**
  * The project note's own path, if `project` resolves to one — used by the
- * feed/calendar views to track which project notes the last render's dots
- * depended on (`lastProjectPaths`), so a `metadataCache` `changed` on one of
- * them can trigger a re-render (`docs/DOMAIN-MODEL.md`).
+ * feed/calendar views to track which project notes the last render's
+ * project labels/dots depended on (`lastProjectPaths`), so a
+ * `metadataCache` `changed` on one of them can trigger a re-render
+ * (`docs/DOMAIN-MODEL.md`).
  */
 export function projectFilePath(app: App, project: string, sourcePath: string): string | undefined {
 	return app.metadataCache.getFirstLinkpathDest(project, sourcePath)?.path;

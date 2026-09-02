@@ -28,12 +28,12 @@
  * again. `--obtask-feed-meta-columns` is still set on `.obtask-feed` (the
  * view container) and reaches this rule by inheritance.
  *
- * Leading `max-content` track is the project-color dot (`.obtask-feed__dot`,
- * `feed-view.ts`'s `renderDot` — the row's actual first DOM child), ahead
- * of the pre-existing status/title/meta tracks. Wide mode has no explicit
- * `grid-column` anywhere on a row's children — this template's column
- * order and each row's DOM order (dot, status, title, meta) just have to
- * keep matching.
+ * Two leading tracks are status and title, ahead of the meta columns — the
+ * project color no longer gets a leading dot track of its own (removed in
+ * favor of coloring the project label's text, `.obtask-feed__project`
+ * below). Wide mode has no explicit `grid-column` anywhere on a row's
+ * children — this template's column order and each row's DOM order
+ * (status, title, meta) just have to keep matching.
  *
  * `position: relative`: auto-animate inline-sets this on a static animation
  * parent (its absolute-positioned exit clones need a positioned ancestor)
@@ -42,20 +42,26 @@
  */
 .obtask-feed__list {
 	display: grid;
-	grid-template-columns: max-content max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
+	grid-template-columns: max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
 	column-gap: var(--size-4-2);
 	position: relative;
 }
 
 /* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. Leading track matches `.obtask-feed__list`'s own (see the comment there). */
 .obtask-feed--no-meta .obtask-feed__list {
-	grid-template-columns: max-content max-content minmax(0, 1fr);
+	grid-template-columns: max-content minmax(0, 1fr);
 }
 
 .obtask-feed__group,
 .obtask-feed__bucket,
 .obtask-feed__bucket-empty {
 	grid-column: 1 / -1;
+}
+
+.obtask-feed__group,
+.obtask-feed__bucket,
+.obtask-feed__bucket-empty {
+	padding-inline: var(--size-4-2);
 }
 
 .obtask-feed__group {
@@ -90,12 +96,26 @@
 	margin-top: 0;
 }
 
+/*
+ * Horizontal padding insets every cell from the row's edges (a subgrid
+ * applies its padding to its first/last tracks) so the hover tint reads
+ * as a card rather than a hairline, and `justify-items: start` pins each
+ * cell's content to the left (the priority control's `clickable-icon` is a
+ * `justify-content: center` flex box, and stretched cells would otherwise
+ * float a short value in the middle of their `max-content` track).
+ * The group/bucket headings below get the same inline padding so their
+ * text lines up with the checkbox column. The cells that truncate with an
+ * ellipsis (title, project, tags, generic) opt back into `stretch` below:
+ * a `start`-justified grid item sizes to its own max-content and simply
+ * overflows its track instead of eliding.
+ */
 .obtask-feed__row {
 	grid-column: 1 / -1;
 	display: grid;
 	grid-template-columns: subgrid;
 	align-items: center;
-	padding: var(--size-4-1) 0;
+	justify-items: start;
+	padding: var(--size-4-1) var(--size-4-2);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -125,25 +145,6 @@
 }
 
 /*
- * The project-color dot (`feed-view.ts`'s `renderDot`) — the row's first
- * DOM child, occupying the leading `max-content` track `.obtask-feed`/
- * `.obtask-feed--no-meta` reserve for it. Renders on every row, including
- * project-less ones (a plain neutral dot, `--obtask-dot-color` unset),
- * so every row's later columns stay aligned regardless of whether a given
- * task has a project. `--obtask-dot-color` itself comes from one of the
- * `.obtask-color-*` classes below (palette) or is set directly on this
- * element via `setCssProps` (`feed-view.ts`'s `renderDot`, for a hex
- * color) — same custom property the calendar's dot/ring/pill already key
- * off (`styles/calendar.css`).
- */
-.obtask-feed__dot {
-	inline-size: 7px;
-	block-size: 7px;
-	border-radius: 50%;
-	background-color: var(--obtask-dot-color, var(--text-faint));
-}
-
-/*
  * Truncates a long title to one line with an ellipsis instead of wrapping
  * onto a second line — `min-width: 0` alone (which lets this grid item
  * shrink below its text's own min-content width in the first place) doesn't
@@ -154,6 +155,13 @@
  * `.obtask-feed--compact .obtask-feed__title` below overrides these three
  * properties, only `grid-column`/`grid-row`.
  */
+.obtask-feed__title,
+.obtask-feed__project,
+.obtask-feed__tags,
+.obtask-feed__generic {
+	justify-self: stretch;
+}
+
 .obtask-feed__title {
 	min-width: 0;
 	overflow: hidden;
@@ -284,7 +292,7 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	cursor: pointer;
-	transition: transform var(--obtask-motion, 120ms) ease;
+	/* `transition` lives in the shared clickable-text rule further down. */
 }
 
 .obtask-feed__date--empty {
@@ -299,55 +307,71 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	font-style: italic;
-	padding: var(--size-4-1) 0;
+	padding-block: var(--size-4-1);
 }
 
 /*
  * Apple Reminders-style priority mark (`!`/`!!`, domain/task.ts#priorityMarks)
- * at the right of a feed row's meta line. `normal` renders no element at
- * all (feed-view.ts#renderPriorityControl), so this is only ever a compact
- * one/two-character chip, not a full chip-with-icon like the other feed
- * controls.
+ * at the right of a feed row's meta line — a compact one/two-character
+ * chip, not a full chip-with-icon like the other feed controls. `normal`
+ * renders the same control with a muted "no priority" icon instead of a
+ * mark (`feed-view.ts#renderPriorityControl`, `.obtask-feed__priority--empty`
+ * below).
  */
 .obtask-feed__priority {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	/* The one cell that's centred in its track: a 1–2 glyph mark (or the
+	 * "no priority" icon) reads better centred under the column than
+	 * hugging its left edge like the text cells do. Fixed square footprint
+	 * so `!`, `!!` and the icon all share one hit area and column width
+	 * (overrides `clickable-icon`'s content-driven padding). */
+	justify-self: center;
+	inline-size: var(--size-4-6);
+	block-size: var(--size-4-6);
+	padding: 0;
+	box-sizing: border-box;
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-semibold);
 	cursor: pointer;
-}
-
-/*
- * Scoped like the `:active` rule below (excludes `--empty`, which never
- * matches `:active` and so never has a `transform` to ease) rather than on
- * the base rule above — `.obtask-feed__date`'s equivalent transition stays
- * unscoped instead, because its own `--empty` variant ("Set date") IS still
- * a live click target and needs the same easing.
- */
-.obtask-feed__priority:not(.obtask-feed__priority--empty) {
 	transition: transform var(--obtask-motion, 120ms) ease;
 }
 
 /*
- * Press feedback for the three clickable feed chips (status, date,
- * priority — excluding `.obtask-feed__priority--empty`, which renders as an
- * inert alignment placeholder with no click target, so it must never look
- * pressable). `transform` only —
- * no layout impact (unlike e.g. padding/border changes, which would reflow
+ * "No priority" state: a muted icon at Obsidian's default `--icon-size`
+ * (the same size the priority menu draws it — not shrunk to match the
+ * mark's glyph height; not italic either, unlike the date/project/tags
+ * empty states, since an icon has no font style to italicise) instead of
+ * the `!`/`!!` mark, styled the same clickable control as every other
+ * priority value.
+ */
+.obtask-feed__priority--empty {
+	color: var(--text-faint);
+}
+
+/*
+ * Press feedback for every clickable feed chip (status, date, priority
+ * — including its `--empty` "no priority" state — and the "Set project"/
+ * "Set tags" placeholders). `transform` only — no
+ * layout impact (unlike e.g. padding/border changes, which would reflow
  * neighbouring subgrid cells) — and works identically for a touch tap, not
  * just a mouse click.
  */
 .obtask-feed__status:active,
 .obtask-feed__date:active,
-.obtask-feed__priority:not(.obtask-feed__priority--empty):active {
+.obtask-feed__project--empty:active,
+.obtask-feed__tags--empty:active,
+.obtask-feed__priority:active {
 	transform: scale(0.96);
 }
 
 /*
  * Priority -> theme colour mapping (domain/task.ts#priorityChipClass).
- * `normal` has no rule — it never renders a mark, so there's nothing to
- * colour. Not scoped under .obtask-feed so the calendar view can reuse the
- * same classes for its own event marks (event-content.ts).
+ * `normal` has no rule here — it never renders one of these classes
+ * (`.obtask-feed__priority--empty` above covers its colour instead). Not
+ * scoped under .obtask-feed so the calendar view can reuse the same classes
+ * for its own event marks (event-content.ts).
  */
 .obtask-priority-urgent {
 	color: var(--color-red);
@@ -361,9 +385,9 @@
  * Project-color palette -> theme colour mapping
  * (domain/project-color.ts#PALETTE/#paletteColorClass). Sets
  * `--obtask-dot-color`, not a direct `color`/`background-color` — every
- * actual dot/ring/pill/bar rule (the feed's `.obtask-feed__dot` above,
- * and `styles/calendar.css`'s month dot/due-ring/time-grid pill) reads
- * that custom property, inherited down from whichever of these classes an
+ * actual dot/ring/pill/bar/label rule (the feed's `.obtask-feed__project`
+ * below, and `styles/calendar.css`'s month dot/due-ring/time-grid pill)
+ * reads that custom property, inherited down from whichever of these classes an
  * ancestor element carries, with a `var(--text-faint)` fallback of its own
  * for a project-less (`neutral`) task. Not scoped under `.obtask-feed`: the
  * calendar reuses these same 8 classes on its own event root
@@ -416,8 +440,51 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	color: var(--text-accent);
+	color: var(--obtask-dot-color, var(--text-accent));
 	font-size: var(--font-ui-small);
+}
+
+/*
+ * Wins over the base rule's `color` above by source order alone (same class
+ * specificity, so ordering decides) — the "Set project" placeholder is
+ * never a resolved project, so it never carries `--obtask-dot-color`
+ * either.
+ */
+.obtask-feed__project--empty {
+	color: var(--text-faint);
+	font-style: italic;
+}
+
+/*
+ * Plain clickable text, not a button: the date chip and the "Set project"/
+ * "Set tags" placeholders deliberately do NOT carry Obsidian's
+ * `clickable-icon` (no padding, no hover background) — only the priority
+ * control, which is an icon/mark, keeps that chrome. `cursor: pointer` is
+ * the whole affordance, same as `.obtask-feed__date`.
+ */
+.obtask-feed__project--empty,
+.obtask-feed__tags--empty {
+	cursor: pointer;
+}
+
+/*
+ * Hover state for the plain-text click targets (date chip, "Set project",
+ * "Set tags"): the text brightens from faint to normal, no background —
+ * the row's own hover tint is the only surface change.
+ */
+.obtask-feed__date,
+.obtask-feed__project--empty,
+.obtask-feed__tags--empty {
+	/* `transform` for the shared `:active` press feedback below. */
+	transition:
+		color var(--obtask-motion, 120ms) ease,
+		transform var(--obtask-motion, 120ms) ease;
+}
+
+.obtask-feed__date:hover,
+.obtask-feed__project--empty:hover,
+.obtask-feed__tags--empty:hover {
+	color: var(--text-normal);
 }
 
 /*
@@ -430,6 +497,11 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
+}
+
+.obtask-feed__tags--empty {
+	color: var(--text-faint);
+	font-style: italic;
 }
 
 .obtask-feed__tag {
@@ -495,35 +567,27 @@
  * into. Left on its own pre-existing `.obtask-feed__row--invalid` flex rule
  * rather than picking up this grid.
  *
- * Three explicit columns, not two: the dot (`.obtask-feed__dot`) gets its
- * own leading track, spanning both rows (`grid-row: 1 / -1` below) so it
- * sits centred against the whole two-line row rather than pinned to just
- * the first line. Every other child gets an explicit `grid-column`/
- * `grid-row` too (rather than leaning on auto-placement, which — with the
- * dot now a 4th row child ahead of status/title/meta — would otherwise
- * shuffle status/title/meta across the two lines instead of leaving the
- * original "status + title on line 1, meta wrapped on line 2" shape alone).
+ * Two explicit columns: status stays pinned to line 1 (`grid-row: 1`
+ * below) while title and the wrapped meta chips share column 2, title on
+ * row 1 and meta on row 2 — no leading dot track any more (the project
+ * color now lives in the meta line's own `.obtask-feed__project` label
+ * instead of a separate leading element).
  */
 .obtask-feed--compact .obtask-feed__row:not(.obtask-feed__row--invalid) {
 	display: grid;
-	grid-template-columns: max-content max-content minmax(0, 1fr);
+	grid-template-columns: max-content minmax(0, 1fr);
 	column-gap: var(--size-4-2);
 	row-gap: var(--size-4-1);
 	align-items: center;
 }
 
-.obtask-feed--compact .obtask-feed__dot {
-	grid-column: 1;
-	grid-row: 1 / -1;
-}
-
 .obtask-feed--compact .obtask-feed__status {
-	grid-column: 2;
+	grid-column: 1;
 	grid-row: 1;
 }
 
 .obtask-feed--compact .obtask-feed__title {
-	grid-column: 3;
+	grid-column: 2;
 	grid-row: 1;
 }
 
@@ -532,16 +596,19 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--size-4-1) var(--size-4-2);
-	grid-column: 3;
+	grid-column: 2;
 	grid-row: 2;
 }
 
 /*
- * The wide layout's alignment placeholders (empty project/tags/generic
- * chips that keep every row's subgrid columns lined up) serve no purpose
- * once the columns are gone — showing them here would only add stray gaps
- * to the wrapped line. The empty date chip ("Set date") stays visible: it's
- * a click affordance, not just alignment filler.
+ * Project/tags are click affordances now too ("Set project"/"Set tags",
+ * `feed-view.ts#renderProjectLink`/`#renderTags`), but stay hidden in
+ * compact mode — showing them here would only add stray placeholder noise
+ * to the wrapped meta line, and the row's context menu already reaches
+ * both fields. The generic placeholder stays hidden for its original
+ * reason: it's a pure wide-layout alignment filler with no click target at
+ * all. The empty date chip ("Set date") stays the one placeholder visible
+ * in compact — it's a click affordance, not just alignment filler.
  */
 .obtask-feed--compact .obtask-feed__project--empty,
 .obtask-feed--compact .obtask-feed__tags--empty,

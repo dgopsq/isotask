@@ -136,7 +136,7 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			filename: "Later task.md",
 			title: "Later task",
 			// `project` (no explicit `color` on the "Design Revamp" project note,
-			// `e2e/vault/Design Revamp.md`) gives `views.e2e.ts`'s feed-dot
+			// `e2e/vault/Design Revamp.md`) gives `views.e2e.ts`'s feed project-label
 			// assertions a hash-fallback-color case (`domain/project-color.ts
 			// #hashPaletteColor`), distinct from "Overdue task"'s explicit
 			// `color: red` project ("Q3 Launch", `e2e/vault/Q3 Launch.md`).

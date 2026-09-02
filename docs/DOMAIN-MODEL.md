@@ -85,11 +85,10 @@ desc).
 
 Priority drives no dot/bar color anywhere (that's project color's job, below); instead it renders
 as an Apple Reminders-style text mark at the right of a card, via `domain/task.ts#priorityMarks`:
-`normal` -> no mark (`high`/`urgent`'s clickable `!`/`!!` span is replaced by an empty, inert
-placeholder — `obtask-feed__priority--empty` on the feed row — kept only so a mixed-priority
-feed's later columns stay aligned; the calendar's `event-content.ts` emits nothing at all for
-`normal`), `high` -> `!` (`--color-orange`), `urgent` -> `!!` (`--color-red`), reusing the existing
-`priorityChipClass` mapping for color. Editing priority (the row's priority menu, the task panel,
+`normal` -> a clickable icon control showing a faint "no priority" mark, opening the same priority
+menu as the `!`/`!!` marks; `high` -> `!` (`--color-orange`), `urgent` -> `!!` (`--color-red`),
+reusing the existing `priorityChipClass` mapping for color. The calendar's `event-content.ts`
+emits nothing at all for `normal`. Editing priority (the row's priority menu, the task panel,
 the "Set priority" command) is unaffected by whether a mark currently renders.
 
 ## Project color
@@ -100,7 +99,8 @@ not one of the configurable `PropertyKeys`; the key is always literally `color`,
 the resolved project note's own frontmatter (`adapters/obsidian/project-color-lookup.ts`).
 
 `domain/project-color.ts#resolveDotColor` decides what a task's card dot/bar (the feed row's
-leading dot, the calendar's month dot, due ring, and time-grid pill) renders, in order:
+project label text color — only when the project property is in the Bases Properties order —
+and the calendar's month dot, due ring, and time-grid pill) renders, in order:
 
 1. The task has no `project` at all -> neutral (`var(--text-faint)`).
 2. The project note's `color` parses (`parseProjectColor`) -> that color: one of 8 palette names
@@ -109,6 +109,9 @@ leading dot, the calendar's month dot, due ring, and time-grid pill) renders, in
 3. Otherwise -> a frozen djb2a hash of the project name onto the same 8-entry palette
    (`hashPaletteColor`), giving every project a consistent, distinguishable color with zero
    configuration.
+
+The feed row's project label shows only when the project property is enabled in the Bases
+toolbar's Properties order; a row with it toggled off carries no project color.
 
 **Parse-error policy for `color`:** an invalid value — a non-string, blank/unrecognized text, or a
 malformed hex (`#gg0000`, `#12345`) — never errors and never affects the task's own parse result;
@@ -250,10 +253,14 @@ right:
 
 - `Due` or `Scheduled` -> one date chip, at the position of whichever of the two appears first in
   the menu; the second (if also enabled) is ignored — a row shows one date chip, never two.
-- `Priority` -> the priority mark (see "Priority" above; nothing renders for `normal`).
-  `Project` -> the project link.
+- `Priority` -> the priority mark (see "Priority" above; `normal` renders a clickable icon control
+  showing a faint "no priority" mark).
+- `Project` -> the project link; a task with no project renders an italic faint "Set project"
+  placeholder, clicking it opens ProjectModal (same as the row context menu's "Project…"), hidden
+  in compact mode.
 - `Tags` (either the frontmatter `tags` property or Obsidian's own inline/`file.tags`) -> the tags
-  list, same first-wins dedupe as the date chip.
+  list, same first-wins dedupe as the date chip; a task with no tags renders an italic faint "Set
+  tags" placeholder, clicking it opens TagsModal, hidden in compact mode.
 - The task marker property (`type` by default) contributes nothing — it's noise in a feed row.
 - Any other property (a different frontmatter field, or a formula) renders as a muted label/value
   chip, e.g. `Effort: 3`, using the property's Bases-configured display name.

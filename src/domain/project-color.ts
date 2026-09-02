@@ -131,7 +131,7 @@ export function paletteColorClass(name: PaletteName): string {
  * runtime the way `paletteColorClass` classes are pre-declared. Instead,
  * a `hex` `DotColor` is applied directly as a scoped `--obtask-dot-color`
  * custom property on the specific element/event that needs it — the feed
- * (`views/bases/feed/feed-view.ts#renderDot`, via Obsidian's own
+ * (`views/bases/feed/feed-view.ts#renderProjectLink`, via Obsidian's own
  * `setCssProps`) and the calendar (`event-calendar-mapping.ts`'s
  * `extendedProps.hexDotColor`, applied by
  * `event-calendar-renderer.ts`'s `eventDidMount` via the same
