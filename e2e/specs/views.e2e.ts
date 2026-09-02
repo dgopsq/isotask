@@ -1189,11 +1189,11 @@ describe("Views", function () {
 			);
 
 			const statusLabel = await browser.execute(
-				(rowCls, rowInvalidCls, titleCls, statusLabelCls, wantedTitle) => {
+				(rowCls, rowInvalidCls, titleCls, statusCls, wantedTitle) => {
 					for (const row of Array.from(document.querySelectorAll(`.${rowCls}:not(.${rowInvalidCls})`))) {
 						const titleEl = row.querySelector(`.${titleCls}`);
 						if (titleEl?.textContent === wantedTitle) {
-							return row.querySelector(`.${statusLabelCls}`)?.textContent ?? null;
+							return row.querySelector(`.${statusCls}`)?.getAttribute("aria-label") ?? null;
 						}
 					}
 					return null;
@@ -1201,10 +1201,10 @@ describe("Views", function () {
 				cssClass("feed__row"),
 				cssClass("feed__row--invalid"),
 				cssClass("feed__title"),
-				cssClass("feed__status-label"),
+				cssClass("feed__status"),
 				"Toolbar new",
 			);
-			expect(statusLabel).toEqual("To do");
+			expect(statusLabel).toEqual("To do (click to mark as done)");
 		});
 	});
 

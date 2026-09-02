@@ -22,6 +22,7 @@ import { makeSetProject } from "@/app/set-project";
 import { makeSetRecurrence } from "@/app/set-recurrence";
 import { makeSetStatus } from "@/app/set-status";
 import { makeSetTags } from "@/app/set-tags";
+import { makeToggleDone } from "@/app/toggle-done";
 import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
 import { parseSettings } from "@/domain/settings";
@@ -70,6 +71,7 @@ export default class ObtaskPlugin extends Plugin {
 		const convertNote = makeConvertNote(appDeps);
 		const setStatus = makeSetStatus(appDeps);
 		const cycleStatus = makeCycleStatus(appDeps);
+		const toggleDone = makeToggleDone(appDeps);
 		const rescheduleTask = makeRescheduleTask(appDeps);
 		const setDate = makeSetDate(appDeps);
 		const setDuration = makeSetDuration(appDeps);
@@ -114,6 +116,7 @@ export default class ObtaskPlugin extends Plugin {
 			convertNote,
 			setStatus,
 			cycleStatus,
+			toggleDone,
 			setDate,
 			setPriority,
 			setDuration,

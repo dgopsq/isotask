@@ -44,13 +44,14 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 - [x] `ui/` modals and menus: `CreateTaskModal`, `DateModal`, `RecurrenceModal`,
       `StatusSuggestModal`, `status-menu.ts#buildStatusMenu`.
 - [x] Create task / convert note to task commands.
-- [x] Set status / complete task / cycle status commands.
+- [x] Set status / complete task / cycle status / toggle done commands.
 - [x] Set due date / set scheduled date / set recurrence commands.
 - [x] Completion-triggers-spawn wired end to end (`app/set-status.ts` -> `domain/transitions.ts`
       -> `TaskStore.create`).
 - [x] Status list is user-configurable in `SettingsTab` (`StatusesModal`: add/edit/reorder/delete).
-- [x] File-menu "Set status" entries and the feed row's clickable status control (`Menu` +
-      `buildStatusMenu`) for task notes.
+- [x] File-menu "Set status" entries (`Menu` + `buildStatusMenu`) for task notes; the feed row's
+      status circle toggles between done and open directly (`domain/status.ts#toggleStatus`)
+      rather than opening a menu.
 - [x] "Create tasks base" / "Open tasks base" commands (`app/generate-base.ts#renderTasksBase`).
 
 ## M2 — Feed view

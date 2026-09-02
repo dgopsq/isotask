@@ -17,9 +17,7 @@ function statusId(value: string): StatusId {
 
 export const DEFAULT_STATUSES: readonly StatusConfig[] = [
 	{ id: statusId("todo"), label: "To do", kind: "open" },
-	{ id: statusId("in-progress"), label: "In progress", kind: "active" },
 	{ id: statusId("done"), label: "Done", kind: "done" },
-	{ id: statusId("cancelled"), label: "Cancelled", kind: "cancelled" },
 ];
 
 export function isTerminal(kind: StatusKind): boolean {
@@ -46,6 +44,27 @@ export function findStatus(configs: readonly StatusConfig[], id: StatusId): Opti
 export function firstOpenStatus(configs: readonly StatusConfig[]): Option<StatusConfig> {
 	const found = configs.find((config) => config.kind === "open");
 	return found === undefined ? none() : some(found);
+}
+
+/** The first configured status with kind `done`, used as the feed toggle's "mark as done" target. */
+export function firstDoneStatus(configs: readonly StatusConfig[]): Option<StatusConfig> {
+	const found = configs.find((config) => config.kind === "done");
+	return found === undefined ? none() : some(found);
+}
+
+/**
+ * The feed status circle's toggle target: a terminal status (`done` or
+ * `cancelled`) toggles to the first configured `open` status (reopen);
+ * any other status — `open`, `active`, or an unknown/unconfigured id —
+ * toggles to the first configured `done` status (mark as done). Returns
+ * `none()` when the target kind isn't configured.
+ */
+export function toggleStatus(configs: readonly StatusConfig[], currentId: StatusId): Option<StatusConfig> {
+	const current = findStatus(configs, currentId);
+	if (current.some && isTerminal(current.value.kind)) {
+		return firstOpenStatus(configs);
+	}
+	return firstDoneStatus(configs);
 }
 
 /** Walks the configured status list in configured (array) order, wrapping around. Falls back to the first status if `currentId` isn't found. */

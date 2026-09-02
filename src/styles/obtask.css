@@ -165,7 +165,6 @@
 .obtask-feed__status {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--size-4-1);
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 	cursor: pointer;

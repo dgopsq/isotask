@@ -3,13 +3,21 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { isTaskNote, parseTask, projectFromWikilink, taskToPatch, toWikilink } from "@/domain/frontmatter";
 import type { StatusConfig } from "@/domain/status";
-import { DEFAULT_STATUSES } from "@/domain/status";
 import type { TaskDate } from "@/domain/dates";
 import type { Task, TaskPath } from "@/domain/task";
 
 const path = "Tasks/Buy milk.md" as TaskPath;
 const keys = DEFAULT_PROPERTY_KEYS;
-const statuses = DEFAULT_STATUSES;
+
+// Local four-status list (todo/in-progress/done/cancelled), since DEFAULT_STATUSES no longer
+// configures in-progress/cancelled — most tests below round-trip through them.
+const FOUR_STATUSES: readonly StatusConfig[] = [
+	{ id: "todo" as Task["status"], label: "To do", kind: "open" },
+	{ id: "in-progress" as Task["status"], label: "In progress", kind: "active" },
+	{ id: "done" as Task["status"], label: "Done", kind: "done" },
+	{ id: "cancelled" as Task["status"], label: "Cancelled", kind: "cancelled" },
+];
+const statuses = FOUR_STATUSES;
 
 describe("isTaskNote", () => {
 	it("is true when the marker key/value match", () => {

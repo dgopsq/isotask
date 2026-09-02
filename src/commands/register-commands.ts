@@ -5,6 +5,7 @@ import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
 import type { makeCycleStatus } from "@/app/cycle-status";
 import type { AppError } from "@/app/errors";
+import type { makeToggleDone } from "@/app/toggle-done";
 import { describeAppError, storeError } from "@/app/errors";
 import { renderTasksBase } from "@/app/generate-base";
 import type { DateField, makeSetDate } from "@/app/set-date";
@@ -44,6 +45,7 @@ export interface RegisterCommandsDeps {
 	readonly convertNote: ReturnType<typeof makeConvertNote>;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly cycleStatus: ReturnType<typeof makeCycleStatus>;
+	readonly toggleDone: ReturnType<typeof makeToggleDone>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDuration: ReturnType<typeof makeSetDuration>;
@@ -253,6 +255,21 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			}
 			if (!checking) {
 				void deps.cycleStatus(file.path as TaskPath).then(report);
+			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "toggle-done",
+		name: "Toggle done",
+		checkCallback: (checking) => {
+			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
+			if (file === null) {
+				return false;
+			}
+			if (!checking) {
+				void deps.toggleDone(file.path as TaskPath).then(report);
 			}
 			return true;
 		},

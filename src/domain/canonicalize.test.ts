@@ -3,11 +3,19 @@ import { describe, expect, it } from "vitest";
 import { canonicalizeFrontmatter } from "@/domain/canonicalize";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
-import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
 
 const keys = DEFAULT_PROPERTY_KEYS;
-const statuses = DEFAULT_STATUSES;
+
+// Local four-status list (todo/in-progress/done/cancelled), since DEFAULT_STATUSES no longer
+// configures in-progress/cancelled — several tests below canonicalize against those labels/ids.
+const FOUR_STATUSES: readonly StatusConfig[] = [
+	{ id: "todo" as StatusId, label: "To do", kind: "open" },
+	{ id: "in-progress" as StatusId, label: "In progress", kind: "active" },
+	{ id: "done" as StatusId, label: "Done", kind: "done" },
+	{ id: "cancelled" as StatusId, label: "Cancelled", kind: "cancelled" },
+];
+const statuses = FOUR_STATUSES;
 
 describe("canonicalizeFrontmatter", () => {
 	describe("status", () => {

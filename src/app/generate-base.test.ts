@@ -14,7 +14,7 @@ import type { StatusId } from "@/domain/task";
  * verified there to actually load in Obsidian (see AGENTS.md).
  */
 const EXPECTED_DEFAULT_BASE =
-	'filters:\n  and:\n    - type == "task"\n    - status != "done"\n    - status != "cancelled"\nviews:\n' +
+	'filters:\n  and:\n    - type == "task"\n    - status != "done"\nviews:\n' +
 	"  - type: obtask-feed\n    name: Feed\n    newItemFolder: Tasks\n    order:\n      - file.name\n      - status\n      - due\n      - scheduled\n      - priority\n      - project\n      - tags\n" +
 	"  - type: obtask-calendar\n    name: Calendar\n    newItemFolder: Tasks\n  - type: table\n" +
 	"    name: All tasks\n    order:\n      - file.name\n      - status\n      - priority\n      - due\n      - scheduled\n";

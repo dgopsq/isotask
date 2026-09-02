@@ -4,7 +4,17 @@ import { BUCKET_ORDER, bucketFor, groupIntoBuckets, taskAnchorDate, visibleBucke
 import type { IsoDate, TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
 import { DEFAULT_STATUSES } from "@/domain/status";
+import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
+
+// Local four-status list, since DEFAULT_STATUSES no longer configures cancelled — these
+// completedAtBottom tests need "cancelled" to resolve to a terminal kind.
+const FOUR_STATUSES: readonly StatusConfig[] = [
+	{ id: "todo" as Task["status"], label: "To do", kind: "open" },
+	{ id: "in-progress" as Task["status"], label: "In progress", kind: "active" },
+	{ id: "done" as Task["status"], label: "Done", kind: "done" },
+	{ id: "cancelled" as Task["status"], label: "Cancelled", kind: "cancelled" },
+];
 
 function date(value: string): TaskDate {
 	const result = parseTaskDate(value);
@@ -157,7 +167,7 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 			today: TODAY,
 			firstDay: 0,
 			source: "due",
-			statuses: DEFAULT_STATUSES,
+			statuses: FOUR_STATUSES,
 			completedAtBottom: true,
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
@@ -212,7 +222,7 @@ describe("groupIntoBuckets — order", () => {
 			today: TODAY,
 			firstDay: 0,
 			source: "due",
-			statuses: DEFAULT_STATUSES,
+			statuses: FOUR_STATUSES,
 			completedAtBottom: true,
 			order: "preserve",
 		});

@@ -10,7 +10,6 @@ import { taskToPatch } from "@/domain/frontmatter";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { parseRRule } from "@/domain/recurrence";
 import { isNone, isSome } from "@/domain/result";
-import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
 import { applyStatusChange, seriesTitle, spawnBasename } from "@/domain/transitions";
 import type { StatusChangeInput } from "@/domain/transitions";
@@ -36,10 +35,19 @@ function rule(body: string): RRuleString {
 	return result.value;
 }
 
+// Local four-status list, since DEFAULT_STATUSES no longer configures in-progress/cancelled —
+// most of this file's transition tests need both present as configured statuses.
+const FOUR_STATUSES: readonly StatusConfig[] = [
+	{ id: "todo" as StatusId, label: "To do", kind: "open" },
+	{ id: "in-progress" as StatusId, label: "In progress", kind: "active" },
+	{ id: "done" as StatusId, label: "Done", kind: "done" },
+	{ id: "cancelled" as StatusId, label: "Cancelled", kind: "cancelled" },
+];
+
 function statusOf(id: string): StatusConfig {
-	const found = DEFAULT_STATUSES.find((s) => s.id === id);
+	const found = FOUR_STATUSES.find((s) => s.id === id);
 	if (found === undefined) {
-		throw new Error(`unreachable: missing default status ${id}`);
+		throw new Error(`unreachable: missing status ${id}`);
 	}
 	return found;
 }
@@ -73,7 +81,7 @@ function inputFor(t: Task, to: StatusConfig, overrides: Partial<StatusChangeInpu
 		raw: rawFor(t),
 		basename: t.title,
 		to,
-		statuses: DEFAULT_STATUSES,
+		statuses: FOUR_STATUSES,
 		keys: DEFAULT_PROPERTY_KEYS,
 		now: NOW,
 		spawnTemplate: "{{title}} {{due}}",
@@ -194,7 +202,7 @@ describe("applyStatusChange — spawn", () => {
 			due: date("2026-09-02"),
 			repeat: rule("FREQ=WEEKLY"),
 		});
-		const noOpenStatuses = DEFAULT_STATUSES.filter((s) => s.kind !== "open");
+		const noOpenStatuses = FOUR_STATUSES.filter((s) => s.kind !== "open");
 		const result = applyStatusChange(inputFor(t, DONE, { statuses: noOpenStatuses }));
 		expect(isNone(result.spawn)).toBe(true);
 	});

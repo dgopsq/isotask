@@ -29,7 +29,7 @@ import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
-import { findStatus } from "@/domain/status";
+import { findStatus, isTerminal, toggleStatus } from "@/domain/status";
 import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
 import { describeTaskParseError, priorityChipClass, priorityMarks } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
@@ -39,7 +39,7 @@ import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
 import { buildPriorityMenu } from "@/ui/priority-menu";
 import { ProjectColorModal } from "@/ui/project-color-modal";
-import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
+import { statusIcon } from "@/ui/status-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook (see below) — mirrors the shape read off `BasesView` instances in the Bases toolbar bundle, not exported by `obsidian.d.ts`. */
@@ -709,38 +709,40 @@ export class FeedBasesView extends BasesView {
 		}
 	}
 
-	/** Button-like span (icon + label) that opens the status `Menu` on click/Enter/Space and dispatches to `setStatus`. */
+	/**
+	 * Icon-only button that toggles the task between done and open on
+	 * click/Enter/Space, via `domain/status.ts#toggleStatus` (terminal ->
+	 * first open status, otherwise -> first done status) and dispatches to
+	 * `setStatus`. When no matching status is configured, notifies instead
+	 * of acting. The right-click/long-press edit menu (`registerRowContextMenu`)
+	 * still offers every configured status via "Set status".
+	 */
 	private renderStatusControl(comp: Component, row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
 		const statusOption = findStatus(statuses, task.status);
+		const isTaskTerminal = statusOption.some && isTerminal(statusOption.value.kind);
+		const label = statusOption.some ? statusOption.value.label : task.status;
+		const actionHint = isTaskTerminal ? "click to reopen" : "click to mark as done";
 		const control = row.createSpan({
 			cls: [cssClass("feed__status"), "clickable-icon"],
-			attr: { role: "button", tabindex: "0" },
+			attr: { role: "button", tabindex: "0", "aria-label": `${label} (${actionHint})` },
 		});
 
 		setIcon(control.createSpan({ cls: cssClass("feed__status-icon") }), statusOption.some ? statusIcon(statusOption.value) : "circle");
-		control.createSpan({
-			text: statusOption.some ? statusOption.value.label : task.status,
-			cls: cssClass("feed__status-label"),
-		});
 
-		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
-			const menu = newMenu();
-			buildStatusMenu(menu, statuses, task.status, (status) => {
-				void this.setStatus(task.path, status.id);
-			});
-			if (evt instanceof MouseEvent) {
-				menu.showAtMouseEvent(evt);
-			} else {
-				const rect = control.getBoundingClientRect();
-				menu.showAtPosition({ x: rect.left, y: rect.bottom });
+		const toggle = (): void => {
+			const next = toggleStatus(statuses, task.status);
+			if (!next.some) {
+				this.deps.notifier.error("No status to toggle to is configured");
+				return;
 			}
+			void this.setStatus(task.path, next.value.id);
 		};
 
-		comp.registerDomEvent(control, "click", openMenu);
+		comp.registerDomEvent(control, "click", toggle);
 		comp.registerDomEvent(control, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
-				openMenu(evt);
+				toggle();
 			}
 		});
 	}
