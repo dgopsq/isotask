@@ -1,5 +1,5 @@
 import type { AppDeps } from "@/app/deps";
-import { storeError, unknownStatusError } from "@/app/errors";
+import { storeError } from "@/app/errors";
 import type { AppError } from "@/app/errors";
 import { joinTaskPath } from "@/app/paths";
 import type { TaskDate } from "@/domain/dates";
@@ -8,14 +8,13 @@ import type { FrontmatterValue } from "@/domain/frontmatter";
 import { toWikilink } from "@/domain/frontmatter";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
-import { findStatus, firstOpenStatus } from "@/domain/status";
-import type { Minutes, Priority, RRuleString, StatusId, TaskPath } from "@/domain/task";
+import { firstOpenStatus } from "@/domain/status";
+import type { Minutes, Priority, RRuleString, TaskPath } from "@/domain/task";
 
-/** Input to `createTask`: everything a new task note's frontmatter can carry. Only `title` is required. */
+/** Input to `createTask`: everything a new task note's frontmatter can carry. Only `title` is required. A new task always gets the first configured `open` status — there's no way to pick one at creation. */
 export interface TaskDraft {
 	readonly title: string;
 	readonly folder?: string;
-	readonly status?: StatusId;
 	readonly priority?: Priority;
 	readonly due?: TaskDate;
 	readonly scheduled?: TaskDate;
@@ -51,25 +50,20 @@ async function resolveUniqueBasename(deps: AppDeps, folder: string, basename: st
 }
 
 /**
- * Creates a new task note: resolves the target status (draft's, or the
- * first configured `open` status), builds frontmatter with only the
- * configured keys that have a value, expands the filename template, and
- * de-duplicates against an existing file the way Obsidian itself does
- * (`" 2"`, `" 3"`, ...).
+ * Creates a new task note: resolves the target status (always the first
+ * configured `open` status — a new task never starts anywhere else),
+ * builds frontmatter with only the configured keys that have a value,
+ * expands the filename template, and de-duplicates against an existing
+ * file the way Obsidian itself does (`" 2"`, `" 3"`, ...).
  */
 export function makeCreateTask(deps: AppDeps) {
 	return async (draft: TaskDraft): Promise<Result<TaskPath, AppError>> => {
 		const settings = deps.settings();
 		const keys = settings.propertyKeys;
 
-		const statusResult =
-			draft.status !== undefined
-				? findStatus(settings.statuses, draft.status)
-				: firstOpenStatus(settings.statuses);
+		const statusResult = firstOpenStatus(settings.statuses);
 		if (!statusResult.some) {
-			return draft.status !== undefined
-				? err(unknownStatusError(draft.status))
-				: err({ kind: "no-status-configured" });
+			return err({ kind: "no-status-configured" });
 		}
 
 		const folder = draft.folder ?? settings.taskFolder;

@@ -4,7 +4,6 @@ import { PluginSettingTab } from "obsidian";
 import type { ObtaskSettings } from "@/adapters/obsidian/settings";
 import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
-import { StatusesModal } from "@/ui/statuses-modal";
 
 const WEEKDAY_LABELS: Readonly<Record<Weekday, string>> = {
 	0: "Monday",
@@ -101,10 +100,9 @@ export interface SettingsTabDeps {
  * rather than `this.plugin.settings` (the `PluginSettingTab` default) since
  * settings live behind the `getSettings`/`setSettings` deps instead.
  *
- * The status list has no scalar control of its own — reordering, adding and
- * deleting entries doesn't fit a single text/dropdown/toggle control — so it
- * is edited in `src/ui/statuses-modal.ts`, opened from a `SettingDefinitionAction`
- * row (the declarative API's equivalent of a standalone button setting).
+ * The status list itself has no UI here: task status is a two-way toggle
+ * (open/done, see ADR 0017) with no user-facing way to pick or configure a
+ * status. Only the `status` property key remains editable, below.
  */
 export class ObtaskSettingTab extends PluginSettingTab {
 	private readonly deps: SettingsTabDeps;
@@ -144,22 +142,6 @@ export class ObtaskSettingTab extends PluginSettingTab {
 						name: "Week starts on",
 						desc: "Used by the feed view's this week / next week buckets.",
 						control: { type: "dropdown", key: "weekStart", options: WEEKDAY_OPTIONS },
-					},
-				],
-			},
-			{
-				type: "group",
-				heading: "Statuses",
-				items: [
-					{
-						name: "Manage statuses…",
-						desc: "Add, edit, reorder or delete the statuses tasks can have.",
-						action: () => {
-							new StatusesModal(this.app, {
-								getStatuses: () => this.deps.getSettings().statuses,
-								setStatuses: (statuses) => this.deps.setSettings({ ...this.deps.getSettings(), statuses }),
-							}).open();
-						},
 					},
 				],
 			},

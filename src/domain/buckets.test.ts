@@ -148,7 +148,7 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 	const tasks = [
 		task({ title: "Z done early", due: date("2026-09-03"), status: "done" as Task["status"] }),
 		task({ title: "A todo late", due: date("2026-09-04"), status: "todo" as Task["status"] }),
-		task({ title: "B cancelled mid", due: date("2026-09-03"), status: "cancelled" as Task["status"] }),
+		task({ title: "B open mid", due: date("2026-09-03"), status: "todo" as Task["status"] }),
 		task({ title: "C todo early", due: date("2026-09-03"), status: "todo" as Task["status"] }),
 	];
 
@@ -161,7 +161,7 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 			completedAtBottom: true,
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["C todo early", "A todo late", "B cancelled mid", "Z done early"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "A todo late", "Z done early"]);
 	});
 
 	it("when false, terminal-ness is ignored and the existing date order applies", () => {
@@ -173,19 +173,19 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 			completedAtBottom: false,
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["B cancelled mid", "C todo early", "Z done early", "A todo late"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "Z done early", "A todo late"]);
 	});
 
 	it("when omitted, behaves the same as false (default off)", () => {
 		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["B cancelled mid", "C todo early", "Z done early", "A todo late"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "Z done early", "A todo late"]);
 	});
 
 	it("when true but statuses is not configured, terminal-ness is ignored (can't classify without configs)", () => {
 		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due", completedAtBottom: true });
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["B cancelled mid", "C todo early", "Z done early", "A todo late"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "Z done early", "A todo late"]);
 	});
 });
 
@@ -205,7 +205,7 @@ describe("groupIntoBuckets — order", () => {
 		const tasks = [
 			task({ title: "Z done early", due: date("2026-09-03"), status: "done" as Task["status"] }),
 			task({ title: "A todo late", due: date("2026-09-04"), status: "todo" as Task["status"] }),
-			task({ title: "B cancelled mid", due: date("2026-09-03"), status: "cancelled" as Task["status"] }),
+			task({ title: "B open mid", due: date("2026-09-03"), status: "todo" as Task["status"] }),
 			task({ title: "C todo early", due: date("2026-09-03"), status: "todo" as Task["status"] }),
 		];
 		const grouped = groupIntoBuckets(tasks, {
@@ -217,7 +217,7 @@ describe("groupIntoBuckets — order", () => {
 			order: "preserve",
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["A todo late", "C todo early", "Z done early", "B cancelled mid"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["A todo late", "B open mid", "C todo early", "Z done early"]);
 	});
 
 	it('omitting `order` (or passing "smart") is unchanged from the pre-existing date/priority/title behavior', () => {

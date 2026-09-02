@@ -4,7 +4,7 @@ import { FuzzySuggestModal } from "obsidian";
 import { PRIORITIES, priorityLabel } from "@/domain/task";
 import type { Priority } from "@/domain/task";
 
-/** Fuzzy-picks one of the three priorities, e.g. for a "Set priority…" command. Same shape as `StatusSuggestModal`. */
+/** Fuzzy-picks one of the three priorities, e.g. for a "Set priority…" command. Same shape as `NoteSuggestModal`. */
 export class PrioritySuggestModal extends FuzzySuggestModal<Priority> {
 	private readonly onPick: (priority: Priority) => void;
 

@@ -29,7 +29,7 @@ import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
-import { findStatus } from "@/domain/status";
+import { findStatus, isTerminal, toggleStatus } from "@/domain/status";
 import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
 import { describeTaskParseError, priorityChipClass, priorityMarks } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
@@ -39,8 +39,18 @@ import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
 import { buildPriorityMenu } from "@/ui/priority-menu";
 import { ProjectColorModal } from "@/ui/project-color-modal";
-import { buildStatusMenu, statusIcon } from "@/ui/status-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
+
+/**
+ * How long the status control's optimistic UI (`renderStatusControl`) holds
+ * before actually writing the new status — long enough for the ink fill and
+ * halo (`styles/obtask.css`) to land, so the row's move (ADR 0016) starts
+ * right as the fill completes. Reopening just shrinks the fill, so it gets a
+ * shorter hold. Both are skipped (delay 0) under
+ * `prefers-reduced-motion: reduce`.
+ */
+const COMPLETE_ANIMATION_MS = 150;
+const REOPEN_ANIMATION_MS = 120;
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook (see below) — mirrors the shape read off `BasesView` instances in the Bases toolbar bundle, not exported by `obsidian.d.ts`. */
 interface BasesViewAction {
@@ -149,6 +159,17 @@ export class FeedBasesView extends BasesView {
 	 */
 	private lastProjectPaths = new Set<string>();
 
+	/**
+	 * Optimistic status-toggle state for rows with a write in flight, keyed by
+	 * task path. The value is the "is checked" state the control should show
+	 * while the delayed `setStatus` write (`renderStatusControl`) is pending —
+	 * held at view level, not on the row's `comp`, so a re-render mid-hold
+	 * (`fillRow` tears the row's `comp` down on every `onDataUpdated`) neither
+	 * cancels the pending write nor loses the optimistic look. Entries are
+	 * removed once the write settles, success or failure.
+	 */
+	private readonly pendingToggles = new Map<TaskPath, boolean>();
+
 	constructor(controller: QueryController, containerEl: HTMLElement, deps: FeedBasesViewDeps) {
 		super(controller);
 		this.viewContainerEl = containerEl;
@@ -209,7 +230,6 @@ export class FeedBasesView extends BasesView {
 		new CreateTaskModal(this.deps.app, {
 			app: this.deps.app,
 			createTask: this.deps.createTask,
-			getStatuses: this.deps.getStatuses,
 			getDefaultFolder: this.deps.getTaskFolder,
 			...(baseFileName !== undefined ? { initial: { title: baseFileName } } : {}),
 		}).open();
@@ -709,38 +729,98 @@ export class FeedBasesView extends BasesView {
 		}
 	}
 
-	/** Button-like span (icon + label) that opens the status `Menu` on click/Enter/Space and dispatches to `setStatus`. */
+	/**
+	 * Custom-drawn circle checkbox that toggles the task between done and
+	 * open on click/Enter/Space, via `domain/status.ts#toggleStatus`
+	 * (terminal -> first open status, otherwise -> first done status) and
+	 * dispatches to `setStatus`. When no matching status is configured,
+	 * notifies instead of acting. The right-click/long-press edit menu
+	 * (`registerRowContextMenu`) offers a single "Mark as done"/"Reopen" item
+	 * (`ui/status-menu.ts#addDoneMenuItem`).
+	 *
+	 * The visual toggle is optimistic: it flips immediately, then the actual
+	 * `setStatus` write is delayed behind the completion/reopen animation
+	 * (`COMPLETE_ANIMATION_MS`/`REOPEN_ANIMATION_MS`, skipped entirely under
+	 * reduced motion) so the ink fill and halo have time to play before Bases
+	 * re-renders the row from the new frontmatter. The delay and the write are
+	 * driven by a promise chain that is NOT tied to the row's `comp` — `fillRow`
+	 * tears that component down on every `onDataUpdated`, and a re-render
+	 * during the hold must not silently drop the write. The pending/optimistic
+	 * state itself lives on the view (`this.pendingToggles`, keyed by task
+	 * path) rather than in this closure, so a row rebuilt mid-hold still shows
+	 * the optimistic state instead of snapping back to the last-known
+	 * frontmatter. On failure the optimistic state is rolled back to the
+	 * last-known terminal-ness; on success the entry is simply cleared and the
+	 * row picks up the new frontmatter on its next rebuild.
+	 */
 	private renderStatusControl(comp: Component, row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
 		const statusOption = findStatus(statuses, task.status);
+		const kind = statusOption.some ? statusOption.value.kind : "open";
+		const isTaskTerminal = statusOption.some && isTerminal(kind);
+		const label = statusOption.some ? statusOption.value.label : task.status;
+		const shownChecked = this.pendingToggles.get(task.path) ?? isTaskTerminal;
+
 		const control = row.createSpan({
-			cls: [cssClass("feed__status"), "clickable-icon"],
-			attr: { role: "button", tabindex: "0" },
+			cls: [cssClass("feed__status"), cssClass(`feed__status--${kind}`)],
+			attr: {
+				role: "checkbox",
+				tabindex: "0",
+				"aria-checked": shownChecked ? "true" : "false",
+				"aria-label": label,
+			},
 		});
 
-		setIcon(control.createSpan({ cls: cssClass("feed__status-icon") }), statusOption.some ? statusIcon(statusOption.value) : "circle");
-		control.createSpan({
-			text: statusOption.some ? statusOption.value.label : task.status,
-			cls: cssClass("feed__status-label"),
-		});
+		const check = control.createSpan({ cls: cssClass("feed__check") });
+		setIcon(check, "check");
 
-		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
-			const menu = newMenu();
-			buildStatusMenu(menu, statuses, task.status, (status) => {
-				void this.setStatus(task.path, status.id);
-			});
-			if (evt instanceof MouseEvent) {
-				menu.showAtMouseEvent(evt);
-			} else {
-				const rect = control.getBoundingClientRect();
-				menu.showAtPosition({ x: rect.left, y: rect.bottom });
-			}
+		control.toggleClass(cssClass("feed__status--checked"), shownChecked);
+
+		const revertOptimism = (): void => {
+			control.removeClass(cssClass("feed__status--completing"));
+			control.setAttribute("aria-checked", isTaskTerminal ? "true" : "false");
+			control.toggleClass(cssClass("feed__status--checked"), isTaskTerminal);
 		};
 
-		comp.registerDomEvent(control, "click", openMenu);
+		const toggle = (): void => {
+			if (this.pendingToggles.has(task.path)) {
+				return;
+			}
+			const next = toggleStatus(statuses, task.status);
+			if (!next.some) {
+				this.deps.notifier.error("No status to toggle to is configured");
+				return;
+			}
+
+			const completing = !isTaskTerminal;
+			this.pendingToggles.set(task.path, completing);
+			control.setAttribute("aria-checked", completing ? "true" : "false");
+			if (completing) {
+				control.addClass(cssClass("feed__status--checked"));
+				control.addClass(cssClass("feed__status--completing"));
+			} else {
+				control.removeClass(cssClass("feed__status--checked"));
+			}
+
+			const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			const delay = reducedMotion ? 0 : completing ? COMPLETE_ANIMATION_MS : REOPEN_ANIMATION_MS;
+
+			void (async (): Promise<void> => {
+				if (delay > 0) {
+					await new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+				}
+				const ok = await this.setStatus(task.path, next.value.id);
+				this.pendingToggles.delete(task.path);
+				if (!ok) {
+					revertOptimism();
+				}
+			})();
+		};
+
+		comp.registerDomEvent(control, "click", toggle);
 		comp.registerDomEvent(control, "keydown", (evt) => {
 			if (evt.key === "Enter" || evt.key === " ") {
 				evt.preventDefault();
-				openMenu(evt);
+				toggle();
 			}
 		});
 	}
@@ -815,11 +895,14 @@ export class FeedBasesView extends BasesView {
 		comp.register(clearLongPress);
 	}
 
-	private async setStatus(path: TaskPath, statusId: StatusId): Promise<void> {
+	/** Resolves `true` on success, `false` on failure (already notified) — the status control's optimistic UI rolls itself back on `false`. */
+	private async setStatus(path: TaskPath, statusId: StatusId): Promise<boolean> {
 		const result = await this.deps.setStatus(path, statusId);
 		if (!result.ok) {
 			this.deps.notifier.error(describeAppError(result.error));
+			return false;
 		}
+		return true;
 	}
 
 	private async setPriority(path: TaskPath, priority: Priority): Promise<void> {

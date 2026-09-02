@@ -12,7 +12,6 @@ import { VaultTaskStore } from "@/adapters/obsidian/task-store";
 import { registerTaskViewActions } from "@/adapters/obsidian/view-actions";
 import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
-import { makeCycleStatus } from "@/app/cycle-status";
 import type { AppDeps } from "@/app/deps";
 import { makeRescheduleTask } from "@/app/reschedule-task";
 import { makeSetDate } from "@/app/set-date";
@@ -22,6 +21,7 @@ import { makeSetProject } from "@/app/set-project";
 import { makeSetRecurrence } from "@/app/set-recurrence";
 import { makeSetStatus } from "@/app/set-status";
 import { makeSetTags } from "@/app/set-tags";
+import { makeToggleDone } from "@/app/toggle-done";
 import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
 import { parseSettings } from "@/domain/settings";
@@ -69,7 +69,7 @@ export default class ObtaskPlugin extends Plugin {
 		const createTask = makeCreateTask(appDeps);
 		const convertNote = makeConvertNote(appDeps);
 		const setStatus = makeSetStatus(appDeps);
-		const cycleStatus = makeCycleStatus(appDeps);
+		const toggleDone = makeToggleDone(appDeps);
 		const rescheduleTask = makeRescheduleTask(appDeps);
 		const setDate = makeSetDate(appDeps);
 		const setDuration = makeSetDuration(appDeps);
@@ -113,7 +113,7 @@ export default class ObtaskPlugin extends Plugin {
 			createTask,
 			convertNote,
 			setStatus,
-			cycleStatus,
+			toggleDone,
 			setDate,
 			setPriority,
 			setDuration,

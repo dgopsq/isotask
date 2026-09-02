@@ -107,16 +107,17 @@ describe("makeSetStatus", () => {
 		expect(notifier.infoMessages).toEqual(["Next occurrence already exists: Tasks/Buy milk 2026-09-09.md"]);
 	});
 
-	it("cancelled never spawns even with a repeat set", async () => {
+	it("reopening a done task never spawns, even with a repeat set", async () => {
 		const { deps, store, notifier } = makeDeps();
 		store.seed(path("Tasks/Buy milk 2026-09-02.md"), {
 			type: "task",
-			status: "todo",
+			status: "done",
 			due: "2026-09-02",
 			repeat: "FREQ=WEEKLY",
+			completed: "2026-08-26T10:00",
 		});
 		const setStatus = makeSetStatus(deps);
-		const result = await setStatus(path("Tasks/Buy milk 2026-09-02.md"), statusId("cancelled"));
+		const result = await setStatus(path("Tasks/Buy milk 2026-09-02.md"), statusId("todo"));
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {

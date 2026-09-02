@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_STATUSES, findStatus, firstOpenStatus, isTerminal, nextStatusInCycle } from "@/domain/status";
+import { DEFAULT_STATUSES, findStatus, firstDoneStatus, firstOpenStatus, isTerminal, toggleStatus } from "@/domain/status";
 import { isNone, isSome } from "@/domain/result";
 import type { StatusId } from "@/domain/task";
 
@@ -11,9 +11,7 @@ function id(value: string): StatusId {
 describe("isTerminal", () => {
 	it.each([
 		["open", false],
-		["active", false],
 		["done", true],
-		["cancelled", true],
 	] as const)("%s -> %s", (kind, expected) => {
 		expect(isTerminal(kind)).toBe(expected);
 	});
@@ -48,27 +46,44 @@ describe("firstOpenStatus", () => {
 	});
 });
 
-describe("nextStatusInCycle", () => {
-	it("walks the status list in configured order", () => {
-		// configured order: todo, in-progress, done, cancelled
-		const first = nextStatusInCycle(DEFAULT_STATUSES, id("todo"));
-		expect(first.some && first.value.id).toBe("in-progress");
-
-		const second = nextStatusInCycle(DEFAULT_STATUSES, id("in-progress"));
-		expect(second.some && second.value.id).toBe("done");
+describe("firstDoneStatus", () => {
+	it("returns the first status with kind done", () => {
+		const result = firstDoneStatus(DEFAULT_STATUSES);
+		expect(isSome(result)).toBe(true);
+		if (result.some) {
+			expect(result.value.id).toBe("done");
+		}
 	});
 
-	it("wraps around after the last status in configured order", () => {
-		const wrapped = nextStatusInCycle(DEFAULT_STATUSES, id("cancelled"));
-		expect(wrapped.some && wrapped.value.id).toBe("todo");
+	it("returns none when no status has kind done", () => {
+		const noDone = DEFAULT_STATUSES.filter((s) => s.kind !== "done");
+		expect(isNone(firstDoneStatus(noDone))).toBe(true);
+	});
+});
+
+describe("toggleStatus", () => {
+	it("open -> done", () => {
+		const result = toggleStatus(DEFAULT_STATUSES, id("todo"));
+		expect(result.some && result.value.id).toBe("done");
 	});
 
-	it("falls back to the first status in configured order when currentId is unknown", () => {
-		const result = nextStatusInCycle(DEFAULT_STATUSES, id("nope"));
+	it("done -> open (first open status)", () => {
+		const result = toggleStatus(DEFAULT_STATUSES, id("done"));
 		expect(result.some && result.value.id).toBe("todo");
 	});
 
-	it("returns none for an empty status list", () => {
-		expect(isNone(nextStatusInCycle([], id("todo")))).toBe(true);
+	it("unknown id -> done (treated as non-terminal)", () => {
+		const result = toggleStatus(DEFAULT_STATUSES, id("nope"));
+		expect(result.some && result.value.id).toBe("done");
+	});
+
+	it("returns none when no done status is configured", () => {
+		const noDone = DEFAULT_STATUSES.filter((s) => s.kind !== "done");
+		expect(isNone(toggleStatus(noDone, id("todo")))).toBe(true);
+	});
+
+	it("returns none when no open status is configured (toggling from terminal)", () => {
+		const noOpen = DEFAULT_STATUSES.filter((s) => s.kind !== "open");
+		expect(isNone(toggleStatus(noOpen, id("done")))).toBe(true);
 	});
 });

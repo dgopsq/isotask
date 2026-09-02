@@ -162,19 +162,122 @@
 	color: var(--text-accent);
 }
 
+/*
+ * Custom-drawn circle checkbox (`feed-view.ts#renderStatusControl`), replacing
+ * a plain icon button. The visible ring (`.obtask-feed__check`) is inset from
+ * this hit area — 5px padding/negative margin gives an ~28px touch target
+ * around an 18px visual circle without affecting row layout.
+ */
 .obtask-feed__status {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--size-4-1);
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
+	justify-content: center;
+	padding: var(--size-4-1);
+	margin: calc(var(--size-4-1) * -1);
 	cursor: pointer;
 	transition: transform var(--obtask-motion, 120ms) ease;
 }
 
-.obtask-feed__status-icon {
+.obtask-feed__check {
+	inline-size: 18px;
+	block-size: 18px;
+	border-radius: 50%;
+	border: 1.5px solid var(--background-modifier-border-hover);
+	position: relative;
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	transition: border-color var(--obtask-motion, 120ms) ease;
+}
+
+/*
+ * The "ink" fill: an accent disc that grows from the ring's centre on check
+ * (160ms on the feed's move curve, ADR 0016) and shrinks back on uncheck
+ * (120ms). Covers the border (`inset: -1.5px`) so the filled state is one
+ * solid disc.
+ */
+.obtask-feed__check::before {
+	content: "";
+	position: absolute;
+	inset: -1.5px;
+	border-radius: 50%;
+	background-color: var(--interactive-accent);
+	transform: scale(0);
+	transition:
+		transform var(--obtask-motion-uncheck, 120ms) cubic-bezier(0.22, 1, 0.36, 1),
+		background-color var(--obtask-motion, 120ms) ease;
+}
+
+.obtask-feed__check svg {
+	position: relative;
+	width: 12px;
+	height: 12px;
+	stroke-width: 2.5;
+	color: var(--text-faint);
+	opacity: 0;
+	transition: opacity var(--obtask-motion, 120ms) ease;
+}
+
+/*
+ * Hover, one signal per state and one shared 120ms ease for everything that
+ * changes: an empty ring previews a faint check inside it (the border stays
+ * put), a filled disc shifts to Obsidian's own `--interactive-accent-hover`
+ * like any accent button.
+ */
+.obtask-feed__status:not(.obtask-feed__status--checked):hover .obtask-feed__check svg {
+	opacity: 1;
+}
+
+.obtask-feed__status--checked:hover .obtask-feed__check {
+	border-color: var(--interactive-accent-hover);
+}
+
+.obtask-feed__status--checked:hover .obtask-feed__check::before {
+	background-color: var(--interactive-accent-hover);
+}
+
+.obtask-feed__status--checked .obtask-feed__check {
+	border-color: var(--interactive-accent);
+}
+
+.obtask-feed__status--checked .obtask-feed__check::before {
+	transform: scale(1);
+	transition-duration: var(--obtask-motion-check, 160ms);
+}
+
+/* The check fades in over the tail of the fill. */
+.obtask-feed__status--checked .obtask-feed__check svg {
+	opacity: 1;
+	color: var(--text-on-accent);
+	transition: opacity var(--obtask-motion-check-tail, 70ms) ease var(--obtask-motion-check-delay, 90ms);
+}
+
+/*
+ * The one flourish on completion: a single soft halo ring expanding from the
+ * edge and fading, played only while `--completing` is present
+ * (`feed-view.ts` adds it for the optimistic "marking done" state, never for
+ * reopening). Disabled under reduced motion, see the media query at the end
+ * of this file.
+ */
+.obtask-feed__status--completing .obtask-feed__check::after {
+	content: "";
+	position: absolute;
+	inset: -1.5px;
+	border-radius: 50%;
+	border: 2px solid var(--interactive-accent);
+	pointer-events: none;
+	animation: obtask-check-halo 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes obtask-check-halo {
+	from {
+		transform: scale(1);
+		opacity: 0.7;
+	}
+	to {
+		transform: scale(1.9);
+		opacity: 0;
+	}
 }
 
 .obtask-feed__date {
@@ -457,13 +560,6 @@
 	font-size: var(--font-ui-small);
 }
 
-.obtask-statuses-modal-icon-preview {
-	display: inline-flex;
-	align-items: center;
-	margin-left: var(--size-4-2);
-	color: var(--text-muted);
-}
-
 .obtask-suggest-path {
 	color: var(--text-muted);
 	font-size: var(--font-smaller);
@@ -593,5 +689,22 @@
 	.obtask-feed,
 	.obtask-swatch {
 		--obtask-motion: 0s;
+		--obtask-motion-check: 0s;
+		--obtask-motion-uncheck: 0s;
+		--obtask-motion-check-tail: 0s;
+		--obtask-motion-check-delay: 0s;
+	}
+
+	/*
+	 * The status control's completion halo
+	 * (`.obtask-feed__status--completing`, above) are one-shot `animation`s, not
+	 * `transition`s, so `--obtask-motion` doesn't reach them — disabled here
+	 * instead, at matching specificity, and placed after those rules in file
+	 * order so the cascade picks this one with no `!important` needed.
+	 * `feed-view.ts` also skips the animation hold (delay 0) under this same
+	 * media query, so the end state (checked/struck) still lands immediately.
+	 */
+	.obtask-feed__status--completing .obtask-feed__check::after {
+		animation: none;
 	}
 }

@@ -1,37 +1,36 @@
 import type { Menu } from "obsidian";
 
-import type { StatusConfig, StatusKind } from "@/domain/status";
+import type { StatusConfig } from "@/domain/status";
+import { toggleStatus } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
 
-/** Icon used for a status that doesn't configure its own (`docs/DOMAIN-MODEL.md#statuses`' default kinds). */
-const DEFAULT_ICON_BY_KIND: Readonly<Record<StatusKind, string>> = {
-	open: "circle",
-	active: "circle-dot",
-	done: "check-circle-2",
-	cancelled: "x-circle",
-};
-
-/** The icon to render for a status: its own configured icon, falling back to a default for its kind. */
-export function statusIcon(status: StatusConfig): string {
-	return status.icon ?? DEFAULT_ICON_BY_KIND[status.kind];
-}
-
-/** Adds one menu item per configured status to `menu`, checking the current one. Shared by the feed row status control and the file-menu "Set status" entries. */
-export function buildStatusMenu(
+/**
+ * Adds a single toggle item to `menu`: "Mark as done" when `task`'s current
+ * status isn't `done`-kind, "Reopen" when it is. Picks the target via
+ * `domain/status.ts#toggleStatus`; adds nothing when there's no configured
+ * target to toggle to (e.g. no `done`/`open` status configured). Shared by
+ * the feed row's context menu and the file-menu "Obtask" section.
+ */
+export function addDoneMenuItem(
 	menu: Menu,
+	task: { readonly status: StatusId },
 	statuses: readonly StatusConfig[],
-	current: StatusId,
 	onPick: (status: StatusConfig) => void,
 ): void {
-	for (const status of statuses) {
-		menu.addItem((item) => {
-			item
-				.setTitle(status.label)
-				.setIcon(statusIcon(status))
-				.setChecked(status.id === current)
-				.onClick(() => {
-					onPick(status);
-				});
-		});
+	const next = toggleStatus(statuses, task.status);
+	if (!next.some) {
+		return;
 	}
+
+	// The toggle target's kind is the opposite of the task's current state:
+	// toggling *to* `open` means the task is currently done (reopening).
+	const reopening = next.value.kind === "open";
+	menu.addItem((item) => {
+		item
+			.setTitle(reopening ? "Reopen" : "Mark as done")
+			.setIcon(reopening ? "circle" : "check-circle-2")
+			.onClick(() => {
+				onPick(next.value);
+			});
+	});
 }

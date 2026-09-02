@@ -6,8 +6,7 @@ import { FuzzySuggestModal } from "obsidian";
  * command — unlike `ui/suggest/note-suggest.ts` (an `AbstractInputSuggest`
  * bound to one text field, matching on basename/path), this is a
  * standalone full-screen picker for commands that have no field of their
- * own to attach a suggest to. Same shape as `PrioritySuggestModal`/
- * `StatusSuggestModal`.
+ * own to attach a suggest to. Same shape as `PrioritySuggestModal`.
  */
 export class NoteSuggestModal extends FuzzySuggestModal<TFile> {
 	private readonly onPick: (file: TFile) => void;

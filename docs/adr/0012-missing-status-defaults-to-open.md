@@ -2,14 +2,15 @@
 
 ## Status
 
-Accepted, 2026-08-30
+Accepted, 2026-08-30. Superseded by 0017 (status kinds) for the status-table/kind list; this
+ADR's default-to-open rule for a missing `status` still applies.
 
 ## Context
 
 The Bases toolbar's `+ New` button creates a note whose frontmatter is inferred from the base
 file's filters (`==`, `contains`, `hasTag`, `inFolder`, `hasProperty`, `isEmpty` — never `!=`,
 verified against Obsidian 1.13.7). The generated `Tasks.base` filters on `type == "task"` and
-`status != "done"`/`"cancelled"`, so `+ New` can only ever infer `type: task` — never a `status`,
+`status != "done"`, so `+ New` can only ever infer `type: task` — never a `status`,
 because every status filter it could read is a `!=`. This button is owned by Bases' own
 `QueryController` and cannot be intercepted by a custom `BasesView`, so the resulting note always
 lands with no `status` property. `domain/frontmatter.ts#parseTask` treated that as a hard

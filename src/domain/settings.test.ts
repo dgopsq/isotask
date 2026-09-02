@@ -69,6 +69,16 @@ describe("parseSettings", () => {
 		expect(parseSettings({ statuses }).statuses).toEqual(DEFAULT_STATUSES);
 	});
 
+	it("falls back the whole statuses list when a status uses a removed kind (active/cancelled)", () => {
+		const statuses = [
+			{ id: "todo", label: "To do", kind: "open" },
+			{ id: "in-progress", label: "In progress", kind: "active" },
+			{ id: "done", label: "Done", kind: "done" },
+			{ id: "cancelled", label: "Cancelled", kind: "cancelled" },
+		];
+		expect(parseSettings({ statuses }).statuses).toEqual(DEFAULT_STATUSES);
+	});
+
 	it("keeps an optional status icon when present", () => {
 		const statuses = [
 			{ id: "todo", label: "To do", kind: "open", icon: "circle" },

@@ -11,7 +11,8 @@ import type { DateField } from "@/app/set-date";
 import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import { describeRRule } from "@/domain/recurrence";
 import type { Result } from "@/domain/result";
-import type { Priority, StatusId, Task, TaskParseError, TaskPath } from "@/domain/task";
+import { findStatus, isTerminal, toggleStatus } from "@/domain/status";
+import type { Priority, Task, TaskParseError, TaskPath } from "@/domain/task";
 import { describeTaskParseError, PRIORITIES, priorityLabel } from "@/domain/task";
 import { formatDurationMinutes } from "@/domain/task-display";
 import { cssClass, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
@@ -247,7 +248,7 @@ export class TaskPanelView extends ItemView {
 	private renderForm(root: HTMLElement, task: Task): void {
 		root.createEl("h3", { text: task.title, cls: cssClass("panel__title") });
 
-		this.renderStatusField(root, task);
+		this.renderDoneField(root, task);
 		this.renderPriorityField(root, task);
 		this.renderDateField(root, task, "due", "Due");
 		this.renderDateField(root, task, "scheduled", "Scheduled");
@@ -257,23 +258,29 @@ export class TaskPanelView extends ItemView {
 		this.renderTagsField(root, task);
 	}
 
-	private renderStatusField(root: HTMLElement, task: Task): void {
-		const options: Record<string, string> = {};
-		for (const status of this.deps.getStatuses()) {
-			options[status.id] = status.label;
-		}
+	/** Status is a two-way toggle (open/done, per ADR 0017) — no dropdown, no status list. */
+	private renderDoneField(root: HTMLElement, task: Task): void {
+		const statuses = this.deps.getStatuses();
+		const current = findStatus(statuses, task.status);
+		const isDone = current.some && isTerminal(current.value.kind);
 
 		new Setting(root)
-			.setName("Status")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(options)
-					.setValue(task.status)
-					.onChange((value) => {
-						void this.deps.setStatus(task.path, value as StatusId).then((result) => {
-							this.report(result);
-						});
-					}),
+			.setName("Done")
+			.addToggle((toggle) =>
+				toggle.setValue(isDone).onChange(() => {
+					const next = toggleStatus(statuses, task.status);
+					if (!next.some) {
+						this.deps.notifier.error("No status to toggle to is configured");
+						toggle.setValue(isDone);
+						return;
+					}
+					void this.deps.setStatus(task.path, next.value.id).then((result) => {
+						this.report(result);
+						if (!result.ok) {
+							toggle.setValue(isDone);
+						}
+					});
+				}),
 			);
 	}
 

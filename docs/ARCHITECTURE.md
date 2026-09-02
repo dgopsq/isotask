@@ -15,7 +15,7 @@ src/
                PathResolver.
   app/         use-cases, each a `make*(deps: AppDeps) => (...) => Promise<Result<...>>` factory
                over `deps.ts`'s ports: `createTask`, `setStatus` (incl. complete -> spawn),
-               `cycleStatus`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the
+               `toggleDone`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the
                pure `generateBase#renderTasksBase`. `errors.ts` holds the shared `AppError` union
                and `describeAppError`/`describeRecurrenceError`. Pure orchestration over ports;
                unit-tested with in-memory fakes (`app/test/fakes.ts`).
@@ -32,8 +32,8 @@ src/
                renders its task fields as a form — dropdowns for the enums, the shared modals for
                the rest — dispatching the same app use-cases.
   ui/          small DOM renderers + modals: `CreateTaskModal`, `DateModal`, `RecurrenceModal`,
-               `StatusSuggestModal` (`FuzzySuggestModal`), `status-menu.ts#buildStatusMenu`.
-               createEl only; no innerHTML.
+               `status-menu.ts#addDoneMenuItem` (a single done/reopen toggle — no status picker,
+               see ADR 0017). createEl only; no innerHTML.
   commands/    `register-commands.ts#registerCommands`: wires every command to an `app` use-case;
                note-scoped commands use `checkCallback` + the active file's frontmatter to hide
                themselves off a non-task note.

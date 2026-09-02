@@ -59,7 +59,7 @@ const PropertyKeysSchema = v.fallback(
 	DEFAULT_PROPERTY_KEYS,
 );
 
-const STATUS_KINDS = ["open", "active", "done", "cancelled"] as const;
+const STATUS_KINDS = ["open", "done"] as const;
 
 const StatusConfigSchema = v.object({
 	id: v.pipe(v.string(), v.minLength(1)),
