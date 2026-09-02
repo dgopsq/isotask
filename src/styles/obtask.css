@@ -58,6 +58,12 @@
 	grid-column: 1 / -1;
 }
 
+.obtask-feed__group,
+.obtask-feed__bucket,
+.obtask-feed__bucket-empty {
+	padding-inline: var(--size-4-2);
+}
+
 .obtask-feed__group {
 	margin: var(--size-4-4) 0 var(--size-4-1) 0;
 	color: var(--text-normal);
@@ -90,12 +96,23 @@
 	margin-top: 0;
 }
 
+/*
+ * Horizontal padding insets every cell from the row's edges (a subgrid
+ * applies its padding to its first/last tracks) so the hover tint reads
+ * as a card rather than a hairline, and `justify-items: start` pins each
+ * cell's content to the left — Obsidian's `clickable-icon` (on the date
+ * and priority chips) is a `justify-content: center` flex box, which would
+ * otherwise float a short value in the middle of its `max-content` track.
+ * The group/bucket headings below get the same inline padding so their
+ * text lines up with the checkbox column.
+ */
 .obtask-feed__row {
 	grid-column: 1 / -1;
 	display: grid;
 	grid-template-columns: subgrid;
 	align-items: center;
-	padding: var(--size-4-1) 0;
+	justify-items: start;
+	padding: var(--size-4-1) var(--size-4-2);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -280,7 +297,7 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	font-style: italic;
-	padding: var(--size-4-1) 0;
+	padding-block: var(--size-4-1);
 }
 
 /*
