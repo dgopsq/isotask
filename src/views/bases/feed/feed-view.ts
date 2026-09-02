@@ -37,7 +37,8 @@ import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
-import { buildPriorityMenu } from "@/ui/priority-menu";
+import { openProjectModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+import { buildPriorityMenu, priorityIcon } from "@/ui/priority-menu";
 import { ProjectColorModal } from "@/ui/project-color-modal";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
@@ -465,7 +466,7 @@ export class FeedBasesView extends BasesView {
 					this.renderProjectLink(comp, metaEl, task);
 					break;
 				case "tags":
-					this.renderTags(metaEl, task);
+					this.renderTags(comp, metaEl, task);
 					break;
 				case "generic":
 					this.renderGenericChip(metaEl, entry, column.propertyId);
@@ -551,32 +552,36 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/**
-	 * Priority control: Apple Reminders-style — `normal` renders nothing at
-	 * all (no chip, no click target; a `normal` task's priority is still
-	 * reachable via the row's context menu or the task panel), `high`/
-	 * `urgent` render a small `!`/`!!` mark (`domain/task.ts#priorityMarks`)
-	 * coloured by one `obtask-priority-<value>` class per
-	 * `domain/task.ts#priorityChipClass` (`styles/obtask.css`). Same
-	 * clickable-icon/button-like pattern as the status control — opens
-	 * `buildPriorityMenu` on click/Enter/Space and dispatches to
-	 * `setPriority`.
+	 * Priority control: Apple Reminders-style — `high`/`urgent` render a
+	 * small `!`/`!!` mark (`domain/task.ts#priorityMarks`) coloured by one
+	 * `obtask-priority-<value>` class per `domain/task.ts#priorityChipClass`
+	 * (`styles/obtask.css`); `normal` renders the same control with a muted
+	 * "no priority" icon instead of a mark (`priorityIcon("normal")`,
+	 * `ui/priority-menu.ts` — currently "minus"), styled by
+	 * `feed__priority--empty`. Same clickable-icon/button-like pattern as
+	 * the status control either way — opens `buildPriorityMenu` on
+	 * click/Enter/Space and dispatches to `setPriority`.
 	 */
 	private renderPriorityControl(comp: Component, parent: HTMLElement, task: Task): void {
-		if (task.priority === "normal") {
-			// Still emits an (empty, inert) grid cell: in wide mode the meta
-			// chips are direct subgrid items of the row (`.obtask-feed__meta`
-			// is `display: contents`), so skipping the element entirely would
-			// shift this row's later columns (project, tags) one track left
-			// relative to rows that do render a mark.
-			parent.createSpan({ cls: [cssClass("feed__priority"), cssClass("feed__priority--empty")] });
-			return;
-		}
-
+		const isEmpty = task.priority === "normal";
 		const control = parent.createSpan({
-			cls: [cssClass("feed__priority"), cssClass(priorityChipClass(task.priority)), "clickable-icon"],
+			cls: [
+				cssClass("feed__priority"),
+				isEmpty ? cssClass("feed__priority--empty") : cssClass(priorityChipClass(task.priority)),
+				"clickable-icon",
+			],
 			attr: { role: "button", tabindex: "0" },
-			text: priorityMarks(task.priority),
 		});
+		if (isEmpty) {
+			// Icon, not a mark: `!`/`!!` read as "this task has a priority",
+			// so the empty state needs a visually distinct "no priority"
+			// glyph rather than an absent mark. Lives in its own child span
+			// so the hit area stays the whole control, same as the text
+			// case below.
+			setIcon(control.createSpan(), priorityIcon("normal"));
+		} else {
+			control.setText(priorityMarks(task.priority));
+		}
 
 		const openMenu = (evt: MouseEvent | KeyboardEvent): void => {
 			const menu = newMenu();
@@ -604,8 +609,9 @@ export class FeedBasesView extends BasesView {
 	 * Internal link to the project note, if `task.project` resolves to an
 	 * existing file — same open pattern as the title link. Unresolved
 	 * projects render as plain text (no dead-link click). Always appends
-	 * exactly one top-level element (an empty placeholder span when there is
-	 * no project) so the grid's project column stays aligned across rows.
+	 * exactly one top-level element — a click affordance ("Set project",
+	 * opening `ProjectModal` via `openProjectModalFor`) when there is no
+	 * project — so the grid's project column stays aligned across rows.
 	 *
 	 * Colored in the project's resolved color
 	 * (`domain/project-color.ts#resolveDotColor`) — the palette class or a
@@ -622,7 +628,21 @@ export class FeedBasesView extends BasesView {
 	private renderProjectLink(comp: Component, parent: HTMLElement, task: Task): void {
 		const project = task.project;
 		if (project === undefined) {
-			parent.createSpan({ cls: [cssClass("feed__project"), cssClass("feed__project--empty")] });
+			const placeholder = parent.createSpan({
+				cls: [cssClass("feed__project"), cssClass("feed__project--empty"), "clickable-icon"],
+				attr: { role: "button", tabindex: "0" },
+				text: "Set project",
+			});
+			const openModal = (): void => {
+				openProjectModalFor(this.deps.app, task, this.deps.setProject, this.deps.notifier);
+			};
+			comp.registerDomEvent(placeholder, "click", openModal);
+			comp.registerDomEvent(placeholder, "keydown", (evt) => {
+				if (evt.key === "Enter" || evt.key === " ") {
+					evt.preventDefault();
+					openModal();
+				}
+			});
 			return;
 		}
 
@@ -681,13 +701,27 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/**
-	 * Always appends exactly one top-level element (an empty placeholder
-	 * span when there are no tags) so the grid's tags column stays aligned
-	 * across rows.
+	 * Always appends exactly one top-level element — a click affordance
+	 * ("Set tags", opening `TagsModal` via `openTagsModalFor`) when there
+	 * are no tags — so the grid's tags column stays aligned across rows.
 	 */
-	private renderTags(parent: HTMLElement, task: Task): void {
+	private renderTags(comp: Component, parent: HTMLElement, task: Task): void {
 		if (task.tags.length === 0) {
-			parent.createSpan({ cls: [cssClass("feed__tags"), cssClass("feed__tags--empty")] });
+			const placeholder = parent.createSpan({
+				cls: [cssClass("feed__tags"), cssClass("feed__tags--empty"), "clickable-icon"],
+				attr: { role: "button", tabindex: "0" },
+				text: "Set tags",
+			});
+			const openModal = (): void => {
+				openTagsModalFor(this.deps.app, task, this.deps.setTags, this.deps.notifier);
+			};
+			comp.registerDomEvent(placeholder, "click", openModal);
+			comp.registerDomEvent(placeholder, "keydown", (evt) => {
+				if (evt.key === "Enter" || evt.key === " ") {
+					evt.preventDefault();
+					openModal();
+				}
+			});
 			return;
 		}
 		const container = parent.createSpan({ cls: cssClass("feed__tags") });

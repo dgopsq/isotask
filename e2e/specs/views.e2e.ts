@@ -142,16 +142,16 @@ async function waitForFrontmatter(path: string, key: string, predicate: (value: 
 	);
 }
 
-/** Clicks a feed row's date chip by the row's title text (there's no per-row selector to key off otherwise). Native `.click()` inside the Obsidian window fires the same listeners a real click would. */
-async function clickFeedDateChip(title: string): Promise<void> {
+/** Clicks a feed row cell (by its `obtask-feed__*` class) in the row identified by title text (there's no per-row selector to key off otherwise). Native `.click()` inside the Obsidian window fires the same listeners a real click would. */
+async function clickFeedCell(cellCls: string, title: string): Promise<void> {
 	const clicked = await browser.execute(
-		(rowCls, titleCls, dateCls, wantedTitle) => {
+		(rowCls, titleCls, cls, wantedTitle) => {
 			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
 				const titleEl = row.querySelector(`.${titleCls}`);
 				if (titleEl?.textContent === wantedTitle) {
-					const chip = row.querySelector(`.${dateCls}`);
-					if (chip instanceof HTMLElement) {
-						chip.click();
+					const cell = row.querySelector(`.${cls}`);
+					if (cell instanceof HTMLElement) {
+						cell.click();
 						return true;
 					}
 				}
@@ -160,12 +160,35 @@ async function clickFeedDateChip(title: string): Promise<void> {
 		},
 		cssClass("feed__row"),
 		cssClass("feed__title"),
-		cssClass("feed__date"),
+		cellCls,
 		title,
 	);
 	if (!clicked) {
-		throw new Error(`date chip for "${title}" not found in the feed`);
+		throw new Error(`"${cellCls}" cell for "${title}" not found in the feed`);
 	}
+}
+
+/** Clicks a feed row's date chip by the row's title text. */
+async function clickFeedDateChip(title: string): Promise<void> {
+	await clickFeedCell(cssClass("feed__date"), title);
+}
+
+/**
+ * Closes a Modal with Escape when its focused field is one of the
+ * `AbstractInputSuggest`-backed text fields (`ProjectModal`'s Project field,
+ * `TagsModal`'s Tags field) that auto-open a suggestion popover on focus even
+ * with an empty query (`NoteSuggest`/`TagSuggest` match every candidate
+ * against `""`) — the first `Escape` only dismisses that popover (Obsidian's
+ * own suggest-vs-modal precedence), so a second is needed to actually close
+ * the modal. Harmless when no popover is open: the extra key is sent only
+ * after confirming the modal is still there.
+ */
+async function closeModalWithEscape(modalCls: string): Promise<void> {
+	await browser.keys("Escape");
+	if (await browser.$(`.${modalCls}`).isExisting()) {
+		await browser.keys("Escape");
+	}
+	await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT, reverse: true });
 }
 
 /** Clicks a feed row's priority control by the row's title text — same technique as `clickFeedDateChip`. */
@@ -222,9 +245,9 @@ async function clickFeedStatusControl(title: string): Promise<void> {
 
 /**
  * Reads a feed row's priority mark text and classes (`.obtask-feed__priority`
- * — an inert, roleless, textless `feed__priority--empty` placeholder span
- * for a `normal` task, see `feed-view.ts#renderPriorityControl`) and its
- * project label's class list (`.obtask-feed__project`,
+ * — a clickable `feed__priority--empty` control rendering a muted icon
+ * instead of a mark for a `normal` task, see `feed-view.ts#renderPriorityControl`)
+ * and its project label's class list (`.obtask-feed__project`,
  * `feed-view.ts#renderProjectLink` — carries the project's resolved color
  * as a palette class or a scoped `--obtask-dot-color`, replacing the old
  * leading dot), by the row's title text — same lookup technique as
@@ -677,10 +700,11 @@ describe("Views", function () {
 		 * Apple Reminders-style priority marks (`domain/task.ts#priorityMarks`,
 		 * `feed-view.ts#renderPriorityControl`): `urgent` -> "!!", `high` ->
 		 * "!" (already covered above via the "Overdue task" fixture), `normal`
-		 * -> no visible mark at all — a rendered but textless/inert placeholder
-		 * span, not the old icon+label chip.
+		 * -> the same clickable control with a muted "no priority" icon
+		 * (`priorityIcon("normal")`, `.obtask-feed__priority--empty`) instead
+		 * of a `!`/`!!` text mark — no longer inert.
 		 */
-		it("renders \"!!\" for an urgent-priority row and no visible mark for a normal-priority row", async function () {
+		it('renders "!!" for an urgent-priority row and a "no priority" icon control for a normal-priority row', async function () {
 			const urgentTask = fixtures.tasks[6];
 			if (urgentTask?.title !== "Team sync") {
 				throw new Error("expected fixtures.tasks[6] (Team sync, priority: urgent) to exist");
@@ -695,15 +719,13 @@ describe("Views", function () {
 			expect(urgentMarkers?.priorityRole).toEqual("button");
 
 			const normalMarkers = await readFeedRowMarkers(normalTask.title);
-			// The element still exists — an empty `feed__priority--empty` grid
-			// cell (021bb59: keeps the row's later subgrid columns aligned with
-			// rows that do render a mark) — but carries no text, no
-			// priority-colour class, and no `role="button"`/click target: a
-			// `normal` task's priority is reachable only via the row's context
-			// menu or the task panel, not this control.
+			// `normal` now renders the same clickable control as every other
+			// priority value, just with a muted "no priority" icon instead of
+			// a `!`/`!!` text mark (`feed-view.ts#renderPriorityControl`) — so
+			// it has no text content but IS a live click target.
 			expect(normalMarkers?.priorityText).toEqual("");
 			expect(normalMarkers?.priorityClasses).toContain(cssClass("feed__priority--empty"));
-			expect(normalMarkers?.priorityRole).toBeNull();
+			expect(normalMarkers?.priorityRole).toEqual("button");
 		});
 
 		/**
@@ -807,15 +829,43 @@ describe("Views", function () {
 			}
 		});
 
+		it('clicking the empty project placeholder opens ProjectModal', async function () {
+			const task = fixtures.tasks[4];
+			if (task?.title !== "No date task") {
+				throw new Error('expected fixtures.tasks[4] ("No date task") to exist');
+			}
+
+			await clickFeedCell(cssClass("feed__project--empty"), task.title);
+
+			const modalCls = cssClass("project-modal");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await closeModalWithEscape(modalCls);
+		});
+
+		it('clicking the empty tags placeholder opens TagsModal', async function () {
+			const task = fixtures.tasks[4];
+			if (task?.title !== "No date task") {
+				throw new Error('expected fixtures.tasks[4] ("No date task") to exist');
+			}
+
+			await clickFeedCell(cssClass("feed__tags--empty"), task.title);
+
+			const modalCls = cssClass("tags-modal");
+			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await closeModalWithEscape(modalCls);
+		});
+
 		it("priority control opens buildPriorityMenu and dispatches setPriority on pick", async function () {
-			// A `normal`-priority row renders no clickable control at all — an
-			// inert `.obtask-feed__priority--empty` placeholder span, per
-			// `feed-view.ts#renderPriorityControl` (Apple Reminders-style: only
-			// `high`/`urgent` render a mark to click) — so this has to start
-			// from a task whose fixture priority is already non-`normal`.
-			// `fixtures.tasks[5]` ("Write M1 plan") is `priority: high`; picking
-			// "Urgent" is an observable change to "!!" (rather than re-picking
-			// the same "High").
+			// Starts from a task whose fixture priority is already non-`normal`
+			// so picking a new value is an observable change: `fixtures.tasks[5]`
+			// ("Write M1 plan") is `priority: high`; picking "Urgent" changes the
+			// rendered mark to "!!" (rather than re-picking the same "High").
+			// A `normal`-priority row's control (Apple Reminders-style icon
+			// instead of a `!`/`!!` mark, `feed-view.ts#renderPriorityControl`)
+			// opens the exact same menu, so this fixture choice is just about
+			// making the pick observable, not about which control is clickable.
 			const task = fixtures.tasks[5];
 			if (task === undefined) {
 				throw new Error("expected fixtures.tasks[5] (Write M1 plan) to exist");

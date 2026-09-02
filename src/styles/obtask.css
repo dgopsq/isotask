@@ -312,10 +312,11 @@
 
 /*
  * Apple Reminders-style priority mark (`!`/`!!`, domain/task.ts#priorityMarks)
- * at the right of a feed row's meta line. `normal` renders no element at
- * all (feed-view.ts#renderPriorityControl), so this is only ever a compact
- * one/two-character chip, not a full chip-with-icon like the other feed
- * controls.
+ * at the right of a feed row's meta line — a compact one/two-character
+ * chip, not a full chip-with-icon like the other feed controls. `normal`
+ * renders the same control with a muted "no priority" icon instead of a
+ * mark (`feed-view.ts#renderPriorityControl`, `.obtask-feed__priority--empty`
+ * below).
  */
 .obtask-feed__priority {
 	display: inline-flex;
@@ -323,39 +324,41 @@
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-semibold);
 	cursor: pointer;
-}
-
-/*
- * Scoped like the `:active` rule below (excludes `--empty`, which never
- * matches `:active` and so never has a `transform` to ease) rather than on
- * the base rule above — `.obtask-feed__date`'s equivalent transition stays
- * unscoped instead, because its own `--empty` variant ("Set date") IS still
- * a live click target and needs the same easing.
- */
-.obtask-feed__priority:not(.obtask-feed__priority--empty) {
 	transition: transform var(--obtask-motion, 120ms) ease;
 }
 
 /*
- * Press feedback for the three clickable feed chips (status, date,
- * priority — excluding `.obtask-feed__priority--empty`, which renders as an
- * inert alignment placeholder with no click target, so it must never look
- * pressable). `transform` only —
- * no layout impact (unlike e.g. padding/border changes, which would reflow
+ * "No priority" state: a muted icon (sized down via Obsidian's `--icon-size`
+ * override, per `setIcon`'s own docs — not italic, unlike the date/project/
+ * tags empty states, since an icon has no font style to italicise) instead
+ * of the `!`/`!!` mark, styled the same clickable control as every other
+ * priority value.
+ */
+.obtask-feed__priority--empty {
+	color: var(--text-faint);
+	--icon-size: var(--icon-xs);
+}
+
+/*
+ * Press feedback for the four clickable feed chips (status, date, priority
+ * — including its `--empty` "no priority" state, which is a live click
+ * target too now, not just an alignment placeholder). `transform` only — no
+ * layout impact (unlike e.g. padding/border changes, which would reflow
  * neighbouring subgrid cells) — and works identically for a touch tap, not
  * just a mouse click.
  */
 .obtask-feed__status:active,
 .obtask-feed__date:active,
-.obtask-feed__priority:not(.obtask-feed__priority--empty):active {
+.obtask-feed__priority:active {
 	transform: scale(0.96);
 }
 
 /*
  * Priority -> theme colour mapping (domain/task.ts#priorityChipClass).
- * `normal` has no rule — it never renders a mark, so there's nothing to
- * colour. Not scoped under .obtask-feed so the calendar view can reuse the
- * same classes for its own event marks (event-content.ts).
+ * `normal` has no rule here — it never renders one of these classes
+ * (`.obtask-feed__priority--empty` above covers its colour instead). Not
+ * scoped under .obtask-feed so the calendar view can reuse the same classes
+ * for its own event marks (event-content.ts).
  */
 .obtask-priority-urgent {
 	color: var(--color-red);
@@ -429,6 +432,17 @@
 }
 
 /*
+ * Wins over the base rule's `color` above by source order alone (same class
+ * specificity, so ordering decides) — the "Set project" placeholder is
+ * never a resolved project, so it never carries `--obtask-dot-color`
+ * either.
+ */
+.obtask-feed__project--empty {
+	color: var(--text-faint);
+	font-style: italic;
+}
+
+/*
  * Not a flex row (which would clip mid-tag with no ellipsis): the tags stay
  * inline content so the container's own text-overflow can elide them, with
  * the inter-tag gap coming from margins instead of flex `gap`.
@@ -438,6 +452,11 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
+}
+
+.obtask-feed__tags--empty {
+	color: var(--text-faint);
+	font-style: italic;
 }
 
 .obtask-feed__tag {
@@ -537,11 +556,14 @@
 }
 
 /*
- * The wide layout's alignment placeholders (empty project/tags/generic
- * chips that keep every row's subgrid columns lined up) serve no purpose
- * once the columns are gone — showing them here would only add stray gaps
- * to the wrapped line. The empty date chip ("Set date") stays visible: it's
- * a click affordance, not just alignment filler.
+ * Project/tags are click affordances now too ("Set project"/"Set tags",
+ * `feed-view.ts#renderProjectLink`/`#renderTags`), but stay hidden in
+ * compact mode — showing them here would only add stray placeholder noise
+ * to the wrapped meta line, and the row's context menu already reaches
+ * both fields. The generic placeholder stays hidden for its original
+ * reason: it's a pure wide-layout alignment filler with no click target at
+ * all. The empty date chip ("Set date") stays the one placeholder visible
+ * in compact — it's a click affordance, not just alignment filler.
  */
 .obtask-feed--compact .obtask-feed__project--empty,
 .obtask-feed--compact .obtask-feed__tags--empty,
