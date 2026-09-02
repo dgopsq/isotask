@@ -203,11 +203,12 @@
 	opacity: 0;
 }
 
-.obtask-feed__status:hover .obtask-feed__check {
+/* Hover affordance for an unchecked circle only — a checked one keeps its accent fill untouched. */
+.obtask-feed__status:not(.obtask-feed__status--checked):hover .obtask-feed__check {
 	border-color: var(--text-muted);
 }
 
-.obtask-feed__status:hover .obtask-feed__check svg {
+.obtask-feed__status:not(.obtask-feed__status--checked):hover .obtask-feed__check svg {
 	opacity: 0.35;
 	stroke-dashoffset: 0;
 	color: var(--text-muted);
