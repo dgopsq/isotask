@@ -187,10 +187,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--text-on-accent);
-	transition:
-		border-color var(--obtask-motion, 120ms) ease,
-		transform var(--obtask-motion, 120ms) cubic-bezier(0.22, 1, 0.36, 1);
+	transition: border-color var(--obtask-motion, 120ms) ease;
 }
 
 /*
@@ -206,7 +203,9 @@
 	border-radius: 50%;
 	background-color: var(--interactive-accent);
 	transform: scale(0);
-	transition: transform var(--obtask-motion-uncheck, 120ms) cubic-bezier(0.22, 1, 0.36, 1);
+	transition:
+		transform var(--obtask-motion-uncheck, 120ms) cubic-bezier(0.22, 1, 0.36, 1),
+		background-color var(--obtask-motion, 120ms) ease;
 }
 
 .obtask-feed__check svg {
@@ -214,27 +213,27 @@
 	width: 12px;
 	height: 12px;
 	stroke-width: 2.5;
+	color: var(--text-faint);
 	opacity: 0;
 	transition: opacity var(--obtask-motion, 120ms) ease;
 }
 
 /*
- * Hover: the ring grows slightly in both states (same ease-out curve as the
- * fill), and an unchecked ring previews the accent — tinted border plus a
- * faint accent check — so hover reads as "this will complete", while a
- * checked disc just lifts, reading as "this will undo".
+ * Hover, one signal per state and one shared 120ms ease for everything that
+ * changes: an empty ring previews a faint check inside it (the border stays
+ * put), a filled disc shifts to Obsidian's own `--interactive-accent-hover`
+ * like any accent button.
  */
-.obtask-feed__status:hover .obtask-feed__check {
-	transform: scale(1.08);
-}
-
-.obtask-feed__status:not(.obtask-feed__status--checked):hover .obtask-feed__check {
-	border-color: color-mix(in srgb, var(--interactive-accent) 65%, var(--background-modifier-border-hover));
-}
-
 .obtask-feed__status:not(.obtask-feed__status--checked):hover .obtask-feed__check svg {
-	opacity: 0.45;
-	color: var(--interactive-accent);
+	opacity: 1;
+}
+
+.obtask-feed__status--checked:hover .obtask-feed__check {
+	border-color: var(--interactive-accent-hover);
+}
+
+.obtask-feed__status--checked:hover .obtask-feed__check::before {
+	background-color: var(--interactive-accent-hover);
 }
 
 .obtask-feed__status--checked .obtask-feed__check {
