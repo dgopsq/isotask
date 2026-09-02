@@ -104,7 +104,10 @@
  * and priority chips) is a `justify-content: center` flex box, which would
  * otherwise float a short value in the middle of its `max-content` track.
  * The group/bucket headings below get the same inline padding so their
- * text lines up with the checkbox column.
+ * text lines up with the checkbox column. The cells that truncate with an
+ * ellipsis (title, project, tags, generic) opt back into `stretch` below:
+ * a `start`-justified grid item sizes to its own max-content and simply
+ * overflows its track instead of eliding.
  */
 .obtask-feed__row {
 	grid-column: 1 / -1;
@@ -152,6 +155,13 @@
  * `.obtask-feed--compact .obtask-feed__title` below overrides these three
  * properties, only `grid-column`/`grid-row`.
  */
+.obtask-feed__title,
+.obtask-feed__project,
+.obtask-feed__tags,
+.obtask-feed__generic {
+	justify-self: stretch;
+}
+
 .obtask-feed__title {
 	min-width: 0;
 	overflow: hidden;
