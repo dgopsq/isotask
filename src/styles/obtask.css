@@ -155,25 +155,208 @@
  * properties, only `grid-column`/`grid-row`.
  */
 .obtask-feed__title {
+	position: relative;
 	min-width: 0;
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 	color: var(--text-accent);
+	transition: color var(--obtask-motion, 120ms) ease;
 }
 
+/*
+ * Struck-through title for a done/cancelled row (`.obtask-feed__row--done`,
+ * set by `renderStatusControl`). A `::after` line rather than
+ * `text-decoration: line-through` — a pseudo can be scaled from 0 for the
+ * completion sweep below, `text-decoration` cannot. `overflow: hidden` above
+ * clips it to the same ellipsized width as the text, so it never widens the
+ * row.
+ */
+.obtask-feed__row--done .obtask-feed__title {
+	color: var(--text-faint);
+}
+
+.obtask-feed__title::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	height: 1px;
+	background: currentColor;
+	transform: scaleX(0);
+	transform-origin: left;
+}
+
+.obtask-feed__row--done .obtask-feed__title::after {
+	transform: scaleX(1);
+}
+
+.obtask-feed__row--completing .obtask-feed__title {
+	animation: obtask-title-fade 220ms 120ms ease-out both;
+}
+
+.obtask-feed__row--completing .obtask-feed__title::after {
+	animation: obtask-strike-sweep 220ms 120ms ease-out both;
+}
+
+@keyframes obtask-strike-sweep {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
+@keyframes obtask-title-fade {
+	from {
+		color: var(--text-accent);
+	}
+	to {
+		color: var(--text-faint);
+	}
+}
+
+/*
+ * Custom-drawn circle checkbox (`feed-view.ts#renderStatusControl`), replacing
+ * a plain icon button. The visible ring (`.obtask-feed__check`) is inset from
+ * this hit area — 5px padding/negative margin gives an ~28px touch target
+ * around an 18px visual circle without affecting row layout.
+ */
 .obtask-feed__status {
 	display: inline-flex;
 	align-items: center;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
+	justify-content: center;
+	padding: var(--size-4-1);
+	margin: calc(var(--size-4-1) * -1);
 	cursor: pointer;
 	transition: transform var(--obtask-motion, 120ms) ease;
 }
 
-.obtask-feed__status-icon {
+.obtask-feed__check {
+	inline-size: 18px;
+	block-size: 18px;
+	border-radius: 50%;
+	border: 1.5px solid var(--background-modifier-border-hover);
+	position: relative;
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	color: var(--text-on-accent);
+	transition:
+		border-color var(--obtask-motion, 120ms) ease,
+		background-color var(--obtask-motion, 120ms) ease,
+		transform var(--obtask-motion, 120ms) ease;
+}
+
+.obtask-feed__check svg {
+	width: 12px;
+	height: 12px;
+	stroke-width: 2.5;
+	stroke-dasharray: 1;
+	stroke-dashoffset: 1;
+	opacity: 0;
+}
+
+.obtask-feed__status:hover .obtask-feed__check {
+	border-color: var(--text-muted);
+}
+
+.obtask-feed__status:hover .obtask-feed__check svg {
+	opacity: 0.35;
+	stroke-dashoffset: 0;
+	color: var(--text-muted);
+}
+
+.obtask-feed__status--checked .obtask-feed__check {
+	background-color: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+}
+
+.obtask-feed__status--checked .obtask-feed__check svg {
+	opacity: 1;
+	stroke-dashoffset: 0;
+	color: var(--text-on-accent);
+}
+
+.obtask-feed__status--cancelled.obtask-feed__status--checked .obtask-feed__check {
+	background-color: var(--text-faint);
+	border-color: var(--text-faint);
+}
+
+/*
+ * `active` (in-progress) kind, unchecked: a half-filled ring rather than a
+ * fully empty one, so an in-progress task's control reads as "started" at a
+ * glance without needing the row's status label.
+ */
+.obtask-feed__status--active:not(.obtask-feed__status--checked) .obtask-feed__check::before {
+	content: "";
+	position: absolute;
+	inset: 2px;
+	border-radius: 50%;
+	background: linear-gradient(90deg, var(--text-muted) 50%, transparent 50%);
+}
+
+/*
+ * One-shot completion animations, played only while `--completing` is
+ * present (`feed-view.ts` adds it for the optimistic "marking done" state
+ * and never for reopening — reopening just relies on the transitions above
+ * to fade the fill back out). All three run together: the ring pops, the
+ * check draws in via its `stroke-dashoffset`, and a ripple expands and fades
+ * from the ring's edge. Disabled under reduced motion, see the media query
+ * at the end of this file.
+ */
+.obtask-feed__status--completing .obtask-feed__check {
+	animation: obtask-check-pop 320ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+.obtask-feed__status--completing .obtask-feed__check svg {
+	animation: obtask-check-draw 200ms 90ms ease-out both;
+}
+
+.obtask-feed__status--completing .obtask-feed__check::after {
+	content: "";
+	position: absolute;
+	inset: -1.5px;
+	border-radius: 50%;
+	border: 1.5px solid var(--interactive-accent);
+	pointer-events: none;
+	animation: obtask-check-ripple 420ms ease-out;
+}
+
+@keyframes obtask-check-pop {
+	0% {
+		transform: scale(1);
+	}
+	55% {
+		transform: scale(1.12);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+@keyframes obtask-check-draw {
+	from {
+		stroke-dashoffset: 1;
+		opacity: 1;
+	}
+	to {
+		stroke-dashoffset: 0;
+		opacity: 1;
+	}
+}
+
+@keyframes obtask-check-ripple {
+	from {
+		transform: scale(1);
+		opacity: 0.6;
+	}
+	to {
+		transform: scale(2.1);
+		opacity: 0;
+	}
 }
 
 .obtask-feed__date {
@@ -592,5 +775,23 @@
 	.obtask-feed,
 	.obtask-swatch {
 		--obtask-motion: 0s;
+	}
+
+	/*
+	 * The status control's check-pop/draw/ripple and the title's
+	 * strike-sweep/fade (`.obtask-feed__status--completing`,
+	 * `.obtask-feed__row--completing`, above) are one-shot `animation`s, not
+	 * `transition`s, so `--obtask-motion` doesn't reach them — disabled here
+	 * instead, at matching specificity, and placed after those rules in file
+	 * order so the cascade picks this one with no `!important` needed.
+	 * `feed-view.ts` also skips the animation hold (delay 0) under this same
+	 * media query, so the end state (checked/struck) still lands immediately.
+	 */
+	.obtask-feed__status--completing .obtask-feed__check,
+	.obtask-feed__status--completing .obtask-feed__check svg,
+	.obtask-feed__status--completing .obtask-feed__check::after,
+	.obtask-feed__row--completing .obtask-feed__title,
+	.obtask-feed__row--completing .obtask-feed__title::after {
+		animation: none;
 	}
 }

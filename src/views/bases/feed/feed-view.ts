@@ -39,8 +39,18 @@ import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
 import { buildPriorityMenu } from "@/ui/priority-menu";
 import { ProjectColorModal } from "@/ui/project-color-modal";
-import { statusIcon } from "@/ui/status-menu";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
+
+/**
+ * How long the status control's optimistic UI (`renderStatusControl`) holds
+ * before actually writing the new status — long enough for the check-pop/
+ * draw/ripple/strike-sweep CSS animations (`styles/obtask.css`) to play out.
+ * Reopening skips the ripple/strike and just fades the fill, so it gets a
+ * shorter hold. Both are skipped (delay 0) under
+ * `prefers-reduced-motion: reduce`.
+ */
+const COMPLETE_ANIMATION_MS = 380;
+const REOPEN_ANIMATION_MS = 160;
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook (see below) — mirrors the shape read off `BasesView` instances in the Bases toolbar bundle, not exported by `obsidian.d.ts`. */
 interface BasesViewAction {
@@ -710,32 +720,99 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/**
-	 * Icon-only button that toggles the task between done and open on
-	 * click/Enter/Space, via `domain/status.ts#toggleStatus` (terminal ->
-	 * first open status, otherwise -> first done status) and dispatches to
-	 * `setStatus`. When no matching status is configured, notifies instead
-	 * of acting. The right-click/long-press edit menu (`registerRowContextMenu`)
-	 * still offers every configured status via "Set status".
+	 * Custom-drawn circle checkbox that toggles the task between done and
+	 * open on click/Enter/Space, via `domain/status.ts#toggleStatus`
+	 * (terminal -> first open status, otherwise -> first done status) and
+	 * dispatches to `setStatus`. When no matching status is configured,
+	 * notifies instead of acting. The right-click/long-press edit menu
+	 * (`registerRowContextMenu`) still offers every configured status via
+	 * "Set status".
+	 *
+	 * The visual toggle is optimistic: it flips immediately, then the actual
+	 * `setStatus` write is delayed behind the completion/reopen animation
+	 * (`COMPLETE_ANIMATION_MS`/`REOPEN_ANIMATION_MS`, skipped entirely under
+	 * reduced motion) so the ring/check/ripple/strike animation has time to
+	 * play before Bases re-renders the row from the new frontmatter. `pending`
+	 * guards against a second toggle landing mid-animation. On failure the
+	 * optimistic classes are rolled back by hand — a success instead relies on
+	 * the row being rebuilt from scratch (`fillRow`'s `rowEl.empty()`) to
+	 * clear them.
 	 */
 	private renderStatusControl(comp: Component, row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
 		const statusOption = findStatus(statuses, task.status);
-		const isTaskTerminal = statusOption.some && isTerminal(statusOption.value.kind);
+		const kind = statusOption.some ? statusOption.value.kind : "open";
+		const isTaskTerminal = statusOption.some && isTerminal(kind);
 		const label = statusOption.some ? statusOption.value.label : task.status;
-		const actionHint = isTaskTerminal ? "click to reopen" : "click to mark as done";
+
 		const control = row.createSpan({
-			cls: [cssClass("feed__status"), "clickable-icon"],
-			attr: { role: "button", tabindex: "0", "aria-label": `${label} (${actionHint})` },
+			cls: [cssClass("feed__status"), cssClass(`feed__status--${kind}`)],
+			attr: {
+				role: "checkbox",
+				tabindex: "0",
+				"aria-checked": isTaskTerminal ? "true" : "false",
+				"aria-label": label,
+			},
 		});
 
-		setIcon(control.createSpan({ cls: cssClass("feed__status-icon") }), statusOption.some ? statusIcon(statusOption.value) : "circle");
+		const check = control.createSpan({ cls: cssClass("feed__check") });
+		setIcon(check, kind === "cancelled" ? "x" : "check");
+		for (const path of check.querySelectorAll("svg path")) {
+			path.setAttribute("pathLength", "1");
+		}
+
+		if (isTaskTerminal) {
+			control.addClass(cssClass("feed__status--checked"));
+			row.addClass(cssClass("feed__row--done"));
+		}
+
+		let pending = false;
+
+		const revertOptimism = (completing: boolean): void => {
+			control.removeClass(cssClass("feed__status--completing"));
+			row.removeClass(cssClass("feed__row--completing"));
+			control.setAttribute("aria-checked", isTaskTerminal ? "true" : "false");
+			if (completing) {
+				control.removeClass(cssClass("feed__status--checked"));
+			} else {
+				control.addClass(cssClass("feed__status--checked"));
+			}
+		};
 
 		const toggle = (): void => {
+			if (pending) {
+				return;
+			}
 			const next = toggleStatus(statuses, task.status);
 			if (!next.some) {
 				this.deps.notifier.error("No status to toggle to is configured");
 				return;
 			}
-			void this.setStatus(task.path, next.value.id);
+
+			const completing = !isTaskTerminal;
+			pending = true;
+			control.setAttribute("aria-checked", completing ? "true" : "false");
+			if (completing) {
+				control.addClass(cssClass("feed__status--checked"));
+				control.addClass(cssClass("feed__status--completing"));
+				row.addClass(cssClass("feed__row--completing"));
+			} else {
+				control.removeClass(cssClass("feed__status--checked"));
+			}
+
+			const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			const delay = reducedMotion ? 0 : completing ? COMPLETE_ANIMATION_MS : REOPEN_ANIMATION_MS;
+
+			const timeoutId = window.setTimeout(() => {
+				pending = false;
+				void this.setStatus(task.path, next.value.id).then((ok) => {
+					if (!ok) {
+						revertOptimism(completing);
+					}
+				});
+			}, delay);
+			comp.register(() => {
+				window.clearTimeout(timeoutId);
+			});
 		};
 
 		comp.registerDomEvent(control, "click", toggle);
@@ -817,11 +894,14 @@ export class FeedBasesView extends BasesView {
 		comp.register(clearLongPress);
 	}
 
-	private async setStatus(path: TaskPath, statusId: StatusId): Promise<void> {
+	/** Resolves `true` on success, `false` on failure (already notified) — the status control's optimistic UI rolls itself back on `false`. */
+	private async setStatus(path: TaskPath, statusId: StatusId): Promise<boolean> {
 		const result = await this.deps.setStatus(path, statusId);
 		if (!result.ok) {
 			this.deps.notifier.error(describeAppError(result.error));
+			return false;
 		}
+		return true;
 	}
 
 	private async setPriority(path: TaskPath, priority: Priority): Promise<void> {

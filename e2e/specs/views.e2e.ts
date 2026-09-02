@@ -1048,6 +1048,44 @@ describe("Views", function () {
 				);
 			}
 
+			async function feedRowStatusAriaChecked(title: string): Promise<string | null> {
+				return browser.execute(
+					(rowCls, titleCls, statusCls, wantedTitle) => {
+						for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+							const titleEl = row.querySelector(`.${titleCls}`);
+							if (titleEl?.textContent === wantedTitle) {
+								return row.querySelector(`.${statusCls}`)?.getAttribute("aria-checked") ?? null;
+							}
+						}
+						return null;
+					},
+					cssClass("feed__row"),
+					cssClass("feed__title"),
+					cssClass("feed__status"),
+					title,
+				);
+			}
+
+			/** True once the row's status control has the optimistic `--checked` modifier class (set immediately on click, well before the delayed frontmatter write lands). */
+			async function feedRowStatusChecked(title: string): Promise<boolean> {
+				return browser.execute(
+					(rowCls, titleCls, statusCls, checkedCls, wantedTitle) => {
+						for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+							const titleEl = row.querySelector(`.${titleCls}`);
+							if (titleEl?.textContent === wantedTitle) {
+								return (row.querySelector(`.${statusCls}`)?.classList.contains(checkedCls) ?? false);
+							}
+						}
+						return false;
+					},
+					cssClass("feed__row"),
+					cssClass("feed__title"),
+					cssClass("feed__status"),
+					cssClass("feed__status--checked"),
+					title,
+				);
+			}
+
 			before(async function () {
 				await reopenFeedView();
 				await browser.$(`.${cssClass("feed__row")}`).waitForExist({ timeout: SELECT_TIMEOUT });
@@ -1061,9 +1099,21 @@ describe("Views", function () {
 
 			it("marks the task done and removes its row from the feed", async function () {
 				const ariaLabelBefore = await feedRowStatusAriaLabel(task.title);
-				expect(ariaLabelBefore).toEqual("To do (click to mark as done)");
+				expect(ariaLabelBefore).toEqual("To do");
+				expect(await feedRowStatusAriaChecked(task.title)).toEqual("false");
 
 				await clickFeedStatusControl(task.title);
+
+				// Optimistic UI: the control flips to checked immediately, well
+				// before the actual frontmatter write, which `renderStatusControl`
+				// (feed-view.ts) delays behind the ~380ms completion animation.
+				// Proving this state exists (and capturing it) before waiting on
+				// the frontmatter is the point of these two lines.
+				await browser.waitUntil(async () => await feedRowStatusChecked(task.title), {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: `${task.title}'s status control never got the optimistic --checked class after being clicked`,
+				});
+				await saveScreenshot("feed-check-completing");
 
 				await waitForFrontmatter(path, "status", (v) => v === "done", `${path} status never became done via the feed's status control`);
 				const fm = await frontmatterOf(path);
@@ -1097,7 +1147,8 @@ describe("Views", function () {
 				expect(await feedRowExists(task.title)).toBe(true);
 
 				const ariaLabelAfter = await feedRowStatusAriaLabel(task.title);
-				expect(ariaLabelAfter).toEqual("To do (click to mark as done)");
+				expect(ariaLabelAfter).toEqual("To do");
+				expect(await feedRowStatusAriaChecked(task.title)).toEqual("false");
 			});
 		});
 	});
@@ -1334,7 +1385,7 @@ describe("Views", function () {
 				cssClass("feed__status"),
 				"Toolbar new",
 			);
-			expect(statusLabel).toEqual("To do (click to mark as done)");
+			expect(statusLabel).toEqual("To do");
 		});
 	});
 
