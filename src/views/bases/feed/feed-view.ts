@@ -760,10 +760,12 @@ export class FeedBasesView extends BasesView {
 			path.setAttribute("pathLength", "1");
 		}
 
-		if (isTaskTerminal) {
-			control.addClass(cssClass("feed__status--checked"));
-			row.addClass(cssClass("feed__row--done"));
-		}
+		// `row` is reused across re-renders (`fillRow` only empties its
+		// children), so the done/completing modifiers must be set both ways
+		// here rather than only added.
+		control.toggleClass(cssClass("feed__status--checked"), isTaskTerminal);
+		row.toggleClass(cssClass("feed__row--done"), isTaskTerminal);
+		row.removeClass(cssClass("feed__row--completing"));
 
 		let pending = false;
 
@@ -771,11 +773,8 @@ export class FeedBasesView extends BasesView {
 			control.removeClass(cssClass("feed__status--completing"));
 			row.removeClass(cssClass("feed__row--completing"));
 			control.setAttribute("aria-checked", isTaskTerminal ? "true" : "false");
-			if (completing) {
-				control.removeClass(cssClass("feed__status--checked"));
-			} else {
-				control.addClass(cssClass("feed__status--checked"));
-			}
+			control.toggleClass(cssClass("feed__status--checked"), isTaskTerminal);
+			row.toggleClass(cssClass("feed__row--done"), isTaskTerminal);
 		};
 
 		const toggle = (): void => {
@@ -797,6 +796,7 @@ export class FeedBasesView extends BasesView {
 				row.addClass(cssClass("feed__row--completing"));
 			} else {
 				control.removeClass(cssClass("feed__status--checked"));
+				row.removeClass(cssClass("feed__row--done"));
 			}
 
 			const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

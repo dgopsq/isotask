@@ -155,7 +155,6 @@
  * properties, only `grid-column`/`grid-row`.
  */
 .obtask-feed__title {
-	position: relative;
 	min-width: 0;
 	overflow: hidden;
 	white-space: nowrap;
@@ -165,48 +164,16 @@
 }
 
 /*
- * Struck-through title for a done/cancelled row (`.obtask-feed__row--done`,
- * set by `renderStatusControl`). A `::after` line rather than
- * `text-decoration: line-through` — a pseudo can be scaled from 0 for the
- * completion sweep below, `text-decoration` cannot. `overflow: hidden` above
- * clips it to the same ellipsized width as the text, so it never widens the
- * row.
+ * Faint title for a done/cancelled row (`.obtask-feed__row--done`, set by
+ * `renderStatusControl`); `--completing` fades it in step with the check
+ * animation while the row is being marked done.
  */
 .obtask-feed__row--done .obtask-feed__title {
 	color: var(--text-faint);
 }
 
-.obtask-feed__title::after {
-	content: "";
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 50%;
-	height: 1px;
-	background: currentColor;
-	transform: scaleX(0);
-	transform-origin: left;
-}
-
-.obtask-feed__row--done .obtask-feed__title::after {
-	transform: scaleX(1);
-}
-
 .obtask-feed__row--completing .obtask-feed__title {
 	animation: obtask-title-fade 220ms 120ms ease-out both;
-}
-
-.obtask-feed__row--completing .obtask-feed__title::after {
-	animation: obtask-strike-sweep 220ms 120ms ease-out both;
-}
-
-@keyframes obtask-strike-sweep {
-	from {
-		transform: scaleX(0);
-	}
-	to {
-		transform: scaleX(1);
-	}
 }
 
 @keyframes obtask-title-fade {
@@ -779,7 +746,7 @@
 
 	/*
 	 * The status control's check-pop/draw/ripple and the title's
-	 * strike-sweep/fade (`.obtask-feed__status--completing`,
+	 * fade (`.obtask-feed__status--completing`,
 	 * `.obtask-feed__row--completing`, above) are one-shot `animation`s, not
 	 * `transition`s, so `--obtask-motion` doesn't reach them — disabled here
 	 * instead, at matching specificity, and placed after those rules in file
@@ -790,8 +757,7 @@
 	.obtask-feed__status--completing .obtask-feed__check,
 	.obtask-feed__status--completing .obtask-feed__check svg,
 	.obtask-feed__status--completing .obtask-feed__check::after,
-	.obtask-feed__row--completing .obtask-feed__title,
-	.obtask-feed__row--completing .obtask-feed__title::after {
+	.obtask-feed__row--completing .obtask-feed__title {
 		animation: none;
 	}
 }
