@@ -159,6 +159,17 @@ export class FeedBasesView extends BasesView {
 	 */
 	private lastProjectPaths = new Set<string>();
 
+	/**
+	 * Optimistic status-toggle state for rows with a write in flight, keyed by
+	 * task path. The value is the "is checked" state the control should show
+	 * while the delayed `setStatus` write (`renderStatusControl`) is pending —
+	 * held at view level, not on the row's `comp`, so a re-render mid-hold
+	 * (`fillRow` tears the row's `comp` down on every `onDataUpdated`) neither
+	 * cancels the pending write nor loses the optimistic look. Entries are
+	 * removed once the write settles, success or failure.
+	 */
+	private readonly pendingToggles = new Map<TaskPath, boolean>();
+
 	constructor(controller: QueryController, containerEl: HTMLElement, deps: FeedBasesViewDeps) {
 		super(controller);
 		this.viewContainerEl = containerEl;
@@ -724,31 +735,37 @@ export class FeedBasesView extends BasesView {
 	 * (terminal -> first open status, otherwise -> first done status) and
 	 * dispatches to `setStatus`. When no matching status is configured,
 	 * notifies instead of acting. The right-click/long-press edit menu
-	 * (`registerRowContextMenu`) still offers every configured status via
-	 * "Set status".
+	 * (`registerRowContextMenu`) offers a single "Mark as done"/"Reopen" item
+	 * (`ui/status-menu.ts#addDoneMenuItem`).
 	 *
 	 * The visual toggle is optimistic: it flips immediately, then the actual
 	 * `setStatus` write is delayed behind the completion/reopen animation
 	 * (`COMPLETE_ANIMATION_MS`/`REOPEN_ANIMATION_MS`, skipped entirely under
-	 * reduced motion) so the ink fill and halo have time to
-	 * play before Bases re-renders the row from the new frontmatter. `pending`
-	 * guards against a second toggle landing mid-animation. On failure the
-	 * optimistic classes are rolled back by hand — a success instead relies on
-	 * the row being rebuilt from scratch (`fillRow`'s `rowEl.empty()`) to
-	 * clear them.
+	 * reduced motion) so the ink fill and halo have time to play before Bases
+	 * re-renders the row from the new frontmatter. The delay and the write are
+	 * driven by a promise chain that is NOT tied to the row's `comp` — `fillRow`
+	 * tears that component down on every `onDataUpdated`, and a re-render
+	 * during the hold must not silently drop the write. The pending/optimistic
+	 * state itself lives on the view (`this.pendingToggles`, keyed by task
+	 * path) rather than in this closure, so a row rebuilt mid-hold still shows
+	 * the optimistic state instead of snapping back to the last-known
+	 * frontmatter. On failure the optimistic state is rolled back to the
+	 * last-known terminal-ness; on success the entry is simply cleared and the
+	 * row picks up the new frontmatter on its next rebuild.
 	 */
 	private renderStatusControl(comp: Component, row: HTMLElement, task: Task, statuses: readonly StatusConfig[]): void {
 		const statusOption = findStatus(statuses, task.status);
 		const kind = statusOption.some ? statusOption.value.kind : "open";
 		const isTaskTerminal = statusOption.some && isTerminal(kind);
 		const label = statusOption.some ? statusOption.value.label : task.status;
+		const shownChecked = this.pendingToggles.get(task.path) ?? isTaskTerminal;
 
 		const control = row.createSpan({
 			cls: [cssClass("feed__status"), cssClass(`feed__status--${kind}`)],
 			attr: {
 				role: "checkbox",
 				tabindex: "0",
-				"aria-checked": isTaskTerminal ? "true" : "false",
+				"aria-checked": shownChecked ? "true" : "false",
 				"aria-label": label,
 			},
 		});
@@ -756,25 +773,16 @@ export class FeedBasesView extends BasesView {
 		const check = control.createSpan({ cls: cssClass("feed__check") });
 		setIcon(check, "check");
 
-		// `row` is reused across re-renders (`fillRow` only empties its
-		// children), so the done/completing modifiers must be set both ways
-		// here rather than only added.
-		control.toggleClass(cssClass("feed__status--checked"), isTaskTerminal);
-		row.toggleClass(cssClass("feed__row--done"), isTaskTerminal);
-		row.removeClass(cssClass("feed__row--completing"));
+		control.toggleClass(cssClass("feed__status--checked"), shownChecked);
 
-		let pending = false;
-
-		const revertOptimism = (completing: boolean): void => {
+		const revertOptimism = (): void => {
 			control.removeClass(cssClass("feed__status--completing"));
-			row.removeClass(cssClass("feed__row--completing"));
 			control.setAttribute("aria-checked", isTaskTerminal ? "true" : "false");
 			control.toggleClass(cssClass("feed__status--checked"), isTaskTerminal);
-			row.toggleClass(cssClass("feed__row--done"), isTaskTerminal);
 		};
 
 		const toggle = (): void => {
-			if (pending) {
+			if (this.pendingToggles.has(task.path)) {
 				return;
 			}
 			const next = toggleStatus(statuses, task.status);
@@ -784,31 +792,28 @@ export class FeedBasesView extends BasesView {
 			}
 
 			const completing = !isTaskTerminal;
-			pending = true;
+			this.pendingToggles.set(task.path, completing);
 			control.setAttribute("aria-checked", completing ? "true" : "false");
 			if (completing) {
 				control.addClass(cssClass("feed__status--checked"));
 				control.addClass(cssClass("feed__status--completing"));
-				row.addClass(cssClass("feed__row--completing"));
 			} else {
 				control.removeClass(cssClass("feed__status--checked"));
-				row.removeClass(cssClass("feed__row--done"));
 			}
 
 			const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 			const delay = reducedMotion ? 0 : completing ? COMPLETE_ANIMATION_MS : REOPEN_ANIMATION_MS;
 
-			const timeoutId = window.setTimeout(() => {
-				pending = false;
-				void this.setStatus(task.path, next.value.id).then((ok) => {
-					if (!ok) {
-						revertOptimism(completing);
-					}
-				});
-			}, delay);
-			comp.register(() => {
-				window.clearTimeout(timeoutId);
-			});
+			void (async (): Promise<void> => {
+				if (delay > 0) {
+					await new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+				}
+				const ok = await this.setStatus(task.path, next.value.id);
+				this.pendingToggles.delete(task.path);
+				if (!ok) {
+					revertOptimism();
+				}
+			})();
 		};
 
 		comp.registerDomEvent(control, "click", toggle);

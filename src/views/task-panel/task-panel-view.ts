@@ -270,10 +270,15 @@ export class TaskPanelView extends ItemView {
 				toggle.setValue(isDone).onChange(() => {
 					const next = toggleStatus(statuses, task.status);
 					if (!next.some) {
+						this.deps.notifier.error("No status to toggle to is configured");
+						toggle.setValue(isDone);
 						return;
 					}
 					void this.deps.setStatus(task.path, next.value.id).then((result) => {
 						this.report(result);
+						if (!result.ok) {
+							toggle.setValue(isDone);
+						}
 					});
 				}),
 			);
