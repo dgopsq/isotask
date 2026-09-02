@@ -224,30 +224,32 @@ async function clickFeedStatusControl(title: string): Promise<void> {
  * Reads a feed row's priority mark text and classes (`.obtask-feed__priority`
  * — an inert, roleless, textless `feed__priority--empty` placeholder span
  * for a `normal` task, see `feed-view.ts#renderPriorityControl`) and its
- * leading project-color dot's class list (`.obtask-feed__dot`,
- * `feed-view.ts#renderDot`), by the row's title text — same lookup
- * technique as `clickFeedPriorityControl`.
+ * project label's class list (`.obtask-feed__project`,
+ * `feed-view.ts#renderProjectLink` — carries the project's resolved color
+ * as a palette class or a scoped `--obtask-dot-color`, replacing the old
+ * leading dot), by the row's title text — same lookup technique as
+ * `clickFeedPriorityControl`.
  */
 async function readFeedRowMarkers(title: string): Promise<{
 	readonly priorityText: string | null;
 	readonly priorityClasses: readonly string[];
 	readonly priorityRole: string | null;
-	readonly dotClasses: readonly string[];
+	readonly projectClasses: readonly string[];
 } | null> {
 	return browser.execute(
-		(rowCls, titleCls, priorityCls, dotCls, wantedTitle) => {
+		(rowCls, titleCls, priorityCls, projectCls, wantedTitle) => {
 			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
 				const titleEl = row.querySelector(`.${titleCls}`);
 				if (titleEl?.textContent !== wantedTitle) {
 					continue;
 				}
 				const priorityEl = row.querySelector(`.${priorityCls}`);
-				const dotEl = row.querySelector(`.${dotCls}`);
+				const projectEl = row.querySelector(`.${projectCls}`);
 				return {
 					priorityText: priorityEl?.textContent ?? null,
 					priorityClasses: priorityEl === null ? [] : Array.from(priorityEl.classList),
 					priorityRole: priorityEl?.getAttribute("role") ?? null,
-					dotClasses: dotEl === null ? [] : Array.from(dotEl.classList),
+					projectClasses: projectEl === null ? [] : Array.from(projectEl.classList),
 				};
 			}
 			return null;
@@ -255,7 +257,7 @@ async function readFeedRowMarkers(title: string): Promise<{
 		cssClass("feed__row"),
 		cssClass("feed__title"),
 		cssClass("feed__priority"),
-		cssClass("feed__dot"),
+		cssClass("feed__project"),
 		title,
 	);
 }
@@ -705,8 +707,9 @@ describe("Views", function () {
 		});
 
 		/**
-		 * The leading project-color dot (`.obtask-feed__dot`,
-		 * `feed-view.ts#renderDot`) — every row gets one, coloured by
+		 * The feed's project label (`.obtask-feed__project`,
+		 * `feed-view.ts#renderProjectLink`) — no more leading dot; the label
+		 * itself carries the project's color, coloured by
 		 * `domain/project-color.ts#resolveDotColor`:
 		 *
 		 * - "Overdue task" (`project: Q3 Launch`) resolves to
@@ -718,10 +721,13 @@ describe("Views", function () {
 		 *   `obtask-color-*` class, not a specific one (the hash is FROZEN
 		 *   but asserting the exact color here would just be re-deriving the
 		 *   algorithm rather than testing behaviour).
-		 * - "No date task" has no `project` frontmatter at all -> `neutral`,
-		 *   which gets no `obtask-color-*` class.
+		 * - "No date task" has no `project` frontmatter at all -> the empty
+		 *   placeholder span (`feed__project--empty`), which gets no
+		 *   `obtask-color-*` class.
+		 *
+		 * Also asserts the old leading dot element is gone entirely.
 		 */
-		it("colors the leading feed dot from the task's project, with a hash fallback and a neutral no-project case", async function () {
+		it("colors the feed's project label from the task's project, with a hash fallback and no color for a project-less row", async function () {
 			const explicitColorTask = fixtures.tasks[0];
 			const hashFallbackTask = fixtures.tasks[3];
 			const noProjectTask = fixtures.tasks[4];
@@ -736,14 +742,17 @@ describe("Views", function () {
 			}
 
 			const explicitMarkers = await readFeedRowMarkers(explicitColorTask.title);
-			expect(explicitMarkers?.dotClasses).toContain(cssClass(paletteColorClass("red")));
+			expect(explicitMarkers?.projectClasses).toContain(cssClass(paletteColorClass("red")));
 
 			const hashMarkers = await readFeedRowMarkers(hashFallbackTask.title);
 			const paletteClasses = PALETTE.map((name) => cssClass(paletteColorClass(name)));
-			expect(hashMarkers?.dotClasses.some((cls) => paletteClasses.includes(cls))).toBe(true);
+			expect(hashMarkers?.projectClasses.some((cls) => paletteClasses.includes(cls))).toBe(true);
 
 			const noProjectMarkers = await readFeedRowMarkers(noProjectTask.title);
-			expect(noProjectMarkers?.dotClasses.some((cls) => paletteClasses.includes(cls))).toBe(false);
+			expect(noProjectMarkers?.projectClasses.some((cls) => paletteClasses.includes(cls))).toBe(false);
+
+			const dotEl = await browser.execute(() => document.querySelector(".obtask-feed__dot"));
+			expect(dotEl).toBeNull();
 		});
 
 		it("date chip opens DateModal pre-filled and dispatches setDate on save", async function () {
