@@ -206,11 +206,12 @@ describe("Task panel", function () {
 			const statusDropdown = await panelDropdownFor("Status");
 			expect(await statusDropdown.getValue()).toEqual("todo");
 
-			await statusDropdown.selectByVisibleText("In progress");
+			await statusDropdown.selectByVisibleText("Done");
 
-			await waitForFrontmatter(path, "status", (v) => v === "in-progress", `${path} status never became in-progress via the task panel`);
+			await waitForFrontmatter(path, "status", (v) => v === "done", `${path} status never became done via the task panel`);
 			const fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("in-progress");
+			expect(fm?.["status"]).toEqual("done");
+			expect(typeof fm?.["completed"]).toEqual("string");
 
 			// The panel re-renders from the metadata cache's debounced `changed`
 			// subscription (`REFRESH_DEBOUNCE_MS`, `task-panel-view.ts`) — poll
@@ -218,9 +219,9 @@ describe("Task panel", function () {
 			await browser.waitUntil(
 				async () => {
 					const dropdown = await panelDropdownFor("Status");
-					return (await dropdown.getValue()) === "in-progress";
+					return (await dropdown.getValue()) === "done";
 				},
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: "task panel's Status dropdown never re-rendered as In progress" },
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "task panel's Status dropdown never re-rendered as Done" },
 			);
 		} finally {
 			await restoreFixtureNote(path, task.frontmatter, task.body);

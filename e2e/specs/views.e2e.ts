@@ -194,6 +194,32 @@ async function clickFeedPriorityControl(title: string): Promise<void> {
 	}
 }
 
+/** Clicks a feed row's status control by the row's title text — same technique as `clickFeedPriorityControl`. */
+async function clickFeedStatusControl(title: string): Promise<void> {
+	const clicked = await browser.execute(
+		(rowCls, titleCls, statusCls, wantedTitle) => {
+			for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+				const titleEl = row.querySelector(`.${titleCls}`);
+				if (titleEl?.textContent === wantedTitle) {
+					const control = row.querySelector(`.${statusCls}`);
+					if (control instanceof HTMLElement) {
+						control.click();
+						return true;
+					}
+				}
+			}
+			return false;
+		},
+		cssClass("feed__row"),
+		cssClass("feed__title"),
+		cssClass("feed__status"),
+		title,
+	);
+	if (!clicked) {
+		throw new Error(`status control for "${title}" not found in the feed`);
+	}
+}
+
 /**
  * Reads a feed row's priority mark text and classes (`.obtask-feed__priority`
  * — an inert, roleless, textless `feed__priority--empty` placeholder span
@@ -601,9 +627,7 @@ describe("Views", function () {
 			expect(invalidRowText).toBeDefined();
 			expect(invalidRowText?.groupLabel).toEqual("Errors");
 			expect(invalidRowText?.title).toEqual(`Tasks/${fixtures.invalid.filename}`);
-			expect(invalidRowText?.errorText).toEqual(
-				'Unknown status "banana" (allowed: todo, in-progress, done, cancelled), Invalid due "not-a-date"',
-			);
+			expect(invalidRowText?.errorText).toEqual('Unknown status "banana" (allowed: todo, done), Invalid due "not-a-date"');
 		});
 
 		it("renders the priority, project and tags chips for the extended fixture task", async function () {
@@ -969,6 +993,112 @@ describe("Views", function () {
 				await openFile("Tasks/Today task.md");
 				await reopenFeedView();
 			}
+		});
+
+		/**
+		 * `e2e/vault/Tasks.base`'s Feed view filters `status != "done"` — a
+		 * task marked done via the status control doesn't move to the bottom
+		 * of its bucket, it disappears from the feed entirely (`completedAt
+		 * Bottom` never gets a chance to apply since the row is filtered out
+		 * upstream of the view). So (a) asserts disappearance rather than
+		 * bucket position, and (b) reopens the note through the
+		 * `obtask:toggle-done` command (rather than a second click on a
+		 * control that no longer exists in the DOM) before asserting the row
+		 * comes back.
+		 *
+		 * Uses "Deadline call" (`fixtures.tasks[9]`, due today at 14:30) —
+		 * read only by the calendar suite's chip-ordering assertions
+		 * elsewhere in this file, never mutated by any other test, and its
+		 * "today" due bucket also holds "Today task", "Early ping" and "Late
+		 * ping" at the point this suite runs (before the calendar suite's own
+		 * drag test permanently moves "Early ping" elsewhere).
+		 */
+		describe("Feed done toggle", function () {
+			const task = fixtures.tasks[9];
+			if (task?.title !== "Deadline call") {
+				throw new Error("expected fixtures.tasks[9] (Deadline call) to exist");
+			}
+			const path = `Tasks/${task.filename}`;
+
+			async function feedRowExists(title: string): Promise<boolean> {
+				return browser.execute(
+					(rowCls, titleCls, wantedTitle) =>
+						Array.from(document.querySelectorAll(`.${rowCls}`)).some((row) => row.querySelector(`.${titleCls}`)?.textContent === wantedTitle),
+					cssClass("feed__row"),
+					cssClass("feed__title"),
+					title,
+				);
+			}
+
+			async function feedRowStatusAriaLabel(title: string): Promise<string | null> {
+				return browser.execute(
+					(rowCls, titleCls, statusCls, wantedTitle) => {
+						for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+							const titleEl = row.querySelector(`.${titleCls}`);
+							if (titleEl?.textContent === wantedTitle) {
+								return row.querySelector(`.${statusCls}`)?.getAttribute("aria-label") ?? null;
+							}
+						}
+						return null;
+					},
+					cssClass("feed__row"),
+					cssClass("feed__title"),
+					cssClass("feed__status"),
+					title,
+				);
+			}
+
+			before(async function () {
+				await reopenFeedView();
+				await browser.$(`.${cssClass("feed__row")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+			});
+
+			after(async function () {
+				await restoreFixtureNote(path, task.frontmatter, task.body);
+				await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never restored to its fixture value`);
+				await reopenFeedView();
+			});
+
+			it("marks the task done and removes its row from the feed", async function () {
+				const ariaLabelBefore = await feedRowStatusAriaLabel(task.title);
+				expect(ariaLabelBefore).toEqual("To do (click to mark as done)");
+
+				await clickFeedStatusControl(task.title);
+
+				await waitForFrontmatter(path, "status", (v) => v === "done", `${path} status never became done via the feed's status control`);
+				const fm = await frontmatterOf(path);
+				expect(fm?.["status"]).toEqual("done");
+				expect(typeof fm?.["completed"]).toEqual("string");
+
+				// The base's Feed view filters `status != "done"` — a done task
+				// is filtered out entirely rather than sinking to the bottom of
+				// its bucket, so the row disappearing is the observable effect.
+				await browser.waitUntil(async () => !(await feedRowExists(task.title)), {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: `${task.title}'s row never disappeared from the feed after being marked done`,
+				});
+				expect(await feedRowExists(task.title)).toBe(false);
+			});
+
+			it("reopens the task via the toggle-done command and its row reappears", async function () {
+				await openFile(path);
+				await browser.executeObsidianCommand("obtask:toggle-done");
+
+				await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never became todo via obtask:toggle-done`);
+				const fm = await frontmatterOf(path);
+				expect(fm?.["status"]).toEqual("todo");
+				expect(fm?.["completed"]).toBeUndefined();
+
+				await reopenFeedView();
+				await browser.waitUntil(async () => await feedRowExists(task.title), {
+					timeout: SELECT_TIMEOUT,
+					timeoutMsg: `${task.title}'s row never reappeared in the feed after being reopened`,
+				});
+				expect(await feedRowExists(task.title)).toBe(true);
+
+				const ariaLabelAfter = await feedRowStatusAriaLabel(task.title);
+				expect(ariaLabelAfter).toEqual("To do (click to mark as done)");
+			});
 		});
 	});
 
@@ -3253,29 +3383,17 @@ describe("Actions", function () {
 		 * `nextStatusInCycle` (domain/status.ts) walks statuses in *configured*
 		 * (array) order — confirmed both by the source doc comment and its
 		 * table-driven unit test (`domain/status.test.ts`). With the default
-		 * statuses, the cycle is todo -> in-progress -> done -> cancelled -> todo.
+		 * statuses (just `todo` and `done`), the cycle is todo -> done -> todo.
 		 */
 		it("cycles through every status in configured order, setting/clearing completed at terminal transitions", async function () {
 			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "in-progress", "expected status=in-progress after 1st cycle");
+			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done after 1st cycle");
 			let fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("in-progress");
-			expect(fm?.["completed"]).toBeUndefined();
-
-			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done after 2nd cycle");
-			fm = await frontmatterOf(path);
 			expect(fm?.["status"]).toEqual("done");
 			expect(typeof fm?.["completed"]).toEqual("string");
 
 			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "cancelled", "expected status=cancelled after 3rd cycle");
-			fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("cancelled");
-			expect(typeof fm?.["completed"]).toEqual("string");
-
-			await browser.executeObsidianCommand("obtask:cycle-status");
-			await waitForFrontmatter(path, "status", (v) => v === "todo", "expected status=todo after 4th cycle");
+			await waitForFrontmatter(path, "status", (v) => v === "todo", "expected status=todo after 2nd cycle");
 			fm = await frontmatterOf(path);
 			expect(fm?.["status"]).toEqual("todo");
 			expect(fm?.["completed"]).toBeUndefined();
@@ -3410,17 +3528,18 @@ describe("Actions", function () {
 			await openFile(path);
 		});
 
-		it('sets status to "cancelled" via fuzzy search', async function () {
+		it('sets status to "done" via fuzzy search', async function () {
 			await browser.executeObsidianCommand("obtask:set-status");
 			const input = browser.$(".prompt-input");
 			await input.waitForExist({ timeout: SELECT_TIMEOUT });
-			await input.setValue("canc");
+			await input.setValue("don");
 			await browser.$(".suggestion-item").waitForExist({ timeout: SELECT_TIMEOUT });
 			await browser.keys("Enter");
 
-			await waitForFrontmatter(path, "status", (v) => v === "cancelled", 'expected status="cancelled" via suggest modal');
+			await waitForFrontmatter(path, "status", (v) => v === "done", 'expected status="done" via suggest modal');
 			const fm = await frontmatterOf(path);
-			expect(fm?.["status"]).toEqual("cancelled");
+			expect(fm?.["status"]).toEqual("done");
+			expect(typeof fm?.["completed"]).toEqual("string");
 		});
 	});
 
@@ -3429,7 +3548,7 @@ describe("Actions", function () {
 
 		before(async function () {
 			// Continues from "Set status via suggest modal" above, which leaves
-			// this note at status=cancelled.
+			// this note at status=done.
 			await openFile(path);
 		});
 
