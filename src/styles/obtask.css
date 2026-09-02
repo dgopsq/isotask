@@ -292,7 +292,7 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	cursor: pointer;
-	transition: transform var(--obtask-motion, 120ms) ease;
+	/* `transition` lives in the shared clickable-text rule further down. */
 }
 
 .obtask-feed__date--empty {
@@ -351,15 +351,17 @@
 }
 
 /*
- * Press feedback for the four clickable feed chips (status, date, priority
- * — including its `--empty` "no priority" state, which is a live click
- * target too now, not just an alignment placeholder). `transform` only — no
+ * Press feedback for every clickable feed chip (status, date, priority
+ * — including its `--empty` "no priority" state — and the "Set project"/
+ * "Set tags" placeholders). `transform` only — no
  * layout impact (unlike e.g. padding/border changes, which would reflow
  * neighbouring subgrid cells) — and works identically for a touch tap, not
  * just a mouse click.
  */
 .obtask-feed__status:active,
 .obtask-feed__date:active,
+.obtask-feed__project--empty:active,
+.obtask-feed__tags--empty:active,
 .obtask-feed__priority:active {
 	transform: scale(0.96);
 }
@@ -473,7 +475,7 @@
 .obtask-feed__date,
 .obtask-feed__project--empty,
 .obtask-feed__tags--empty {
-	/* `transform` kept for the date chip's press feedback below. */
+	/* `transform` for the shared `:active` press feedback below. */
 	transition:
 		color var(--obtask-motion, 120ms) ease,
 		transform var(--obtask-motion, 120ms) ease;
