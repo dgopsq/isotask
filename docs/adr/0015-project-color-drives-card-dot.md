@@ -64,6 +64,16 @@ live — hex -> hex, hex -> palette, and hex -> neutral — the same as a palett
 no Event Calendar update hook turned out to be needed. `docs/DOMAIN-MODEL.md`'s "Project color"
 section has been updated to match this. The other two negative consequences are unaffected.
 
+### Addendum, 2026-09-02
+
+The feed no longer renders a leading dot slot. Project color now paints the text of the project
+chip/label in the feed row's meta area, visible only when the project property is enabled in the
+Bases toolbar's Properties order. Rationale: a leading dot plus a separate uncolored project chip
+was redundant, and the dot had no legend to explain what color meant. The label is self-describing.
+Calendar cards (month dot, due ring, time-grid pill) are unchanged. The custom property
+`--obtask-dot-color` keeps its name for continuity. `docs/DOMAIN-MODEL.md`'s "Project color"
+section has been updated to match this.
+
 ## Alternatives considered
 
 - **A settings-registered project → color map (like the status list).** Rejected: a project is
@@ -71,7 +81,8 @@ section has been updated to match this. The other two negative consequences are 
   status list is — an entry would silently orphan on every rename, and the settings UI would need
   its own live project picker just to stay useful.
 - **Keep priority driving dot color, add project color as a second dot.** Rejected: see ADR 0014
-  — one card, one dot slot.
+  — one card, one dot slot (on calendar cards; the feed's project color moved to the text of the
+  label in the meta area, see addendum above).
 - **Render a per-project `<style>` rule for hex colors.** Rejected outright: Obsidian's plugin
   guidelines (`eslint-plugin-obsidianmd`'s `no-forbidden-elements`) forbid a plugin creating
   stylesheet elements at runtime; `setCssProps` on the specific element is the sanctioned

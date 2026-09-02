@@ -100,7 +100,8 @@ not one of the configurable `PropertyKeys`; the key is always literally `color`,
 the resolved project note's own frontmatter (`adapters/obsidian/project-color-lookup.ts`).
 
 `domain/project-color.ts#resolveDotColor` decides what a task's card dot/bar (the feed row's
-leading dot, the calendar's month dot, due ring, and time-grid pill) renders, in order:
+project label text color — only when the project property is in the Bases Properties order —
+and the calendar's month dot, due ring, and time-grid pill) renders, in order:
 
 1. The task has no `project` at all -> neutral (`var(--text-faint)`).
 2. The project note's `color` parses (`parseProjectColor`) -> that color: one of 8 palette names
@@ -109,6 +110,9 @@ leading dot, the calendar's month dot, due ring, and time-grid pill) renders, in
 3. Otherwise -> a frozen djb2a hash of the project name onto the same 8-entry palette
    (`hashPaletteColor`), giving every project a consistent, distinguishable color with zero
    configuration.
+
+The feed row's project label shows only when the project property is enabled in the Bases
+toolbar's Properties order; a row with it toggled off carries no project color.
 
 **Parse-error policy for `color`:** an invalid value — a non-string, blank/unrecognized text, or a
 malformed hex (`#gg0000`, `#12345`) — never errors and never affects the task's own parse result;
