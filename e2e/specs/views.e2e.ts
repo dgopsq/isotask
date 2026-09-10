@@ -1256,10 +1256,8 @@ describe("Views", function () {
 		 * since they're the deliverable here, not just a debugging aid.
 		 */
 		it("captures the feed at its default order and again with a generic chip", async function () {
-			const screenshotOutDir = "/Users/dgopsq/.claude/jobs/4adbd2c8/tmp";
-
 			await browser.$(`.${cssClass("feed__row")}`).waitForExist({ timeout: SELECT_TIMEOUT });
-			await saveScreenshotAt(`${screenshotOutDir}/feed-default-order.png`);
+			await saveScreenshotAt(join(screenshotDir, "feed-default-order.png"));
 
 			const defaultOrder = await getFeedOrder();
 			try {
@@ -1268,7 +1266,7 @@ describe("Views", function () {
 				expect(usedSetOrder).toBe(true);
 
 				await browser.$(`.${genericCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
-				await saveScreenshotAt(`${screenshotOutDir}/feed-generic-chip.png`);
+				await saveScreenshotAt(join(screenshotDir, "feed-generic-chip.png"));
 			} finally {
 				await setFeedOrder(defaultOrder);
 				await browser.$(`.${cssClass("feed__date")}`).waitForExist({ timeout: SELECT_TIMEOUT });

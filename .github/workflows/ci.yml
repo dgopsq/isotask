@@ -73,14 +73,15 @@ jobs:
 
       - name: Set up virtual display
         run: |
-          # Obsidian needs a window manager on top of the X server, or some UI features misbehave — xvfb-run alone isn't enough.
+          # Obsidian needs a window manager, and a stacking one: tiling WMs ignore the
+          # phone-viewport setSize() the specs rely on.
           sudo apt-get update -q
-          sudo apt-get install -y xvfb herbstluftwm dzen2 x11-xserver-utils
+          sudo apt-get install -y xvfb fluxbox
           export DISPLAY=:99
           echo "DISPLAY=$DISPLAY" >> "$GITHUB_ENV"
-          Xvfb "$DISPLAY" -screen 0 1280x1024x24 +extension GLX -noreset &
+          Xvfb "$DISPLAY" -screen 0 1600x1200x24 +extension GLX -noreset &
           sleep 1
-          herbstluftwm &
+          fluxbox &
           sleep 1
 
       - name: Run e2e tests
