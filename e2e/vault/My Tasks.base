@@ -1,0 +1,20 @@
+filters:
+  and:
+    - type == "task"
+    - status != "done"
+    - file.inFolder("DocsDemo")
+views:
+  - type: obtask-feed
+    name: Feed
+    newItemFolder: DocsDemo
+    order:
+      - file.name
+      - status
+      - due
+      - scheduled
+      - priority
+      - project
+      - tags
+  - type: obtask-calendar
+    name: Calendar
+    newItemFolder: DocsDemo
