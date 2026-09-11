@@ -217,6 +217,14 @@ or feature (`domain`, `app`, `calendar`, `feed`, `settings`, `adr`). Example:
   `registerBasesView` so `onunload` needs no manual cleanup.
 - Mobile QA: touch interactions (long-press drag on the calendar, tap targets) verified on at
   least one mobile client.
-- `manifest.json`/`versions.json` version bump via `pnpm version` before tagging a release.
 - Bundle size check: `main.js` minified ≤ 150 kB (Event Calendar ~35 kB gz + rrule ~13 kB gz +
   tree-shaken date-fns + valibot is the budget basis).
+
+## Releasing
+
+Conventional commits on `main` drive [release-please](https://github.com/googleapis/release-please);
+merging its release PR ships a release. The tag is the bare version, no `v` prefix, so it matches
+`manifest.json`. `release.yml` builds and uploads `main.js`/`manifest.json`/`styles.css` to the
+GitHub release, then runs `version-bump.mjs` and pushes the new `versions.json` key to `main`.
+`release-as` in `release-please-config.json` pins the first release to 0.1.0; remove it once that
+ships.

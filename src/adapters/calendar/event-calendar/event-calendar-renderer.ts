@@ -207,7 +207,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// CSS rule targeting a class: a live DOM probe against the vendored
 			// bundle (`createAllDayContent`/`contentFrom` in
 			// `@event-calendar/core@5.12.0/dist/index.js`) showed the default
-			// renders via `el.innerHTML = "all-day"` directly into `.ec-sidebar`
+			// renders by assigning the raw "all-day" string as markup directly into `.ec-sidebar`
 			// — a bare text node, nothing CSS can select on its own. Supplying
 			// our own `domNodes` here (the same `Content` shape `eventContent`
 			// already returns, see `event-content.ts`) wraps the text in a

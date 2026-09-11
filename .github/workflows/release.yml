@@ -1,0 +1,70 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build-upload:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Verify manifest version matches tag
+        run: |
+          node -e "
+            const { version } = require('./manifest.json');
+            const tag = '${{ needs.release-please.outputs.tag_name }}';
+            if (version !== tag) {
+              throw new Error('manifest.json version ' + version + ' does not match tag ' + tag);
+            }
+          "
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          gh release upload "$TAG" main.js manifest.json styles.css --clobber
+
+      # Obsidian reads versions.json from the default branch, so the new key lands on main after
+      # the release. This push uses the default token and therefore triggers no workflow.
+      - name: Sync versions.json on main
+        run: |
+          git checkout main
+          npm_package_version="$(node -p "require('./manifest.json').version")" node version-bump.mjs
+          if [ -n "$(git status --porcelain versions.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add versions.json
+            git commit -m "chore: sync versions.json for $(node -p "require('./manifest.json').version")"
+            git push origin main
+          fi
