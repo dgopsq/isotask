@@ -1,10 +1,8 @@
-import { mkdir } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-
 import { browser, expect } from "@wdio/globals";
 import { after, afterEach, before, describe, it } from "mocha";
 
 import { buildFixtures, noteContent } from "../fixtures.ts";
+import { fileURLToPath, mkdir } from "../node-io.ts";
 import { cssClass } from "@/plugin-id";
 
 /**

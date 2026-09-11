@@ -1,9 +1,7 @@
-import { mkdir } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-
 import { browser, expect } from "@wdio/globals";
 import { after, before, describe, it } from "mocha";
 
+import { fileURLToPath, mkdir } from "../node-io.ts";
 import { cssClass } from "@/plugin-id";
 
 /** Produces `docs/assets/feed.png`/`calendar.png`; runs only via `pnpm shots:docs`, excluded from `pnpm test:e2e`. */
