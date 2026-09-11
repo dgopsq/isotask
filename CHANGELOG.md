@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2](https://github.com/dgopsq/isotask/compare/0.1.1...0.1.2) (2026-09-11)
+
+
+### Bug fixes
+
+* clear Obsidian review bot warnings ([#16](https://github.com/dgopsq/isotask/issues/16)) ([ff09094](https://github.com/dgopsq/isotask/commit/ff0909430d9c9a708ddac6021404a84055676978))
+* **css:** drop :has, display: contents and column-gap flagged by the review bot ([#18](https://github.com/dgopsq/isotask/issues/18)) ([863454e](https://github.com/dgopsq/isotask/commit/863454ea352054711bb1bdf94585110ef00c3327))
+
+
+### Maintenance
+
+* sync versions.json for 0.1.1 ([431256d](https://github.com/dgopsq/isotask/commit/431256d4e2462b10f7b1bc0e45c40dc8cd9ff85a))
+
 ## [0.1.1](https://github.com/dgopsq/isotask/compare/0.1.0...0.1.1) (2026-09-11)
 
 
