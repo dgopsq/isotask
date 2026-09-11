@@ -44,8 +44,8 @@ describe("Docs screenshots", function () {
 	before(async function () {
 		await setWindowSize(1400, 900);
 		await browser.execute(() => {
-			document.body.classList.remove("theme-dark");
-			document.body.classList.add("theme-light");
+			document.body.classList.remove("theme-light");
+			document.body.classList.add("theme-dark");
 		});
 		await browser.executeObsidian(({ app }) => {
 			app.workspace.leftSplit.collapse();
