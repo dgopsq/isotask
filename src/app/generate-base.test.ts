@@ -9,7 +9,7 @@ import type { StatusId } from "@/domain/task";
 /**
  * Kept as a literal (rather than reading `e2e/vault/Tasks.base` from disk)
  * because `src/**` typechecks without Node types (the plugin bundle targets
- * the Obsidian sandbox) — a `node:fs` import there would fail `tsc`. Keep
+ * the Obsidian sandbox) — a filesystem-module import there would fail `tsc`. Keep
  * this in sync with that fixture file if either changes; it's the syntax
  * verified there to actually load in Obsidian (see AGENTS.md).
  */
