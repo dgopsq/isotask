@@ -16,6 +16,8 @@ const PADDING = 64;
 const targets = [
 	fileURLToPath(new URL("../docs/assets/feed.png", import.meta.url)),
 	fileURLToPath(new URL("../docs/assets/calendar.png", import.meta.url)),
+	fileURLToPath(new URL("../docs/assets/feed-mobile.png", import.meta.url)),
+	fileURLToPath(new URL("../docs/assets/calendar-mobile.png", import.meta.url)),
 ];
 
 function roundedRectSvg(width: number, height: number, fill: string, opacity: number): Buffer {
