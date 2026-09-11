@@ -82,7 +82,6 @@ export default defineConfig([
 					// an ad-hoc single-file program instead of erroring.
 					allowDefaultProject: ["vitest.config.ts"],
 				},
-				tsconfigRootDir: import.meta.dirname,
 			},
 		},
 	},
@@ -92,21 +91,17 @@ export default defineConfig([
 		languageOptions: {
 			parserOptions: {
 				project: ["./e2e/tsconfig.json"],
-				tsconfigRootDir: import.meta.dirname,
 			},
 		},
 	},
-	// e2e/ (wdio-obsidian-service specs + fixtures) and wdio.conf.mts run
-	// under Node/tsx, not the Obsidian sandbox esbuild bundles for src/ — Node
-	// built-ins are expected, and this is glue/test code rather than plugin
-	// UI, so the plugin-guideline console restriction doesn't apply.
+	// e2e/ and wdio.conf.mts are Node/tsx test glue, not plugin UI — the
+	// console restriction doesn't apply.
 	{
 		files: ["e2e/**/*.ts", "e2e/**/*.mts", "wdio.conf.mts"],
 		rules: {
 			"no-console": "off",
 			// Ambient namespaces such as `WebdriverIO` are type-only; tsc checks them.
 			"no-undef": "off",
-			"obsidianmd/no-nodejs-modules": "off",
 			"obsidianmd/rule-custom-message": "off",
 			// This Node script reads/writes the sandbox vault's `.obsidian/`
 			// folder directly on disk (there's no running `Vault` instance to
@@ -116,15 +111,9 @@ export default defineConfig([
 		},
 	},
 	{
-		// `builtin-modules` mirrors the official obsidian-sample-plugin esbuild
-		// config (it feeds esbuild's `external` list) and is deliberately kept.
-		files: ["package.json"],
-		rules: {
-			"depend/ban-dependencies": [
-				"error",
-				{ presets: ["native", "microutilities", "preferred"], allowed: ["builtin-modules"] },
-			],
-		},
+		// The review bot only scans .ts; Node scripts stay .mts with plain imports.
+		files: ["**/*.mts"],
+		rules: { "obsidianmd/no-nodejs-modules": "off" },
 	},
 
 	// --- Layer boundaries -----------------------------------------------

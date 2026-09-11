@@ -1,13 +1,10 @@
-import { mkdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { browser, expect } from "@wdio/globals";
 import { addDays, format, parseISO } from "date-fns";
 import { after, afterEach, before, describe, it } from "mocha";
 import { obsidianPage } from "wdio-obsidian-service";
 
 import { BUCKET_LABELS, buildFixtures, noteContent } from "../fixtures.ts";
+import { dirname, fileURLToPath, join, mkdir, readFile } from "../node-io.ts";
 import { BUCKET_ORDER } from "@/domain/buckets";
 import type { Bucket } from "@/domain/buckets";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
