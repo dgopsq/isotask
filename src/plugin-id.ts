@@ -1,23 +1,22 @@
 import manifest from "../manifest.json";
 
 /**
- * Single source of truth for every code-level use of the plugin's identity
- * (view type ids, CSS class prefix, display name). Derived from
- * `manifest.json` so a rename only ever needs the checklist in
- * `docs/CONVENTIONS.md` — never a source-wide string search.
- *
- * No `obsidian` import here, so this module may be imported from any layer
- * (`domain`, `app`, `ports`, `adapters`, `views`, `ui`, `settings`, `main.ts`).
+ * Single source of truth for the plugin's identity (view type ids, CSS
+ * prefix, display name). `scripts/link-vault.mjs` reads `manifest.json`
+ * directly; everything else should import from here.
  */
+// Directory-registered id; also the install folder, so it cannot follow the brand.
 export const PLUGIN_ID: string = manifest.id;
 export const PLUGIN_NAME: string = manifest.name;
 
-export const VIEW_TYPE_FEED = `${PLUGIN_ID}-feed`;
-export const VIEW_TYPE_CALENDAR = `${PLUGIN_ID}-calendar`;
-export const VIEW_TYPE_TASK_PANEL = `${PLUGIN_ID}-task-panel`;
+// View type ids are persisted in users' .base files and CSS is literal, so they stay pinned to the brand.
+export const BRAND = "isotask";
 
-/** Prefix every plugin-defined CSS class must use (see `src/styles/isotask.css`). */
-export const CSS_PREFIX: string = PLUGIN_ID;
+export const VIEW_TYPE_FEED = `${BRAND}-feed`;
+export const VIEW_TYPE_CALENDAR = `${BRAND}-calendar`;
+export const VIEW_TYPE_TASK_PANEL = `${BRAND}-task-panel`;
+
+export const CSS_PREFIX: string = BRAND;
 
 /** Builds a prefixed CSS class name, e.g. `cssClass("feed")` -> `"isotask-feed"`. */
 export function cssClass(name: string): string {

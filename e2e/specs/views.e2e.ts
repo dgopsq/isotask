@@ -1192,7 +1192,7 @@ describe("Views", function () {
 
 			it("reopens the task via the toggle-done command and its row reappears", async function () {
 				await openFile(path);
-				await browser.executeObsidianCommand("isotask:toggle-done");
+				await browser.executeObsidianCommand("obtask:toggle-done");
 
 				await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never became todo via isotask:toggle-done`);
 				const fm = await frontmatterOf(path);
@@ -2497,14 +2497,14 @@ describe("Views", function () {
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${targetDate} after the drag` },
 			);
 
-			await browser.executeObsidianCommand("isotask:undo-reschedule");
+			await browser.executeObsidianCommand("obtask:undo-reschedule");
 			await browser.waitUntil(
 				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === originalDue,
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Undo last calendar reschedule" never restored the original due date' },
 			);
 			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(originalDue);
 
-			await browser.executeObsidianCommand("isotask:redo-reschedule");
+			await browser.executeObsidianCommand("obtask:redo-reschedule");
 			await browser.waitUntil(
 				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === targetDate,
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Redo last calendar reschedule" never re-applied the dragged due date' },
@@ -3487,7 +3487,7 @@ describe("Actions", function () {
 		});
 
 		it("marks the original done and spawns the next occurrence", async function () {
-			await browser.executeObsidianCommand("isotask:complete-task");
+			await browser.executeObsidianCommand("obtask:complete-task");
 
 			await waitForFrontmatter(originalPath, "status", (v) => v === "done", "original task never reached status=done");
 			const originalFm = await frontmatterOf(originalPath);
@@ -3520,7 +3520,7 @@ describe("Actions", function () {
 			// The original is already status=done; re-running complete-task is a
 			// same-status no-op in applyStatusChange (domain/transitions.ts), so
 			// no second spawn should appear.
-			await browser.executeObsidianCommand("isotask:complete-task");
+			await browser.executeObsidianCommand("obtask:complete-task");
 
 			// There's no state transition to poll for here (it's a no-op), so
 			// give the fire-and-forget command a moment to have run by polling
@@ -3560,7 +3560,7 @@ describe("Actions", function () {
 		});
 
 		it("adds the task marker, an open status and a created date", async function () {
-			await browser.executeObsidianCommand("isotask:convert-note-to-task");
+			await browser.executeObsidianCommand("obtask:convert-note-to-task");
 
 			await waitForFrontmatter(path, "type", (v) => v === "task", "note was never converted (type: task missing)");
 			const fm = await frontmatterOf(path);
@@ -3583,7 +3583,7 @@ describe("Actions", function () {
 		});
 
 		it("creates a task from the modal and opens it", async function () {
-			await browser.executeObsidianCommand("isotask:create-task");
+			await browser.executeObsidianCommand("obtask:create-task");
 			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
 
 			const titleInput = await inputAt(modalCls, "text", 0);
@@ -3629,7 +3629,7 @@ describe("Actions", function () {
 		});
 
 		it("suggests an existing note in the Project field and fills in its basename on selection", async function () {
-			await browser.executeObsidianCommand("isotask:create-task");
+			await browser.executeObsidianCommand("obtask:create-task");
 			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
 
 			// Project lives behind "More options" — there's exactly one toggle
@@ -3690,9 +3690,9 @@ describe("Actions", function () {
 			// AGENTS.md gives `app.plugins.getPlugin` in e2e).
 			await browser.executeObsidian(
 				async ({ app, plugins }, settings: IsotaskSettings) => {
-					const plugin = plugins["isotask"];
+					const plugin = plugins["obtask"];
 					if (plugin === undefined) {
-						throw new Error("isotask plugin is not installed");
+						throw new Error("obtask plugin is not installed");
 					}
 					await plugin.saveData(settings);
 					const internalPlugins = (app as unknown as {
@@ -3701,8 +3701,8 @@ describe("Actions", function () {
 							enablePlugin: (id: string) => Promise<void>;
 						};
 					}).plugins;
-					await internalPlugins.disablePlugin("isotask");
-					await internalPlugins.enablePlugin("isotask");
+					await internalPlugins.disablePlugin("obtask");
+					await internalPlugins.enablePlugin("obtask");
 				},
 				newSettings,
 			);
@@ -3714,10 +3714,10 @@ describe("Actions", function () {
 			// Complete, then reopen: the reopen step is the one that resolves
 			// `firstOpenStatus`, so its result is what actually proves the
 			// reloaded list (with "waiting" first) was read.
-			await browser.executeObsidianCommand("isotask:complete-task");
+			await browser.executeObsidianCommand("obtask:complete-task");
 			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done before reopening");
 
-			await browser.executeObsidianCommand("isotask:toggle-done");
+			await browser.executeObsidianCommand("obtask:toggle-done");
 			await waitForFrontmatter(path, "status", (v) => v === "waiting", 'expected status="waiting" after reload');
 			const fm = await frontmatterOf(path);
 			expect(fm?.["status"]).toEqual("waiting");
@@ -3731,7 +3731,7 @@ describe("Actions", function () {
 		it("does not overwrite an existing tasks base", async function () {
 			const contentBefore = await readFileContent(path);
 
-			await browser.executeObsidianCommand("isotask:create-tasks-base");
+			await browser.executeObsidianCommand("obtask:create-tasks-base");
 
 			// Poll rather than a single waitForExist: a `.notice` from an
 			// earlier action in this suite could still be in the DOM, so check

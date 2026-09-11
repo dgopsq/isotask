@@ -1,8 +1,8 @@
 /*
  * Isotask styles. Theme variables only — no hardcoded colors (docs/CONVENTIONS.md).
  *
- * Class prefix `isotask-` must match PLUGIN_ID in manifest.json (see
- * src/plugin-id.ts); renaming = one search/replace here.
+ * Class prefix `isotask-` must match BRAND in src/plugin-id.ts, not manifest.json's
+ * `id` (the install id, which can differ from the brand).
  */
 
 .isotask-feed {

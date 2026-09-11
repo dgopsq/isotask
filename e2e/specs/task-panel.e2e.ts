@@ -88,7 +88,7 @@ async function deleteNoteIfExists(path: string): Promise<void> {
 
 /** Opens the sidebar task panel via its command and waits for its root element to mount. */
 async function openTaskPanel(): Promise<void> {
-	await browser.executeObsidianCommand("isotask:open-task-panel");
+	await browser.executeObsidianCommand("obtask:open-task-panel");
 	await browser.$(`.${cssClass("panel")}`).waitForExist({ timeout: SELECT_TIMEOUT });
 }
 

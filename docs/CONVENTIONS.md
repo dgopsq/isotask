@@ -173,12 +173,14 @@ afterwards; never commit it.
 
 ## Renaming the plugin
 
-"Isotask" is provisional. Every code-level use of the plugin id/name/CSS prefix is centralised in
-`src/plugin-id.ts`, derived from `manifest.json` (`PLUGIN_ID`, `PLUGIN_NAME`, `VIEW_TYPE_FEED`,
-`VIEW_TYPE_CALENDAR`, `CSS_PREFIX`, `cssClass()`), and `scripts/link-vault.mjs` reads the id from
-`manifest.json` directly — so most of a rename is a single edit plus a search/replace. Checklist:
+`manifest.json`'s `id` is permanently `obtask` — the Obsidian community plugin directory record is immutable once created. The display brand (`isotask`) lives in `BRAND` in `src/plugin-id.ts` and drives view type ids and CSS prefix; a future rename touches only `BRAND`, never the locked `manifest.json` `id`.
 
-- `manifest.json`: `id`, `name`, `description`.
+"Isotask" is provisional. Plugin identity is centralised in `src/plugin-id.ts`: `PLUGIN_ID` and
+`PLUGIN_NAME` derive from `manifest.json`, while view type ids (`VIEW_TYPE_FEED`, `VIEW_TYPE_CALENDAR`,
+`VIEW_TYPE_TASK_PANEL`) and `CSS_PREFIX` derive from `BRAND`. `scripts/link-vault.mjs` reads the id
+from `manifest.json` directly — so a rename is a single edit to `BRAND` plus a search/replace. Checklist:
+
+- `manifest.json`: `name`, `description` (`id` is locked, see above).
 - `package.json`: `name` (and `description` if it still says "Isotask").
 - `src/styles/*.css`: search/replace the `isotask-` class prefix (see the comment at the top of
   `src/styles/isotask.css`) — CSS class names are literal strings, not derived from
@@ -191,7 +193,7 @@ afterwards; never commit it.
 
 **Warning — Bases view type ids are persisted data.** A user's `.base` file stores the view type
 id (`isotask-feed`/`isotask-calendar`) verbatim. Once the plugin has a public release, changing
-`PLUGIN_ID` breaks every `.base` file that already references the old view type id — Obsidian will
+`BRAND` breaks every `.base` file that already references the old view type id — Obsidian will
 no longer recognise the view. A rename after that point needs a migration that keeps registering
 the old view type ids as aliases (pointing at the same view factories) alongside the new ones,
 rather than a straight cutover.
