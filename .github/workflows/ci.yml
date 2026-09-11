@@ -1,0 +1,99 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Bundle size
+        run: |
+          # Report only: budget is 150 kB (docs/CONVENTIONS.md) and is currently exceeded.
+          raw_js=$(wc -c < main.js)
+          gzip_js=$(gzip -c main.js | wc -c)
+          raw_css=$(wc -c < styles.css)
+          gzip_css=$(gzip -c styles.css | wc -c)
+          echo "main.js: ${raw_js} B raw / ${gzip_js} B gzip"
+          echo "styles.css: ${raw_css} B raw / ${gzip_css} B gzip"
+          {
+            echo "### Bundle size"
+            echo "| file | raw | gzip |"
+            echo "| --- | --- | --- |"
+            echo "| main.js | ${raw_js} B | ${gzip_js} B |"
+            echo "| styles.css | ${raw_css} B | ${gzip_css} B |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Resolve Obsidian cache key
+        id: versions
+        run: |
+          echo "wdio-obsidian-service=$(node -p "require('./package.json').devDependencies['wdio-obsidian-service']")" >> "$GITHUB_OUTPUT"
+          echo "min-app-version=$(node -p "require('./manifest.json').minAppVersion")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Obsidian downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.obsidian-cache
+          # wdio.conf.mts pins appVersion/installerVersion to "latest", not minAppVersion,
+          # so this key can go stale on a new Obsidian release; restore-keys covers that.
+          key: obsidian-${{ runner.os }}-${{ steps.versions.outputs.wdio-obsidian-service }}-${{ steps.versions.outputs.min-app-version }}
+          restore-keys: |
+            obsidian-${{ runner.os }}-${{ steps.versions.outputs.wdio-obsidian-service }}-
+
+      - name: Set up virtual display
+        run: |
+          # Obsidian needs a window manager, and a stacking one: tiling WMs ignore the
+          # phone-viewport setSize() the specs rely on.
+          sudo apt-get update -q
+          sudo apt-get install -y xvfb fluxbox
+          export DISPLAY=:99
+          echo "DISPLAY=$DISPLAY" >> "$GITHUB_ENV"
+          Xvfb "$DISPLAY" -screen 0 1600x1200x24 +extension GLX -noreset &
+          sleep 1
+          fluxbox &
+          sleep 1
+
+      - name: Run e2e tests
+        env:
+          E2E_VERBOSE: "1"
+          OBSIDIAN_CACHE: ${{ github.workspace }}/.obsidian-cache
+        run: pnpm test:e2e
+
+      - name: Upload e2e screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e/screenshots/
+          if-no-files-found: ignore

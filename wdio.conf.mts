@@ -19,12 +19,15 @@ import QuietReporter from "./e2e/quiet-reporter.ts";
  * reporter and wdio/service/Obsidian logging when debugging locally.
  */
 const verbose = process.env["E2E_VERBOSE"] === "1";
+const docsShots = process.env["E2E_DOCS_SHOTS"] === "1";
 
 export const config: WebdriverIO.Config = {
 	runner: "local",
 	framework: "mocha",
 
 	specs: ["./e2e/specs/**/*.e2e.ts"],
+	// Excluded, not skipped inside the spec: every spec file boots its own Obsidian window.
+	exclude: docsShots ? [] : ["./e2e/specs/docs-screenshots.e2e.ts"],
 
 	maxInstances: 1,
 

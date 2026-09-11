@@ -61,12 +61,16 @@ async function writePluginData(): Promise<boolean> {
  */
 const staleVaultRootFiles = ["Plain.md", "Task panel plain note.md"];
 
+// Tasks.base has no folder filter: demo notes left by `pnpm shots:docs` would leak into this suite.
+const docsDemoDir = join(vaultDir, "DocsDemo");
+
 async function main(): Promise<void> {
 	await mkdir(tasksDir, { recursive: true });
 
 	const pluginDataWritten = await writePluginData();
 
 	await Promise.all(staleVaultRootFiles.map((name) => rm(join(vaultDir, name), { force: true })));
+	await rm(docsDemoDir, { recursive: true, force: true });
 
 	const fixtures = buildFixtures();
 

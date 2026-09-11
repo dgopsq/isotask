@@ -11,4 +11,5 @@ data.json
 # e2e (wdio-obsidian-service)
 .obsidian-cache/
 e2e/vault/Tasks/
+e2e/vault/DocsDemo/
 e2e/screenshots/

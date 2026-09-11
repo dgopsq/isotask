@@ -100,6 +100,8 @@ are not in `package.json` yet — added back when the calendar adapter and recur
       with a day detail on tap, a horizontally scrollable grid, or steering narrow viewports to
       week/day view. Event Calendar's own header also wraps to three rows there, eating most of
       the screen before the grid starts.
+- [x] GitHub Actions CI (`.github/workflows/ci.yml`): typecheck, lint, test, build on every push.
+- [x] README + screenshots.
 - [ ] GitHub Actions release workflow triggered on tag.
 - [ ] Community plugin submission.
 
