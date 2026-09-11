@@ -43,7 +43,7 @@
 .isotask-feed__list {
 	display: grid;
 	grid-template-columns: max-content minmax(min(var(--isotask-feed-title-min), 50%), 1fr) repeat(var(--isotask-feed-meta-columns, 1), max-content);
-	column-gap: var(--size-4-2);
+	gap: 0 var(--size-4-2);
 	position: relative;
 }
 
@@ -535,16 +535,20 @@
 }
 
 /*
- * `display: contents` makes this wrapper transparent to the grid: in wide
- * mode its children (date/priority/project/tags/generic chips) stay direct
- * subgrid items of `.isotask-feed__row`, exactly as if `renderRow` had
- * appended them to the row itself — nothing about the wide layout changes.
- * `.isotask-feed--compact` below turns it back into a real box, which is what
- * lets the chips wrap onto a second line as a unit instead of each staying
- * pinned to its own grid column.
+ * Subgrid keeps children aligned to `.isotask-feed__row`'s own tracks in wide
+ * mode; compact mode below still gets one real box to wrap onto a second line.
  */
 .isotask-feed__meta {
-	display: contents;
+	display: grid;
+	grid-template-columns: subgrid;
+	grid-column: 3 / -1;
+	align-items: center;
+	justify-items: start;
+}
+
+/* Zero meta columns still renders this div (`feed-view.ts`'s `fillRow`) — hidden so it doesn't force an implicit grid track. */
+.isotask-feed__meta:empty {
+	display: none;
 }
 
 /*
@@ -576,8 +580,7 @@
 .isotask-feed--compact .isotask-feed__row:not(.isotask-feed__row--invalid) {
 	display: grid;
 	grid-template-columns: max-content minmax(0, 1fr);
-	column-gap: var(--size-4-2);
-	row-gap: var(--size-4-1);
+	gap: var(--size-4-1) var(--size-4-2);
 	align-items: center;
 }
 

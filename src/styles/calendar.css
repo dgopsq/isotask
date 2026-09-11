@@ -813,25 +813,8 @@
  * 16.4+ WebKit — both years past `scale`'s own ship dates (Chromium 79,
  * Safari 14.1), so no separate floor check is needed for it.
  *
- * - Press: `.ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active))`
- *   (below) — plain `:active`, no EC involvement, so it fires immediately on
- *   pointer/finger down rather than waiting for the drag threshold.
- *   `:not(.ec-ghost)`: the moment ANY interaction starts (drag OR resize) EC
- *   swaps the original's display to "ghost", and a still-held `:active` must
- *   not keep that ghost inflated — this matters most for a resize, where the
- *   ghost stays in place under the still-pressed pointer for the whole
- *   gesture instead of being replaced by a preview clone. `:not(:has(.ec-
- *   resizer:active))`: `.ec-resizer` (vendored, `@event-calendar/core/dist/
- *   index.css`) is the resize-handle drag grip rendered as a CHILD of
- *   `.ec-event` (confirmed against the event component's own template in
- *   `@event-calendar/core/dist/index.js`), so pressing the handle also
- *   `:active`s the event it belongs to — without this exclusion, grabbing an
- *   edge to resize a block would lift the very block being stretched,
- *   fighting the resize instead of getting out of its way. `:has()` is
- *   already relied on elsewhere in this file (the time-grid title rule
- *   below), so it's within this plugin's existing support floor. No tilt on
- *   press: a straight lift reads as "raised" — the tilt is a *carry* cue and
- *   joins only once the block is actually moving (the preview clone, below).
+ * - Press: `.isotask-calendar:not(.isotask-calendar--resizing) .ec-event:active:not(.ec-ghost)`
+ *   (below) — `:active` on the resize handle also matches its `.ec-event`; `calendar-view.ts` flags the root on pointerdown so the lift stays off for the whole grab.
  * - Pickup: `.ec-dragging .ec-preview` scoped, not plain `.ec-preview` — a
  *   resize's own preview is a size change already in progress under the
  *   pointer, and a simultaneous 105% scale on it would visibly fight the
@@ -916,7 +899,7 @@
  * settle un-press/drop keeps: releasing removes the `:active` match, so the
  * base rule's own (slower) transition governs the way back down instead.
  */
-.isotask-calendar .ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active)) {
+.isotask-calendar:not(.isotask-calendar--resizing) .ec-event:active:not(.ec-ghost) {
 	scale: var(--isotask-lift-scale);
 	box-shadow: var(--isotask-lift-shadow);
 	transition:
@@ -1356,18 +1339,11 @@
 }
 
 /*
- * The priority mark sits absolutely positioned in this box's own top-right
- * corner (`.isotask-event-marks`, below) rather than in the title's own flex
- * flow, so — unlike the day-grid/all-day row, where `margin-inline-start:
- * auto` on a real flex sibling naturally reserves room for it — nothing
- * here stops the title's own ellipsis from running text underneath the
- * mark. `:has(~ .isotask-event-marks)` (a later sibling — `event-content.ts`
- * pushes the title node before the marks node) only reserves this padding
- * on events that actually render a mark, so a `normal`-priority block's
- * title still gets the full width. 1.6em comfortably clears the widest mark
- * ("!!" at the title's own font-size) plus a small gap before it.
+ * Reserves room so the title's ellipsis doesn't run under the priority mark
+ * (only high/urgent render one); 1.6em clears the widest mark ("!!") plus a gap.
  */
-.isotask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .isotask-event-marks) {
+.isotask-calendar .ec-time-grid .ec-body .isotask-priority-high .ec-event-title,
+.isotask-calendar .ec-time-grid .ec-body .isotask-priority-urgent .ec-event-title {
 	padding-inline-end: 1.6em;
 }
 
@@ -1493,7 +1469,8 @@
 		display: none;
 	}
 
-	.isotask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .isotask-event-marks) {
+	.isotask-calendar .ec-time-grid .ec-body .isotask-priority-high .ec-event-title,
+	.isotask-calendar .ec-time-grid .ec-body .isotask-priority-urgent .ec-event-title {
 		padding-inline-end: 0;
 	}
 }
@@ -1543,7 +1520,7 @@
  * gap, each button keeping its own full radius) restores a visible
  * separation for prev/next. The month/week/day trio gets its own,
  * different treatment below (a shadcn-Tabs-style track) which overrides
- * this base rule for that one group via `:has()`.
+ * this base rule for that one group by targeting `.ec-end`'s last child.
  *
  * No nested-radius concern here (unlike the tab track below): this base
  * `.ec-button-group` carries no `background-color`/`padding`/`border-radius`
@@ -1578,13 +1555,9 @@
  * `Buttons.svelte`'s `ec-${button}` per-button class, e.g.
  * `.ec-dayGridMonth`/`.ec-timeGridWeek`/`.ec-timeGridDay`/`.ec-prev`/
  * `.ec-next` — confirmed against the vendored source, not documented in the
- * public API), so `:has(.ec-timeGridWeek)` is what scopes this to *only*
- * the view trio and leaves the prev/next pair on the plain unfused-button
- * rules above. Anchored on `.ec-timeGridWeek` rather than `.ec-dayGridMonth`
- * specifically so this still matches in a narrow pane's compact header
- * (`isotask-calendar--compact`, below), which drops the month button from
- * `headerToolbar` entirely (`event-calendar-renderer.ts`) but always keeps
- * week + day.
+ * public API), so `.ec-end > :last-child` is what scopes this to *only*
+ * the view trio (the last button group `headerToolbar.end` renders there)
+ * and leaves the prev/next pair on the plain unfused-button rules above.
  *
  * A first pass used a raised "card" active tab (`--background-primary` fill
  * + `--shadow-s`) on a `--background-modifier-hover` track, shadcn-Tabs
@@ -1612,14 +1585,15 @@
  * exactly inside the track's padding box, so the inset the radius math
  * assumes is the real one.
  */
-.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) {
+/* Last group in .ec-end is the view switcher: headerToolbar.end in event-calendar-renderer.ts puts it after today and prev,next. */
+.isotask-calendar .ec-end > .ec-button-group:last-child {
 	gap: var(--size-2-1);
 	padding: var(--size-2-1);
 	border-radius: var(--radius-m);
 	background-color: var(--background-secondary);
 }
 
-.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button {
+.isotask-calendar .ec-end > .ec-button-group:last-child .ec-button {
 	box-sizing: border-box;
 	background-color: transparent;
 	color: var(--text-muted);
@@ -1632,7 +1606,7 @@
 	border-radius: calc(var(--radius-m) - var(--size-2-1));
 }
 
-.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button:not(:disabled):hover {
+.isotask-calendar .ec-end > .ec-button-group:last-child .ec-button:not(:disabled):hover {
 	background-color: transparent;
 	color: var(--text-normal);
 }
@@ -1640,7 +1614,7 @@
 /* Active tab: a flat tinted overlay, not a filled-accent pill (which would
  * read as a primary action rather than "the currently open view") and not
  * a raised card (see the shadow/darkness note above). */
-.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
+.isotask-calendar .ec-end > .ec-button-group:last-child .ec-button.ec-active {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	font-weight: var(--font-semibold);
@@ -1648,7 +1622,7 @@
 	box-shadow: none;
 }
 
-.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active:not(:disabled):hover {
+.isotask-calendar .ec-end > .ec-button-group:last-child .ec-button.ec-active:not(:disabled):hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
@@ -1673,8 +1647,7 @@
  * 0,3,0 vs. their 0,2,0 — so these always win regardless of source order.
  */
 .isotask-calendar.isotask-calendar--compact .ec-toolbar {
-	row-gap: var(--size-4-1);
-	column-gap: var(--size-4-2);
+	gap: var(--size-4-1) var(--size-4-2);
 	margin-block-end: var(--size-4-2);
 }
 
@@ -1711,12 +1684,12 @@
  * kept, unchanged, purely for the horizontal "track" reveal around Day/3
  * days' unselected labels.
  */
-.isotask-calendar.isotask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) {
+.isotask-calendar.isotask-calendar--compact .ec-end > .ec-button-group:last-child {
 	padding: 0 var(--size-2-1);
 }
 
-.isotask-calendar.isotask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button,
-.isotask-calendar.isotask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
+.isotask-calendar.isotask-calendar--compact .ec-end > .ec-button-group:last-child .ec-button,
+.isotask-calendar.isotask-calendar--compact .ec-end > .ec-button-group:last-child .ec-button.ec-active {
 	font-size: var(--font-ui-smaller);
 	padding: var(--size-2-1) var(--size-4-2);
 }

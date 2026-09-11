@@ -2641,6 +2641,63 @@ describe("Views", function () {
 		});
 
 		/**
+		 * `isotask-calendar--resizing` (`calendar-view.ts`, `styles/calendar.css`)
+		 * replaced a `:has(.ec-resizer:active)` CSS check the review bot flags —
+		 * flagged on the calendar root, not the block, since Event Calendar's own
+		 * Svelte binding overwrites a resized `.ec-event`'s `class` wholesale once
+		 * the drag threshold is crossed (verified: a class added there is gone by
+		 * the first qualifying move).
+		 */
+		it("marks the calendar root as resizing while a resize handle is held, and clears it on release", async function () {
+			await setCalendarInitialView("week");
+			await browser.$(`.${cssClass("calendar")} .ec-week-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			const resizingCls = cssClass("calendar--resizing");
+			const maxAttempts = 3;
+			let plan: { x: number; y: number } | null = null;
+			for (let attempt = 1; attempt <= maxAttempts && plan === null; attempt += 1) {
+				await dismissStrayModal();
+				await browser.releaseActions();
+
+				plan = await browser.execute((calendarCls) => {
+					const events = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-body .ec-event`));
+					const source = events.find((el) => el.querySelector(".ec-event-title")?.textContent === "Planning session");
+					const resizer = source === undefined ? undefined : source.querySelector(".ec-resizer");
+					if (source === undefined || resizer === null || resizer === undefined) {
+						return null;
+					}
+					resizer.scrollIntoView({ block: "center" });
+					const rect = resizer.getBoundingClientRect();
+					const point = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+					if (!document.elementsFromPoint(point.x, point.y).includes(resizer)) {
+						return null;
+					}
+					return point;
+				}, cssClass("calendar"));
+			}
+			if (plan === null) {
+				throw new Error("Planning session's resize handle was never reliably grabbable");
+			}
+
+			// `perform(true)` keeps the pointer held so the mid-gesture DOM state below can be observed before release.
+			await browser
+				.action("pointer", { parameters: { pointerType: "mouse" } })
+				.move({ x: Math.round(plan.x), y: Math.round(plan.y), origin: "viewport" })
+				.down({ button: 0 })
+				.pause(50)
+				// Past the ~5px drag threshold, so Event Calendar has actually started the resize by the time this is checked.
+				.move({ x: Math.round(plan.x), y: Math.round(plan.y) + 10, origin: "viewport", duration: 100 })
+				.perform(true);
+
+			expect(await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, resizingCls)).toBe(1);
+
+			await browser.action("pointer", { parameters: { pointerType: "mouse" } }).up({ button: 0 }).perform();
+			await browser.releaseActions();
+
+			expect(await browser.execute((cls) => document.querySelectorAll(`.${cls}`).length, resizingCls)).toBe(0);
+		});
+
+		/**
 		 * Complements the resize test above with the other timed-block
 		 * gesture — a move, not a resize — asserted against the rule from
 		 * `docs/DOMAIN-MODEL.md`'s "Reschedule semantics": "`duration` is
