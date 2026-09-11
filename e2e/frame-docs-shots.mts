@@ -8,7 +8,8 @@ import sharp from "sharp";
 const ACCENT = "#8a5cf5";
 const RADIUS = 20;
 const STROKE_WIDTH = 2;
-const STROKE_OPACITY = 0.6;
+// Opaque, not ACCENT at partial alpha: a blended edge shifts with each capture's own edge color.
+const EDGE = "#5e429e";
 const GLOW_BLUR_SIGMA = 28;
 const GLOW_OPACITY = 0.12;
 const PADDING = 64;
@@ -28,7 +29,7 @@ function strokeRectSvg(width: number, height: number): Buffer {
 	const inset = STROKE_WIDTH / 2;
 	const w = width - STROKE_WIDTH;
 	const h = height - STROKE_WIDTH;
-	return Buffer.from(`<svg width="${String(width)}" height="${String(height)}"><rect x="${String(inset)}" y="${String(inset)}" width="${String(w)}" height="${String(h)}" rx="${String(RADIUS)}" ry="${String(RADIUS)}" fill="none" stroke="${ACCENT}" stroke-opacity="${String(STROKE_OPACITY)}" stroke-width="${String(STROKE_WIDTH)}"/></svg>`);
+	return Buffer.from(`<svg width="${String(width)}" height="${String(height)}"><rect x="${String(inset)}" y="${String(inset)}" width="${String(w)}" height="${String(h)}" rx="${String(RADIUS)}" ry="${String(RADIUS)}" fill="none" stroke="${EDGE}" stroke-width="${String(STROKE_WIDTH)}"/></svg>`);
 }
 
 // A re-run would frame an already-framed (padded, transparent-cornered) image; the corner alpha is the tell.
