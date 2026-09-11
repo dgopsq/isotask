@@ -6,17 +6,14 @@
 [![Latest release](https://img.shields.io/github/v/release/dgopsq/obtasks)](https://github.com/dgopsq/obtasks/releases)
 [![License](https://img.shields.io/github/license/dgopsq/obtasks)](LICENSE)
 
-<p align="center"><img src="docs/assets/feed.png" width="100%" alt="Obtask feed view"></p>
-<p align="center"><sub>Feed</sub></p>
-
-<p align="center"><img src="docs/assets/calendar.png" width="100%" alt="Obtask calendar view"></p>
-<p align="center"><sub>Calendar</sub></p>
-
 <p align="center">
-  <img src="docs/assets/feed-mobile.png" width="34%" alt="Obtask feed view on mobile">
-  <img src="docs/assets/calendar-mobile.png" width="34%" alt="Obtask calendar view on mobile">
+  <img src="docs/assets/feed.png" width="73%" alt="Obtask feed view">
+  <img src="docs/assets/feed-mobile.png" width="23.7%" alt="Obtask feed view on mobile">
 </p>
-<p align="center"><sub>Feed and calendar on mobile</sub></p>
+<p align="center">
+  <img src="docs/assets/calendar.png" width="73%" alt="Obtask calendar view">
+  <img src="docs/assets/calendar-mobile.png" width="23.7%" alt="Obtask calendar view on mobile">
+</p>
 
 **Your notes are your tasks.** Frontmatter in, feed and calendar out, built on Obsidian Bases.
 
