@@ -26,14 +26,18 @@ function projectNotes(): readonly DemoNote[] {
 	return [
 		{ filename: "Acme Redesign.md", frontmatter: { type: "project", color: "blue" }, body: "Demo project for e2e docs screenshots." },
 		{ filename: "Personal.md", frontmatter: { type: "project", color: "orange" }, body: "Demo project for e2e docs screenshots." },
+		{ filename: "Home Renovation.md", frontmatter: { type: "project", color: "green" }, body: "Demo project for e2e docs screenshots." },
 	];
 }
 
 function taskNotes(now: Date): readonly DemoNote[] {
 	const today = iso(now, 0);
-	// Monday-anchored so Tue/Fri land in the same week as `today`, whatever weekday the suite runs on.
+	// Monday-anchored so weekday blocks land in the same week as `today`, whatever weekday the suite runs on.
 	const monday = startOfWeek(now, { weekStartsOn: 1 });
+	const mondayIso = format(monday, "yyyy-MM-dd");
 	const tuesday = format(addDays(monday, 1), "yyyy-MM-dd");
+	const wednesday = format(addDays(monday, 2), "yyyy-MM-dd");
+	const thursday = format(addDays(monday, 3), "yyyy-MM-dd");
 	const friday = format(addDays(monday, 4), "yyyy-MM-dd");
 	return [
 		{
@@ -106,6 +110,51 @@ function taskNotes(now: Date): readonly DemoNote[] {
 			filename: "Read Deep Work.md",
 			frontmatter: { type: "task", status: "todo", tags: "[reading]" },
 			body: "Recommended by a colleague.",
+		},
+		{
+			filename: "Get quotes for kitchen.md",
+			frontmatter: { type: "task", status: "todo", due: iso(now, 3), project: "Home Renovation", tags: "[renovation]" },
+			body: "Compare prices and timelines from three contractors.",
+		},
+		{
+			filename: "Pick tile samples.md",
+			frontmatter: { type: "task", status: "todo", due: iso(now, 5), project: "Home Renovation" },
+			body: "Visit showroom to see options in person.",
+		},
+		{
+			filename: "Negotiate contractor terms.md",
+			frontmatter: { type: "task", status: "todo", due: iso(now, 8), priority: "high", project: "Home Renovation" },
+			body: "Get written estimates and timeline.",
+		},
+		{
+			filename: "Kitchen contractor visit.md",
+			frontmatter: { type: "task", status: "todo", scheduled: `${mondayIso}T10:00`, duration: "90", project: "Home Renovation" },
+			body: "In-person measure and discuss scope.",
+		},
+		{
+			filename: "Order paint samples.md",
+			frontmatter: { type: "task", status: "todo", scheduled: `${mondayIso}T15:30`, duration: "30", project: "Home Renovation" },
+			body: "Get samples matched to the mockups.",
+		},
+		{
+			filename: "Design workshop.md",
+			frontmatter: { type: "task", status: "todo", scheduled: `${wednesday}T09:30`, duration: "120", project: "Acme Redesign" },
+			body: "Full day brainstorm with the design team.",
+		},
+		{
+			filename: "Call the bank.md",
+			frontmatter: { type: "task", status: "todo", scheduled: `${wednesday}T15:00`, duration: "30", project: "Personal", tags: "[finance]" },
+			body: "Discuss mortgage refinancing options.",
+		},
+		{
+			filename: "Sprint review.md",
+			frontmatter: { type: "task", status: "todo", scheduled: `${thursday}T11:00`, duration: "60", project: "Acme Redesign" },
+			body: "Demo finished features to stakeholders.",
+		},
+		{
+			filename: "Gym.md",
+			frontmatter: { type: "task", status: "todo", scheduled: `${thursday}T16:00`, duration: "45" },
+			body: "Strength training session.",
 		},
 	];
 }

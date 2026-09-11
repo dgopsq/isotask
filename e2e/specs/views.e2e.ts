@@ -2356,6 +2356,14 @@ describe("Views", function () {
 			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(targetDate);
 		});
 
+		/** A gesture that degraded into a cell click leaves the create-task modal over the calendar; a retry must clear it first. */
+		async function dismissStrayModal(): Promise<void> {
+			if (await browser.$(".modal").isExisting()) {
+				await browser.keys("Escape");
+				await browser.$(".modal").waitForExist({ timeout: SELECT_TIMEOUT, reverse: true }).catch(() => undefined);
+			}
+		}
+
 		/**
 		 * Drags "Today task"'s due-event chip (month view) to an empty cell in
 		 * the same grid row — same gesture as the "dragging an event to a
@@ -2365,69 +2373,100 @@ describe("Views", function () {
 		 * fixed `fixtures.today`) is excluded from the candidate target cells
 		 * since an earlier test in this suite has already moved "Today task"'s
 		 * due date once. Returns the target cell's date.
+		 *
+		 * Bounded retries with fresh, hit-tested rects: a compact-mode remount near
+		 * `COMPACT_CALENDAR_WIDTH` can swap the chip out between plan and gesture (CI's pane sits on it).
 		 */
 		async function dragTodayTaskDueToEmptyCellSameRow(currentDue: string): Promise<string> {
-			const dragPlan = await browser.execute(
-				(calendarCls, eventCls, dueCls, excludeDate) => {
-					const events = Array.from(document.querySelectorAll(`.${calendarCls} .${eventCls}`));
-					const sourceEl = events.find(
-						(el) => el.querySelector(".ec-event-title")?.textContent === "Today task" && el.classList.contains(dueCls),
-					);
-					if (sourceEl === undefined) {
-						return null;
-					}
-					const sourceRect = sourceEl.getBoundingClientRect();
-					const eventRects = events.map((el) => el.getBoundingClientRect());
-					const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
-					const targetEl = cells.find((cell) => {
-						const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
-						if (dateAttr === null || dateAttr === undefined || dateAttr === excludeDate) {
-							return false;
-						}
-						const rect = cell.getBoundingClientRect();
-						if (Math.abs(rect.top - sourceRect.top) > rect.height / 2) {
-							return false;
-						}
-						return !eventRects.some(
-							(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+			const maxAttempts = 3;
+			let lastFailure = "";
+
+			for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+				await dismissStrayModal();
+				await browser.releaseActions();
+
+				const dragPlan = await browser.execute(
+					(calendarCls, eventCls, dueCls, excludeDate) => {
+						const events = Array.from(document.querySelectorAll(`.${calendarCls} .${eventCls}`));
+						const sourceEl = events.find(
+							(el) => el.querySelector(".ec-event-title")?.textContent === "Today task" && el.classList.contains(dueCls),
 						);
+						if (sourceEl === undefined) {
+							return null;
+						}
+						const sourceRect = sourceEl.getBoundingClientRect();
+						const eventRects = events.map((el) => el.getBoundingClientRect());
+						const cells = Array.from(document.querySelectorAll(`.${calendarCls} .ec-day-grid .ec-day`));
+						const targetEl = cells.find((cell) => {
+							const dateAttr = cell.querySelector("time[datetime]")?.getAttribute("datetime");
+							if (dateAttr === null || dateAttr === undefined || dateAttr === excludeDate) {
+								return false;
+							}
+							const rect = cell.getBoundingClientRect();
+							if (Math.abs(rect.top - sourceRect.top) > rect.height / 2) {
+								return false;
+							}
+							return !eventRects.some(
+								(er) => !(er.right <= rect.left || er.left >= rect.right || er.bottom <= rect.top || er.top >= rect.bottom),
+							);
+						});
+						if (targetEl === undefined) {
+							return null;
+						}
+						const targetDate = targetEl.querySelector("time[datetime]")?.getAttribute("datetime");
+						if (targetDate === null || targetDate === undefined) {
+							return null;
+						}
+						const targetRect = targetEl.getBoundingClientRect();
+						const source = { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 };
+						// A remount can leave a stale rect; only a chip that is still on top is draggable.
+						if (!document.elementsFromPoint(source.x, source.y).includes(sourceEl)) {
+							return null;
+						}
+						return {
+							date: targetDate,
+							source,
+							target: { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 },
+						};
+					},
+					cssClass("calendar"),
+					cssClass("event"),
+					cssClass("event--due"),
+					currentDue,
+				);
+				if (dragPlan === null) {
+					lastFailure = 'could not resolve "Today task"\'s due event and a hit-testable, empty same-row day cell for the drag';
+					continue;
+				}
+				const { date, source, target } = dragPlan;
+
+				await browser
+					.action("pointer", { parameters: { pointerType: "mouse" } })
+					.move({ x: Math.round(source.x), y: Math.round(source.y), origin: "viewport" })
+					.down({ button: 0 })
+					.pause(50)
+					.move({ x: Math.round(source.x) + 10, y: Math.round(source.y) + 10, origin: "viewport", duration: 100 })
+					.move({ x: Math.round(target.x), y: Math.round(target.y), origin: "viewport", duration: 250 })
+					.pause(50)
+					.up({ button: 0 })
+					.perform();
+
+				const landed = await browser
+					.waitUntil(async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === date, { timeout: 2_000 })
+					.then(() => true)
+					.catch(() => false);
+				if (landed) {
+					// `metadataCache` lags the on-disk write; undo's staleness check reads the cache and would refuse.
+					await browser.waitUntil(async () => (await frontmatterOf("Tasks/Today task.md"))?.["due"] === date, {
+						timeout: SELECT_TIMEOUT,
+						timeoutMsg: `Today task's cached "due" never caught up to ${date} after the drag landed on disk`,
 					});
-					if (targetEl === undefined) {
-						return null;
-					}
-					const targetDate = targetEl.querySelector("time[datetime]")?.getAttribute("datetime");
-					if (targetDate === null || targetDate === undefined) {
-						return null;
-					}
-					const targetRect = targetEl.getBoundingClientRect();
-					return {
-						date: targetDate,
-						source: { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
-						target: { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 },
-					};
-				},
-				cssClass("calendar"),
-				cssClass("event"),
-				cssClass("event--due"),
-				currentDue,
-			);
-			if (dragPlan === null) {
-				throw new Error('could not resolve "Today task"\'s due event and an empty same-row day cell for the drag');
+					return date;
+				}
+				lastFailure = `Today task's on-disk "due" never became ${date} after the drag (attempt ${String(attempt)}/${String(maxAttempts)})`;
 			}
-			const { date, source, target } = dragPlan;
 
-			await browser
-				.action("pointer", { parameters: { pointerType: "mouse" } })
-				.move({ x: Math.round(source.x), y: Math.round(source.y), origin: "viewport" })
-				.down({ button: 0 })
-				.pause(50)
-				.move({ x: Math.round(source.x) + 10, y: Math.round(source.y) + 10, origin: "viewport", duration: 100 })
-				.move({ x: Math.round(target.x), y: Math.round(target.y), origin: "viewport", duration: 250 })
-				.pause(50)
-				.up({ button: 0 })
-				.perform();
-
-			return date;
+			throw new Error(lastFailure);
 		}
 
 		/**
@@ -2543,45 +2582,59 @@ describe("Views", function () {
 			const originalDuration = await frontmatterValueOnDisk("Tasks/Planning session.md", "duration");
 			expect(originalDuration).toEqual("120");
 
-			const plan = await browser.execute((calendarCls) => {
-				const events = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-body .ec-event`));
-				const source = events.find((el) => el.querySelector(".ec-event-title")?.textContent === "Planning session");
-				const resizer = source === undefined ? undefined : source.querySelector(".ec-resizer");
-				if (source === undefined || resizer === null || resizer === undefined) {
-					return null;
+			// Same bounded plan+gesture retry as `dragTodayTaskDueToEmptyCellSameRow`, for the same remount reason.
+			const maxAttempts = 3;
+			let landed = false;
+			for (let attempt = 1; attempt <= maxAttempts && !landed; attempt += 1) {
+				await dismissStrayModal();
+				await browser.releaseActions();
+
+				const plan = await browser.execute((calendarCls) => {
+					const events = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-body .ec-event`));
+					const source = events.find((el) => el.querySelector(".ec-event-title")?.textContent === "Planning session");
+					const resizer = source === undefined ? undefined : source.querySelector(".ec-resizer");
+					if (source === undefined || resizer === null || resizer === undefined) {
+						return null;
+					}
+					resizer.scrollIntoView({ block: "center" });
+					const resizerRect = resizer.getBoundingClientRect();
+					const resizerPoint = { x: resizerRect.left + resizerRect.width / 2, y: resizerRect.top + resizerRect.height / 2 };
+					if (!document.elementsFromPoint(resizerPoint.x, resizerPoint.y).includes(resizer)) {
+						return null;
+					}
+					const slots = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-slot`));
+					const targetSlot = slots.find((el) => el.querySelector("time[datetime]")?.getAttribute("datetime")?.includes("T16:00:00"));
+					if (targetSlot === undefined) {
+						return null;
+					}
+					const slotRect = targetSlot.getBoundingClientRect();
+					return { resizer: resizerPoint, targetY: slotRect.top + slotRect.height / 2 };
+				}, cssClass("calendar"));
+				if (plan === null) {
+					continue;
 				}
-				resizer.scrollIntoView({ block: "center" });
-				const resizerRect = resizer.getBoundingClientRect();
-				const slots = Array.from(document.querySelectorAll(`.${calendarCls} .ec-time-grid .ec-slot`));
-				const targetSlot = slots.find((el) => el.querySelector("time[datetime]")?.getAttribute("datetime")?.includes("T16:00:00"));
-				if (targetSlot === undefined) {
-					return null;
-				}
-				const slotRect = targetSlot.getBoundingClientRect();
-				return {
-					resizer: { x: resizerRect.left + resizerRect.width / 2, y: resizerRect.top + resizerRect.height / 2 },
-					targetY: slotRect.top + slotRect.height / 2,
-				};
-			}, cssClass("calendar"));
-			if (plan === null) {
-				throw new Error("could not resolve Planning session's resize handle or the 16:00 target slot");
+
+				await browser
+					.action("pointer", { parameters: { pointerType: "mouse" } })
+					.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.resizer.y), origin: "viewport" })
+					.down({ button: 0 })
+					.pause(50)
+					.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.resizer.y) + 10, origin: "viewport", duration: 100 })
+					.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.targetY), origin: "viewport", duration: 250 })
+					.pause(50)
+					.up({ button: 0 })
+					.perform();
+
+				landed = await browser
+					.waitUntil(async () => (await frontmatterValueOnDisk("Tasks/Planning session.md", "duration")) !== originalDuration, {
+						timeout: 2_000,
+					})
+					.then(() => true)
+					.catch(() => false);
 			}
-
-			await browser
-				.action("pointer", { parameters: { pointerType: "mouse" } })
-				.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.resizer.y), origin: "viewport" })
-				.down({ button: 0 })
-				.pause(50)
-				.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.resizer.y) + 10, origin: "viewport", duration: 100 })
-				.move({ x: Math.round(plan.resizer.x), y: Math.round(plan.targetY), origin: "viewport", duration: 250 })
-				.pause(50)
-				.up({ button: 0 })
-				.perform();
-
-			await browser.waitUntil(
-				async () => (await frontmatterValueOnDisk("Tasks/Planning session.md", "duration")) !== originalDuration,
-				{ timeout: SELECT_TIMEOUT, timeoutMsg: "Planning session's on-disk duration never changed after the resize" },
-			);
+			if (!landed) {
+				throw new Error("Planning session's on-disk duration never changed after the resize");
+			}
 
 			const newDuration = await frontmatterValueOnDisk("Tasks/Planning session.md", "duration");
 			expect(newDuration).toBeDefined();

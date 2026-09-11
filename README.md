@@ -7,10 +7,13 @@
 [![License](https://img.shields.io/github/license/dgopsq/obtasks)](LICENSE)
 
 <p align="center">
-  <img src="docs/assets/feed.png" width="49%" alt="Obtask feed view">
-  <img src="docs/assets/calendar.png" width="49%" alt="Obtask calendar view">
+  <img src="docs/assets/feed.png" width="73%" alt="Obtask feed view">
+  <img src="docs/assets/feed-mobile.png" width="23.7%" alt="Obtask feed view on mobile">
 </p>
-<p align="center"><sub>Feed &nbsp;&nbsp;&nbsp; Calendar</sub></p>
+<p align="center">
+  <img src="docs/assets/calendar.png" width="73%" alt="Obtask calendar view">
+  <img src="docs/assets/calendar-mobile.png" width="23.7%" alt="Obtask calendar view on mobile">
+</p>
 
 **Your notes are your tasks.** Frontmatter in, feed and calendar out, built on Obsidian Bases.
 

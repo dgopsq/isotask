@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { browser, expect } from "@wdio/globals";
-import { before, describe, it } from "mocha";
+import { after, before, describe, it } from "mocha";
 
 import { cssClass } from "@/plugin-id";
 
@@ -44,8 +44,8 @@ describe("Docs screenshots", function () {
 	before(async function () {
 		await setWindowSize(1400, 900);
 		await browser.execute(() => {
-			document.body.classList.remove("theme-dark");
-			document.body.classList.add("theme-light");
+			document.body.classList.remove("theme-light");
+			document.body.classList.add("theme-dark");
 		});
 		await browser.executeObsidian(({ app }) => {
 			app.workspace.leftSplit.collapse();
@@ -89,5 +89,48 @@ describe("Docs screenshots", function () {
 		expect(events.length).toBeGreaterThan(1);
 
 		await saveDocAsset("calendar");
+	});
+
+	it("captures the feed view on mobile", async function () {
+		await setWindowSize(390, 844);
+		await browser.executeObsidian(({ app }) => {
+			(app as unknown as { emulateMobile: (v: boolean) => void }).emulateMobile(true);
+		});
+		// emulateMobile() tears down the active leaf, so the base has to be reopened.
+		await browser.executeObsidian(({ app }) => app.workspace.openLinkText("My Tasks.base", "", false));
+		await browser.$(`.${cssClass("feed")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+		await browser.$(`.${cssClass("feed__bucket")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+		await saveDocAsset("feed-mobile");
+	});
+
+	it("captures the calendar view on mobile", async function () {
+		await browser.$(".workspace-leaf.mod-active .bases-toolbar-views-menu .text-icon-button").click();
+		await browser.$(".bases-toolbar-menu-item-name=Calendar").click();
+		await browser.$(`.${cssClass("calendar")} .ec`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+		await browser.executeObsidian(({ app }) => {
+			const leaves = app.workspace.getLeavesOfType("bases");
+			const leaf = leaves[0];
+			if (leaf === undefined) {
+				throw new Error("no bases leaf found");
+			}
+			const outerView = leaf.view as unknown as {
+				controller: { view: { config: { set: (key: string, value: unknown) => void } } };
+			};
+			// Compact month renders the dot grid, the distinctive mobile shot.
+			outerView.controller.view.config.set("initialView", "month");
+		});
+
+		const eventEl = browser.$(`.${cssClass("event")}`);
+		await eventEl.waitForExist({ timeout: SELECT_TIMEOUT });
+
+		await saveDocAsset("calendar-mobile");
+	});
+
+	after(async function () {
+		await browser.executeObsidian(({ app }) => {
+			(app as unknown as { emulateMobile: (v: boolean) => void }).emulateMobile(false);
+		});
 	});
 });
