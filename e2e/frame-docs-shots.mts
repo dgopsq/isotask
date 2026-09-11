@@ -7,7 +7,10 @@ import sharp from "sharp";
 
 const ACCENT = "#8a5cf5";
 const RADIUS = 20;
-const STROKE_WIDTH = 2;
+const STROKE_WIDTH = 4;
+// Neutral band inside the edge so the purple always downsamples against the same neighbour (mobile is pure black, desktop grey).
+const BEZEL = "#121212";
+const BEZEL_WIDTH = 4;
 // Opaque, not ACCENT at partial alpha: a blended edge shifts with each capture's own edge color.
 const EDGE = "#5e429e";
 const GLOW_BLUR_SIGMA = 28;
@@ -26,10 +29,12 @@ function roundedRectSvg(width: number, height: number, fill: string, opacity: nu
 }
 
 function strokeRectSvg(width: number, height: number): Buffer {
-	const inset = STROKE_WIDTH / 2;
-	const w = width - STROKE_WIDTH;
-	const h = height - STROKE_WIDTH;
-	return Buffer.from(`<svg width="${String(width)}" height="${String(height)}"><rect x="${String(inset)}" y="${String(inset)}" width="${String(w)}" height="${String(h)}" rx="${String(RADIUS)}" ry="${String(RADIUS)}" fill="none" stroke="${EDGE}" stroke-width="${String(STROKE_WIDTH)}"/></svg>`);
+	const ring = (inset: number, color: string, strokeWidth: number, radius: number): string =>
+		`<rect x="${String(inset)}" y="${String(inset)}" width="${String(width - inset * 2)}" height="${String(height - inset * 2)}" rx="${String(radius)}" ry="${String(radius)}" fill="none" stroke="${color}" stroke-width="${String(strokeWidth)}"/>`;
+	const bezelInset = STROKE_WIDTH + BEZEL_WIDTH / 2;
+	return Buffer.from(
+		`<svg width="${String(width)}" height="${String(height)}">${ring(bezelInset, BEZEL, BEZEL_WIDTH, RADIUS - STROKE_WIDTH)}${ring(STROKE_WIDTH / 2, EDGE, STROKE_WIDTH, RADIUS)}</svg>`,
+	);
 }
 
 // A re-run would frame an already-framed (padded, transparent-cornered) image; the corner alpha is the tell.
