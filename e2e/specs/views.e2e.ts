@@ -3505,8 +3505,15 @@ describe("Actions", function () {
 			expect(spawnFm?.["completed"]).toBeUndefined();
 			expect(typeof spawnFm?.["created"]).toEqual("string");
 
-			const spawnBody = await readFileContent(spawnPath);
-			expect(spawnBody?.includes(fixtures.recurring.body)).toBe(true);
+			// The body is appended in a separate write after the frontmatter, so
+			// the cache having the frontmatter doesn't yet mean the body is there.
+			await browser.waitUntil(
+				async () => {
+					const spawnBody = await readFileContent(spawnPath);
+					return spawnBody?.includes(fixtures.recurring.body) ?? false;
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: `${spawnPath} body never got the fixture text` },
+			);
 		});
 
 		it("does not spawn a duplicate when completed again", async function () {
