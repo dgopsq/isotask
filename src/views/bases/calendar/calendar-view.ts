@@ -161,6 +161,25 @@ export class CalendarBasesView extends BasesView {
 			}
 		});
 
+		// Event Calendar classes the root only after the drag threshold, and rewrites `.ec-event`'s class
+		// wholesale once a resize starts, so the press-lift exclusion goes on our own root at pointerdown.
+		const resizingCls = cssClass("calendar--resizing");
+		this.registerDomEvent(
+			this.viewContainerEl,
+			"pointerdown",
+			(evt) => {
+				if (evt.target instanceof Element && evt.target.closest(".ec-resizer") !== null) {
+					this.calendarRootEl?.addClass(resizingCls);
+				}
+			},
+			{ capture: true },
+		);
+		const clearResizing = (): void => {
+			this.calendarRootEl?.removeClass(resizingCls);
+		};
+		this.registerDomEvent(document, "pointerup", clearResizing);
+		this.registerDomEvent(document, "pointercancel", clearResizing);
+
 		refreshAfterMetadataResolved(this, this.deps.app);
 
 		// See `lastProjectPaths`'s doc comment, and the identical listener on
