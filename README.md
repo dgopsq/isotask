@@ -2,9 +2,9 @@
 
 [Install](#install) · [Quick start](#quick-start) · [Docs](#docs) · [Development](#development)
 
-[![CI](https://github.com/dgopsq/obtasks/actions/workflows/ci.yml/badge.svg)](https://github.com/dgopsq/obtasks/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/dgopsq/obtasks)](https://github.com/dgopsq/obtasks/releases)
-[![License](https://img.shields.io/github/license/dgopsq/obtasks)](LICENSE)
+[![CI](https://github.com/dgopsq/obtask/actions/workflows/ci.yml/badge.svg)](https://github.com/dgopsq/obtask/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/dgopsq/obtask)](https://github.com/dgopsq/obtask/releases)
+[![License](https://img.shields.io/github/license/dgopsq/obtask)](LICENSE)
 
 <p align="center">
   <img src="docs/assets/feed.png" width="73%" alt="Obtask feed view">
@@ -63,7 +63,7 @@ Not yet listed; a submission is in progress.
 ### Manual
 
 Download `main.js`, `manifest.json`, and `styles.css` from the
-[latest release](https://github.com/dgopsq/obtasks/releases/latest) into
+[latest release](https://github.com/dgopsq/obtask/releases/latest) into
 `<vault>/.obsidian/plugins/obtask/`, then reload Obsidian and enable Obtask in Settings.
 
 Obtask requires Obsidian 1.13.0 or later (Bases).
