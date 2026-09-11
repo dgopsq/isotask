@@ -17,7 +17,7 @@ export const DEFAULT_FEED_VIEW_OPTIONS: FeedViewOptions = {
 /**
  * Below this pane width (px), the row's fixed metadata columns (date,
  * priority, project, tags, generic — one `max-content` track each) cannot
- * fit beside a readable title, so `styles/obtask.css`'s permanent-horizontal-
+ * fit beside a readable title, so `styles/isotask.css`'s permanent-horizontal-
  * scrollbar wide layout stops being usable and rows collapse to two lines
  * instead (status + title on line one, metadata wrapped onto line two). This
  * is a LAYOUT threshold on the feed pane's own `clientWidth`
@@ -25,7 +25,7 @@ export const DEFAULT_FEED_VIEW_OPTIONS: FeedViewOptions = {
  * pane on desktop crosses it too, and a full-width pane on a phone in
  * landscape doesn't. Mirrors `domain/calendar-view-options.ts`'s
  * `COMPACT_CALENDAR_WIDTH` — same pane-width-fact rationale, same
- * single-source-of-truth relationship with its view's `obtask-feed--compact`
+ * single-source-of-truth relationship with its view's `isotask-feed--compact`
  * CSS class.
  */
 export const COMPACT_FEED_WIDTH = 560;

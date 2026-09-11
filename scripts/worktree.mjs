@@ -8,7 +8,7 @@
  *                         seconds, since pnpm hardlinks from its global
  *                         content-addressable store (no duplicate packages
  *                         on disk) and the Obsidian e2e cache is shared via
- *                         `wdio.conf.mts` (`~/.cache/obtask/obsidian-cache`).
+ *                         `wdio.conf.mts` (`~/.cache/isotask/obsidian-cache`).
  *   pnpm wt rm <branch>   remove that worktree (the branch survives).
  *   pnpm wt list          list all worktrees.
  *

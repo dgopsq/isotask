@@ -31,7 +31,7 @@ Positive:
 Negative:
 - No built-in structured concurrency, retries, or typed-error composition helpers — anything like
   that is hand-rolled if it's ever needed.
-- `Result`/`Option` are hand-maintained (small, but still code and tests obtask owns rather than a
+- `Result`/`Option` are hand-maintained (small, but still code and tests isotask owns rather than a
   library's).
 
 ## Alternatives considered

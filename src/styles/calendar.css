@@ -2,7 +2,7 @@
  * Event Calendar (@event-calendar/core) theming. Theme variables only — no
  * hardcoded colors (docs/CONVENTIONS.md). Every --ec-* custom property the
  * library exposes (see node_modules/@event-calendar/core/dist/index.css) is
- * remapped to an Obsidian theme variable here, scoped under .obtask-calendar
+ * remapped to an Obsidian theme variable here, scoped under .isotask-calendar
  * .ec so this never bleeds into another plugin's own calendar instance.
  * Higher specificity than the library's own `.ec { --ec-*: ...; }` base
  * rule (two classes vs. one) wins regardless of import order.
@@ -22,7 +22,7 @@
  * rendering, but a calendar has no per-row slot to render an invalid entry
  * into, so this is a single muted count instead — see calendar-view.ts).
  */
-.obtask-calendar__invalid {
+.isotask-calendar__invalid {
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	font-style: italic;
@@ -37,11 +37,11 @@
  * — never `outline: none` unconditionally, which would also drop the ring
  * for keyboard navigation.
  */
-.obtask-calendar-view:focus:not(:focus-visible) {
+.isotask-calendar-view:focus:not(:focus-visible) {
 	outline: none;
 }
 
-.obtask-calendar .ec {
+.isotask-calendar .ec {
 	/* Main colors -> the Obsidian scale closest to each role. */
 	--ec-color-50: var(--background-secondary);
 	--ec-color-100: var(--background-secondary);
@@ -68,7 +68,7 @@
 	--ec-today-bg-color: var(--background-secondary);
 	--ec-highlight-color: var(--background-modifier-hover);
 
-	/* Events — .obtask-event/.obtask-priority-* below (higher specificity,
+	/* Events — .isotask-event/.isotask-priority-* below (higher specificity,
 	 * two classes vs. one) are what actually renders these; kept as a
 	 * sensible fallback for anything not covered there. */
 	--ec-event-bg-color: var(--background-modifier-hover);
@@ -91,7 +91,7 @@
  * for "hovering" vs. "this is the selected view" needs concrete rules that
  * out-specificity that coupled one, not just variables.
  */
-.obtask-calendar .ec-button {
+.isotask-calendar .ec-button {
 	background-color: var(--interactive-normal);
 	color: var(--text-normal);
 	border: none;
@@ -102,10 +102,10 @@
 	/* Covers both the plain hover rule below and the active-tab tint change
 	 * in the view switcher (`.ec-active`, further down) — both only ever
 	 * change background-color/color on this same element. */
-	transition: background-color var(--obtask-motion, 120ms) ease, color var(--obtask-motion, 120ms) ease;
+	transition: background-color var(--isotask-motion, 120ms) ease, color var(--isotask-motion, 120ms) ease;
 }
 
-.obtask-calendar .ec-button:not(:disabled):hover {
+.isotask-calendar .ec-button:not(:disabled):hover {
 	background-color: var(--interactive-hover);
 	color: var(--text-normal);
 }
@@ -118,7 +118,7 @@
  * (e.g. "Save"), which the view switcher isn't; the tint reads as "current
  * selection" without competing with real actions elsewhere in the pane.
  */
-.obtask-calendar .ec-button.ec-active {
+.isotask-calendar .ec-button.ec-active {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	font-weight: var(--font-semibold);
@@ -127,7 +127,7 @@
 /* Keeps the active button's own look while it's hovered, instead of
  * falling back to the plain hover rule above (same specificity — this one
  * wins on source order). */
-.obtask-calendar .ec-button.ec-active:not(:disabled):hover {
+.isotask-calendar .ec-button.ec-active:not(:disabled):hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
@@ -141,68 +141,68 @@
  * so these two get that quieter treatment instead of the base `.ec-button`
  * fill.
  */
-.obtask-calendar .ec-button[aria-label="Previous"],
-.obtask-calendar .ec-button[aria-label="Next"] {
+.isotask-calendar .ec-button[aria-label="Previous"],
+.isotask-calendar .ec-button[aria-label="Next"] {
 	background-color: transparent;
 	padding: var(--size-4-1) var(--size-4-2);
 }
 
-.obtask-calendar .ec-button[aria-label="Previous"]:not(:disabled):hover,
-.obtask-calendar .ec-button[aria-label="Next"]:not(:disabled):hover {
+.isotask-calendar .ec-button[aria-label="Previous"]:not(:disabled):hover,
+.isotask-calendar .ec-button[aria-label="Next"]:not(:disabled):hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
 /* Title (e.g. "August 2026") — smaller and calmer than the library's <h2> default. */
-.obtask-calendar .ec-title {
+.isotask-calendar .ec-title {
 	font-size: var(--font-ui-large);
 	font-weight: var(--font-semibold);
 	color: var(--text-normal);
 }
 
 /* Day-of-week header row (month/week view). */
-.obtask-calendar .ec-col-head {
+.isotask-calendar .ec-col-head {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	font-weight: var(--font-medium);
 }
 
 /* Day numbers — muted by default, today's called out, other-month days faint. */
-.obtask-calendar .ec-day-head time {
+.isotask-calendar .ec-day-head time {
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 }
 
-.obtask-calendar .ec-day.ec-today .ec-day-head time {
+.isotask-calendar .ec-day.ec-today .ec-day-head time {
 	color: var(--text-accent);
 	font-weight: var(--font-semibold);
 }
 
 /* Overrides the library's own `opacity: .3` other-month dimming (same
- * property, higher specificity via the extra .obtask-calendar ancestor)
+ * property, higher specificity via the extra .isotask-calendar ancestor)
  * with an explicit muted color instead of a translucent one. */
-.obtask-calendar .ec-day.ec-other-month .ec-day-head time {
+.isotask-calendar .ec-day.ec-other-month .ec-day-head time {
 	color: var(--text-faint);
 	opacity: 1;
 }
 
 /*
  * Per-event classes set by event-calendar-mapping.ts#toEventCalendarEvent
- * (classNames: obtask-event, obtask-event--<source>,
- * obtask-priority-<priority>). obtask-priority-* is domain/task.ts's
+ * (classNames: isotask-event, isotask-event--<source>,
+ * isotask-priority-<priority>). isotask-priority-* is domain/task.ts's
  * existing priorityChipClass mapping, already used unscoped by the feed
- * chip (styles/obtask.css).
+ * chip (styles/isotask.css).
  *
- * `--obtask-dot-color` no longer gets a per-priority value here — priority
+ * `--isotask-dot-color` no longer gets a per-priority value here — priority
  * stopped driving the dot/pill colour (Apple Reminders-style `!`/`!!` marks
  * replaced it, event-content.ts's eventContent) — so every event falls back
  * to the `::before` rule's own `var(--text-faint)` default below. A later
- * wave re-keys `--obtask-dot-color` to the task's project instead.
+ * wave re-keys `--isotask-dot-color` to the task's project instead.
  *
  * A bordered slab (even a thin one) reads as a UI chrome element, not a
  * line of text — Obsidian's own lists mark things with a leading dot/icon,
  * not a box. So month/all-day events go "dot + title" instead: no border,
- * no fill, just a small dot before the title (--obtask-dot-color, consumed
+ * no fill, just a small dot before the title (--isotask-dot-color, consumed
  * by the ::before rule further down). Only the week/day *timed* grid (an
  * actual time block, not a marker) keeps a bordered surface — see the
  * ".ec-time-grid .ec-body" rules at the end of this section.
@@ -226,8 +226,8 @@
  * in this file maps event colour to `--interactive-accent`/`--color-accent`
  * itself, it was this one variable choice.
  */
-.obtask-calendar .ec-day-grid .ec-event,
-.obtask-calendar .ec-all-day .ec-event {
+.isotask-calendar .ec-day-grid .ec-event,
+.isotask-calendar .ec-all-day .ec-event {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	border-inline-start: none;
@@ -249,24 +249,24 @@
 	 * (faster) transition; releasing removes that `:active` match, so THIS
 	 * rule's (slower) transition is what eases the shadow back to `none` —
 	 * see the press-lift comment below for why the two speeds are split. No
-	 * hardcoded ms/`!important` — see the `--obtask-motion` guard at the end
+	 * hardcoded ms/`!important` — see the `--isotask-motion` guard at the end
 	 * of this file. `scale` eases the pickup/landing lift (see the
 	 * drag/resize lift comment below) — the ghost's `scale: 0.97` on pickup
 	 * and the reused element's return to `scale: 1` once `.ec-ghost` is
 	 * dropped at the new slot both ride this.
 	 *
 	 * `scale` is split onto its own, LONGER duration token
-	 * (`--obtask-motion-settle`) than the other three properties here: a
-	 * pickup must register as immediate (120-160ms, `--obtask-motion`, same
+	 * (`--isotask-motion-settle`) than the other three properties here: a
+	 * pickup must register as immediate (120-160ms, `--isotask-motion`, same
 	 * as hover), but a springy landing needs the slower half of the arc to
 	 * read as a settle rather than a snap — see the drag/resize lift comment
 	 * below for the full pickup-to-landing arc this feeds.
 	 */
 	transition:
-		background-color var(--obtask-motion, 120ms) ease,
-		opacity var(--obtask-motion, 120ms) ease,
-		box-shadow var(--obtask-motion, 120ms) ease,
-		scale var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+		background-color var(--isotask-motion, 120ms) ease,
+		opacity var(--isotask-motion, 120ms) ease,
+		box-shadow var(--isotask-motion, 120ms) ease,
+		scale var(--isotask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /*
@@ -283,8 +283,8 @@
  * the mechanism the layout actually honours — a margin-only nudge was
  * tried first and lost to the resolved shortfall.
  */
-.obtask-calendar .ec-day-grid .ec-event,
-.obtask-calendar .ec-all-day .ec-event {
+.isotask-calendar .ec-day-grid .ec-event,
+.isotask-calendar .ec-all-day .ec-event {
 	justify-self: center;
 }
 
@@ -300,8 +300,8 @@
  * `margin + (100% - gap)` = track - half-gap, flush with the same inset.
  */
 
-.obtask-calendar .ec-day-grid .ec-event:hover,
-.obtask-calendar .ec-all-day .ec-event:hover {
+.isotask-calendar .ec-day-grid .ec-event:hover,
+.isotask-calendar .ec-all-day .ec-event:hover {
 	background-color: var(--background-modifier-border);
 	color: var(--text-normal);
 }
@@ -314,14 +314,14 @@
  * event's custom content comes from `event-content.ts`'s `eventContent`
  * instead, see below — but hidden here defensively in case a future event
  * ever falls back to the library's default rendering while `allDay`), and
- * `.obtask-event-time` is this plugin's own label for a timed all-day chip
+ * `.isotask-event-time` is this plugin's own label for a timed all-day chip
  * (`event-content.ts`), hidden the same way in month view for the same
  * "just a marker, not a scheduled call" reason — it still shows in the
  * week/day all-day row (`.ec-all-day`, below) and time-grid's timed blocks
  * keep their own time label (further down this file).
  */
-.obtask-calendar .ec-day-grid .ec-event-time,
-.obtask-calendar .ec-day-grid .obtask-event-time {
+.isotask-calendar .ec-day-grid .ec-event-time,
+.isotask-calendar .ec-day-grid .isotask-event-time {
 	display: none;
 }
 
@@ -339,15 +339,15 @@
  * to `.ec-day-grid`/`.ec-all-day`/`.ec-timeline` titles) still truncates
  * only the text — the dot is a separate, never-clipped flex item next to
  * it, not prepended content inside the truncated box. Colour comes from
- * `--obtask-dot-color` (set above per `.obtask-priority-*`), inherited
- * down from the ancestor `.obtask-event` element.
+ * `--isotask-dot-color` (set above per `.isotask-priority-*`), inherited
+ * down from the ancestor `.isotask-event` element.
  *
  * due (a deadline marker) -> a ring (inset box-shadow, transparent fill).
  * scheduled (a planned block) -> a filled dot. Same shapes used consistently
  * everywhere a dot appears, including the timed-block title below.
  */
-.obtask-calendar .ec-day-grid .ec-event-body,
-.obtask-calendar .ec-all-day .ec-event-body {
+.isotask-calendar .ec-day-grid .ec-event-body,
+.isotask-calendar .ec-all-day .ec-event-body {
 	align-items: center;
 	/*
 	 * Explicit, defensive nowrap: the vendored `.ec-event-body` rule already
@@ -372,8 +372,8 @@
  * text from wrapping onto a second line internally, which is a distinct
  * failure mode from the row itself wrapping (`flex-wrap: nowrap` above).
  */
-.obtask-calendar .ec-day-grid .ec-event-title,
-.obtask-calendar .ec-all-day .ec-event-title {
+.isotask-calendar .ec-day-grid .ec-event-title,
+.isotask-calendar .ec-all-day .ec-event-title {
 	flex: 1 1 auto;
 	min-width: 0;
 	overflow: hidden;
@@ -381,8 +381,8 @@
 	text-overflow: ellipsis;
 }
 
-.obtask-calendar .ec-day-grid .ec-event-body::before,
-.obtask-calendar .ec-all-day .ec-event-body::before {
+.isotask-calendar .ec-day-grid .ec-event-body::before,
+.isotask-calendar .ec-all-day .ec-event-body::before {
 	content: "";
 	flex: none;
 	align-self: center;
@@ -390,13 +390,13 @@
 	block-size: 7px;
 	margin-inline-end: var(--size-4-2);
 	border-radius: 50%;
-	background-color: var(--obtask-dot-color, var(--text-faint));
+	background-color: var(--isotask-dot-color, var(--text-faint));
 }
 
-.obtask-calendar .ec-day-grid .obtask-event--due .ec-event-body::before,
-.obtask-calendar .ec-all-day .obtask-event--due .ec-event-body::before {
+.isotask-calendar .ec-day-grid .isotask-event--due .ec-event-body::before,
+.isotask-calendar .ec-all-day .isotask-event--due .ec-event-body::before {
 	background-color: transparent;
-	box-shadow: inset 0 0 0 2px var(--obtask-dot-color, var(--text-faint));
+	box-shadow: inset 0 0 0 2px var(--isotask-dot-color, var(--text-faint));
 }
 
 /*
@@ -409,7 +409,7 @@
  * unscaled base, so they stay proportionate to the title rather than
  * suddenly towering over it.
  */
-.obtask-calendar .ec-event-title {
+.isotask-calendar .ec-event-title {
 	font-size: 0.92em;
 	line-height: var(--line-height-tight);
 }
@@ -429,7 +429,7 @@
  * `.ec-event` base rather than from each other. Hidden in month view
  * (`.ec-day-grid`, above).
  */
-.obtask-calendar .ec-all-day .obtask-event-time {
+.isotask-calendar .ec-all-day .isotask-event-time {
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
 	font-size: 0.83em;
@@ -445,15 +445,15 @@
  * above). `margin-inline-start: auto` pushes it to the row's own end
  * without disturbing the dot/time/title items before it; `flex-shrink: 0`
  * keeps it from ever getting squeezed by the title's own ellipsis. Colour
- * comes from the same `obtask-priority-high`/`obtask-priority-urgent`
- * classes `styles/obtask.css` already defines unscoped for the feed chip —
+ * comes from the same `isotask-priority-high`/`isotask-priority-urgent`
+ * classes `styles/isotask.css` already defines unscoped for the feed chip —
  * no separate colour rule needed here. `font-size: 0.92em` matches the
  * title's own reduced size (a plain `inherit` would instead be the
  * unscaled `.ec-event` base, towering over the now-smaller title next to
  * it).
  */
-.obtask-calendar .ec-day-grid .obtask-event-marks,
-.obtask-calendar .ec-all-day .obtask-event-marks {
+.isotask-calendar .ec-day-grid .isotask-event-marks,
+.isotask-calendar .ec-all-day .isotask-event-marks {
 	margin-inline-start: auto;
 	padding-inline-start: var(--size-4-1);
 	flex-shrink: 0;
@@ -475,8 +475,8 @@
  * of it; the horizontal component is subtracted back out of the
  * inline-size calc too, so the box never overflows its grid cell.
  */
-.obtask-calendar .ec-day-grid .ec-event,
-.obtask-calendar .ec-all-day .ec-event {
+.isotask-calendar .ec-day-grid .ec-event,
+.isotask-calendar .ec-all-day .ec-event {
 	margin: var(--size-4-1);
 	inline-size: calc(100% - var(--ec-event-col-gap) - (var(--size-4-1) * 2));
 }
@@ -494,7 +494,7 @@
  * and tapers around the corners instead of reading as a clean bar; due/
  * scheduled still reads via the same ring/filled dot before the title.
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event {
+.isotask-calendar .ec-time-grid .ec-body .ec-event {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	border-radius: var(--radius-s);
@@ -535,10 +535,10 @@
 	 * day-grid/all-day rule above — see its comment for why, including the
 	 * split pickup-vs-settle duration on `scale`. */
 	transition:
-		background-color var(--obtask-motion, 120ms) ease,
-		opacity var(--obtask-motion, 120ms) ease,
-		box-shadow var(--obtask-motion, 120ms) ease,
-		scale var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+		background-color var(--isotask-motion, 120ms) ease,
+		opacity var(--isotask-motion, 120ms) ease,
+		box-shadow var(--isotask-motion, 120ms) ease,
+		scale var(--isotask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 	/* Tight (not the library's own 1.5) — see the day-grid/all-day `.ec-event`
 	 * rule above for the same change; this also shrinks the container-query
 	 * threshold below, since the time line's line-height is one of its
@@ -578,7 +578,7 @@
 	min-height: 24px !important;
 	min-block-size: 24px !important;
 	/*
-	 * A size container so the height-based `@container obtask-event` query
+	 * A size container so the height-based `@container isotask-event` query
 	 * below can read this element's own rendered height (see that rule's
 	 * comment for the threshold arithmetic). EC positions every timed block
 	 * with an inline `top`/`block-size` style (confirmed via a live DOM
@@ -592,7 +592,7 @@
 	 * (e.g. 15-minute) blocks keeps working unchanged.
 	 */
 	container-type: size;
-	container-name: obtask-event;
+	container-name: isotask-event;
 	/*
 	 * Vertical gap between BACK-TO-BACK timed blocks, AND slot-line symmetry
 	 * for every block (solo or not): when one block's end time exactly
@@ -676,18 +676,18 @@
  * `min-height` floor above guarantees at least 16px of pill height, so it
  * never inverts even on the shortest (15-minute) block.
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event::before {
+.isotask-calendar .ec-time-grid .ec-body .ec-event::before {
 	content: "";
 	position: absolute;
 	inset-block: var(--size-4-1);
 	inset-inline-start: var(--size-4-1);
 	inline-size: 3px;
 	border-radius: var(--radius-l);
-	background-color: var(--obtask-dot-color, var(--text-faint));
+	background-color: var(--isotask-dot-color, var(--text-faint));
 	pointer-events: none;
 }
 
-.obtask-calendar .ec-time-grid .ec-body .ec-event:hover {
+.isotask-calendar .ec-time-grid .ec-body .ec-event:hover {
 	background-color: var(--background-modifier-border);
 	color: var(--text-normal);
 }
@@ -721,7 +721,7 @@
  * drag-start, the clone just continues what the press already showed.
  *
  * The full arc reads as four physical beats, press through landing:
- *   0. Press (instant, `--obtask-motion`, `.ec-event:active`): the original
+ *   0. Press (instant, `--isotask-motion`, `.ec-event:active`): the original
  *      lifts to 105% with a cast shadow the moment it's pressed — no tilt
  *      yet, since a straight lift reads as "raised", acknowledging the
  *      touch itself ("I've got it"). On touch this blooms during the 500ms
@@ -731,7 +731,7 @@
  *   1. Handoff (same frame, no animation): once the drag threshold fires,
  *      EC swaps the pressed original's display to "ghost" and inserts the
  *      "preview" clone. The clone's resting state — `scale: 1.05; box-
- *      shadow: var(--obtask-lift-shadow)` — is exactly what the pressed original was
+ *      shadow: var(--isotask-lift-shadow)` — is exactly what the pressed original was
  *      already showing, plus a tilt (`rotate: 0.6deg`) that lands
  *      untransitioned on the clone: deliberately, since the tilt is what
  *      marks the instant the block starts travelling, distinct from the
@@ -740,14 +740,14 @@
  *      already at the state the eye just saw on the original.
  *   2. Float (held, no further animation): the clone sits tilted, shadowed,
  *      and nearly opaque (0.9) while it tracks the pointer.
- *   3. Settle (slow, `--obtask-motion-settle`): EC deletes the `.ec-preview`
+ *   3. Settle (slow, `--isotask-motion-settle`): EC deletes the `.ec-preview`
  *      clone outright on drop, taking its shadow with it, and the element at
  *      the new slot never carried one of its own — so the settle is played
- *      explicitly, as a one-shot `obtask-set` animation (`.obtask-dropped`,
+ *      explicitly, as a one-shot `isotask-set` animation (`.isotask-dropped`,
  *      below) tagged onto that landed element by the `eventDrop`/
  *      `eventResize` handler (`event-calendar-renderer.ts`). Its keyframe
  *      `from` restates the clone's exact float state (105% scale, 0.6deg
- *      tilt, `--obtask-lift-shadow`) so the clone's deletion hands off to the real
+ *      tilt, `--isotask-lift-shadow`) so the clone's deletion hands off to the real
  *      element mid-air instead of visibly cutting the shadow, and settles
  *      through the SAME back-out bezier, now on a longer duration —
  *      overshooting past 100% before relaxing — reading as the block
@@ -756,8 +756,8 @@
  *      `applyMove` is the shared handler for both gestures.)
  *
  * All three magnitudes above — 105% lift, 0.6deg tilt, 97% ghost-shrink —
- * live in inherited custom properties (`--obtask-lift-scale`,
- * `--obtask-lift-tilt`, `--obtask-ghost-scale`, defined on `.obtask-calendar`
+ * live in inherited custom properties (`--isotask-lift-scale`,
+ * `--isotask-lift-tilt`, `--isotask-ghost-scale`, defined on `.isotask-calendar`
  * itself just below) rather than as literals repeated across the four rules
  * that use them, because the right magnitude is a function of the event's
  * on-screen width, not a fixed constant: `scale`/`rotate` are proportional to
@@ -781,7 +781,7 @@
  * cast shadow is the natural depth cue for — Obsidian's own menus/popovers
  * reach for this same shadow COLOR under dark themes for exactly that
  * floating-above-the-page read, so it applies here without the rim problem.
- * The actual token used, `--obtask-lift-shadow` (defined below, `0 2px 8px
+ * The actual token used, `--isotask-lift-shadow` (defined below, `0 2px 8px
  * var(--background-modifier-box-shadow)`), is `--shadow-s`'s same color
  * idiom at a deliberately tighter blur/offset — see that token's own
  * comment for why: `--shadow-s`'s full 30px blur was measured crossing the
@@ -836,7 +836,7 @@
  *   resize's own preview is a size change already in progress under the
  *   pointer, and a simultaneous 105% scale on it would visibly fight the
  *   dimension the drag is actively editing. `scale: 1.05; rotate: 0.6deg;
- *   box-shadow: var(--obtask-lift-shadow)` are all static now, no `animation`: the
+ *   box-shadow: var(--isotask-lift-shadow)` are all static now, no `animation`: the
  *   press rule above already brought the pressed original to this same
  *   scale/shadow before the clone ever existed, so the clone just inherits
  *   the lifted look on the same frame it's inserted — only `rotate` is new
@@ -855,7 +855,7 @@
  *   one at the new slot never had `.ec-ghost` on it to revert from, and
  *   neither had a shadow, since `.ec-preview` — the only thing that ever
  *   carried one — is deleted, not moved, on drop). The actual "landing"
- *   flourish, shadow included, is the explicit `.obtask-dropped` animation
+ *   flourish, shadow included, is the explicit `.isotask-dropped` animation
  *   below (beat 3), tagged on unconditionally by the drop/resize handler
  *   regardless of whether EC reused or recreated the element; this `scale`
  *   reversion still fires alongside it on a reused element, harmlessly
@@ -864,19 +864,19 @@
 /*
  * Lift geometry tokens — see the arc comment above for why these are
  * variables rather than literals baked into each of the four rules that
- * consume them (press-lift, preview, ghost, `obtask-set` keyframe). Defined
+ * consume them (press-lift, preview, ghost, `isotask-set` keyframe). Defined
  * here with the values that read right on a narrow column (week/3-day/
  * month); `.ec-day-view` (below the ghost rule) overrides all three toward
  * neutral for the full-pane-width case.
  *
- * `--obtask-lift-shadow`: the lift's cast shadow, deliberately tighter than
+ * `--isotask-lift-shadow`: the lift's cast shadow, deliberately tighter than
  * `--shadow-s` (Obsidian's own floating-element shadow, `0 15px 30px` at its
  * largest layer — measured via an in-app computed-style probe). The float is
  * often flush against the PANE's own scroll container
- * (`.bases-view.obtask-calendar-view`, `overflow: auto`, Obsidian's own —
+ * (`.bases-view.isotask-calendar-view`, `overflow: auto`, Obsidian's own —
  * the one clipper this plugin cannot relax the way the day-view fix just
  * below relaxes `.ec-main`, because pane scrolling and dragScroll both rely
- * on it staying a scroller), and `.obtask-calendar`'s own `--size-4-4`
+ * on it staying a scroller), and `.isotask-calendar`'s own `--size-4-4`
  * padding (~16px) is the ENTIRE budget the shadow may paint into past a
  * flush-against-the-edge block. `--shadow-s`'s 30px blur was measured
  * crossing that pane edge in a narrow pane, where the hard clip line at
@@ -896,14 +896,14 @@
  * `rgba(0, 0, 0, 0.3)`, the same color Obsidian's own shadow tokens use) —
  * not a hardcoded rgba — keeps this themed like `--shadow-s` was.
  */
-.obtask-calendar {
-	--obtask-lift-scale: 1.05;
-	--obtask-lift-tilt: 0.6deg;
-	--obtask-ghost-scale: 0.97;
-	--obtask-lift-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+.isotask-calendar {
+	--isotask-lift-scale: 1.05;
+	--isotask-lift-tilt: 0.6deg;
+	--isotask-ghost-scale: 0.97;
+	--isotask-lift-shadow: 0 2px 8px var(--background-modifier-box-shadow);
 }
 
-.obtask-calendar .ec-preview {
+.isotask-calendar .ec-preview {
 	opacity: 0.9;
 }
 
@@ -912,16 +912,16 @@
  * Uses THIS rule's own transition (the destination state's — entering a
  * state runs the transition declared on the rule being entered, per normal
  * CSS transition semantics) rather than the base `.ec-event` rule's
- * `--obtask-motion-settle`, so the grab reads snappier than the slower
+ * `--isotask-motion-settle`, so the grab reads snappier than the slower
  * settle un-press/drop keeps: releasing removes the `:active` match, so the
  * base rule's own (slower) transition governs the way back down instead.
  */
-.obtask-calendar .ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active)) {
-	scale: var(--obtask-lift-scale);
-	box-shadow: var(--obtask-lift-shadow);
+.isotask-calendar .ec-event:active:not(.ec-ghost):not(:has(.ec-resizer:active)) {
+	scale: var(--isotask-lift-scale);
+	box-shadow: var(--isotask-lift-shadow);
 	transition:
-		scale var(--obtask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
-		box-shadow var(--obtask-motion, 160ms) ease;
+		scale var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
+		box-shadow var(--isotask-motion, 160ms) ease;
 }
 
 /*
@@ -931,12 +931,12 @@
  * had one of its own either. Rather than rely on a scale-only transition
  * that only ever fired for a REUSED element (see the "Ghost + landing"
  * bullet above), the drop/resize handler (`applyMove` in
- * `event-calendar-renderer.ts`) tags the landed element with `.obtask-
+ * `event-calendar-renderer.ts`) tags the landed element with `.isotask-
  * dropped` unconditionally, and this keyframe plays the whole landing
  * explicitly on it.
  *
  * The `from` restates the preview's exact float state — `scale: 1.05;
- * rotate: 0.6deg; box-shadow: var(--obtask-lift-shadow)` — so the clone's deletion
+ * rotate: 0.6deg; box-shadow: var(--isotask-lift-shadow)` — so the clone's deletion
  * hands off to the real element mid-air and the landing reads as one
  * continuous motion rather than a cut: scale and tilt relax to their
  * natural (unset) values while the shadow fades out, as if the block is
@@ -967,21 +967,21 @@
  * `classList.add` when the class is already present is a no-op, coalesced
  * by the browser before it ever reaches layout).
  *
- * `--obtask-motion-settle` is the same duration token the pickup/release
+ * `--isotask-motion-settle` is the same duration token the pickup/release
  * scale transition uses; under `prefers-reduced-motion` (see the
- * `--obtask-motion` guard at the end of this file) it's 0s, so the landing
+ * `--isotask-motion` guard at the end of this file) it's 0s, so the landing
  * resolves instantly rather than animating.
  */
-@keyframes obtask-set {
+@keyframes isotask-set {
 	from {
-		scale: var(--obtask-lift-scale);
-		rotate: var(--obtask-lift-tilt);
-		box-shadow: var(--obtask-lift-shadow);
+		scale: var(--isotask-lift-scale);
+		rotate: var(--isotask-lift-tilt);
+		box-shadow: var(--isotask-lift-shadow);
 	}
 }
 
-.obtask-calendar .ec-event.obtask-dropped {
-	animation: obtask-set var(--obtask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+.isotask-calendar .ec-event.isotask-dropped {
+	animation: isotask-set var(--isotask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /*
@@ -992,7 +992,7 @@
  * static/untransitioned — it marks the moment the block starts travelling.
  *
  * Specificity is load-bearing: the clone also matches the time-grid base
- * rule (`.obtask-calendar .ec-time-grid .ec-body .ec-event`, 0,4,0), whose
+ * rule (`.isotask-calendar .ec-time-grid .ec-body .ec-event`, 0,4,0), whose
  * `box-shadow: none` silently beat an earlier 3-class version of this
  * selector the moment Event Calendar re-slotted the clone inside `.ec-body`
  * — the reported "shadow disappears while dragging". `.ec.ec-dragging`
@@ -1000,14 +1000,14 @@
  * (both on the clone) lift this to 0,5,0 so it wins on weight, not on
  * source order.
  */
-.obtask-calendar .ec.ec-dragging .ec-event.ec-preview {
-	scale: var(--obtask-lift-scale);
-	rotate: var(--obtask-lift-tilt);
-	box-shadow: var(--obtask-lift-shadow);
+.isotask-calendar .ec.ec-dragging .ec-event.ec-preview {
+	scale: var(--isotask-lift-scale);
+	rotate: var(--isotask-lift-tilt);
+	box-shadow: var(--isotask-lift-shadow);
 }
 
-.obtask-calendar .ec-dragging .ec-ghost {
-	scale: var(--obtask-ghost-scale);
+.isotask-calendar .ec-dragging .ec-ghost {
+	scale: var(--isotask-ghost-scale);
 }
 
 /*
@@ -1033,10 +1033,10 @@
  * to near-neutral instead: barely-there scale, negligible tilt, and no
  * ghost-shrink at all. Week/3-day/month keep the defaults above unchanged.
  */
-.obtask-calendar .ec-day-view {
-	--obtask-lift-scale: 1.01;
-	--obtask-lift-tilt: 0.1deg;
-	--obtask-ghost-scale: 1;
+.isotask-calendar .ec-day-view {
+	--isotask-lift-scale: 1.01;
+	--isotask-lift-tilt: 0.1deg;
+	--isotask-ghost-scale: 1;
 }
 
 /*
@@ -1063,8 +1063,8 @@
  *
  * Still exceeds `.ec-main` today, even though both the shadow and the
  * day-view lift have since shrunk from what the probe above measured:
- * `--obtask-lift-shadow` (0 x-offset, 8px blur) alone paints 8px past the
- * block's left/right edges, and `--obtask-lift-scale: 1.01` on a
+ * `--isotask-lift-shadow` (0 x-offset, 8px blur) alone paints 8px past the
+ * block's left/right edges, and `--isotask-lift-scale: 1.01` on a
  * full-pane-width column (~900-1000px) adds another (1.01 − 1) / 2 ≈ 5px of
  * scale growth per side — roughly 13px of painted overflow past the
  * block's own edge. The block's margin to `.ec-main`'s edge is
@@ -1072,7 +1072,7 @@
  * 2 = 8px) plus the sub-pixel slack the probe above found between the
  * column edge and `.ec-main`'s own edge (~1px) — call it 9px total. 13px of
  * overflow against a 9px margin still clips, so this rule stays required;
- * revisit this arithmetic if either `--obtask-lift-shadow` or
+ * revisit this arithmetic if either `--isotask-lift-shadow` or
  * `--ec-event-col-gap` changes again.
  *
  * Safe to relax: this plugin always mounts Event Calendar with `height:
@@ -1101,7 +1101,7 @@
  * different scrolling ancestor (`.bases-view`/`.view-content`, both already
  * scroll containers) for the transient duration of the drag itself.
  */
-.obtask-calendar .ec.ec-day-view.ec-dragging .ec-main {
+.isotask-calendar .ec.ec-day-view.ec-dragging .ec-main {
 	overflow: visible;
 }
 
@@ -1177,7 +1177,7 @@
  * stylesheet `inline-size` override here at all, which is what desynced the
  * preview from real blocks before — see that landmine's history below).
  */
-.obtask-calendar .ec-time-grid .ec-body {
+.isotask-calendar .ec-time-grid .ec-body {
 	--ec-event-col-gap: calc(var(--size-4-2) * 2);
 }
 
@@ -1223,7 +1223,7 @@
  * see the base rule's own comment for the full arithmetic and the
  * resulting back-to-back gap.
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event {
+.isotask-calendar .ec-time-grid .ec-body .ec-event {
 	margin-block: var(--size-2-1);
 	margin-inline: calc(var(--ec-event-col-gap) / 2);
 }
@@ -1290,7 +1290,7 @@
  * required here specifically so the two borders' different widths don't
  * get cross-applied to the wrong axis.
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event[style*="inset-inline-start"]:not([style*="/ 1 * 1)"]) {
+.isotask-calendar .ec-time-grid .ec-body .ec-event[style*="inset-inline-start"]:not([style*="/ 1 * 1)"]) {
 	border-inline-start: var(--size-2-1) solid transparent;
 	background-clip: padding-box;
 	border-start-start-radius: calc(var(--radius-s) + var(--size-2-1)) var(--radius-s);
@@ -1335,9 +1335,9 @@
  * static` puts the title back in plain, in-flow flex layout, which is all
  * this fixed-height, always-short two-line block needs.
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event-body {
+.isotask-calendar .ec-time-grid .ec-body .ec-event-body {
 	overflow: hidden;
-	/* Containing block for `.obtask-event-marks` below — this box already
+	/* Containing block for `.isotask-event-marks` below — this box already
 	 * fills `.ec-event`'s own padded area exactly (`.ec-event-body`'s
 	 * vendored `inline-size: 100%` plus `.ec-event`'s default flex
 	 * `align-items: stretch`), so positioning against it rather than
@@ -1346,7 +1346,7 @@
 	position: relative;
 }
 
-.obtask-calendar .ec-time-grid .ec-body .ec-event-title {
+.isotask-calendar .ec-time-grid .ec-body .ec-event-title {
 	order: 1;
 	flex-shrink: 0;
 	position: static;
@@ -1357,17 +1357,17 @@
 
 /*
  * The priority mark sits absolutely positioned in this box's own top-right
- * corner (`.obtask-event-marks`, below) rather than in the title's own flex
+ * corner (`.isotask-event-marks`, below) rather than in the title's own flex
  * flow, so — unlike the day-grid/all-day row, where `margin-inline-start:
  * auto` on a real flex sibling naturally reserves room for it — nothing
  * here stops the title's own ellipsis from running text underneath the
- * mark. `:has(~ .obtask-event-marks)` (a later sibling — `event-content.ts`
+ * mark. `:has(~ .isotask-event-marks)` (a later sibling — `event-content.ts`
  * pushes the title node before the marks node) only reserves this padding
  * on events that actually render a mark, so a `normal`-priority block's
  * title still gets the full width. 1.6em comfortably clears the widest mark
  * ("!!" at the title's own font-size) plus a small gap before it.
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .obtask-event-marks) {
+.isotask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .isotask-event-marks) {
 	padding-inline-end: 1.6em;
 }
 
@@ -1380,7 +1380,7 @@
  * flow" pattern the priority pill (`.ec-event::before`, above) already
  * uses for this view.
  */
-.obtask-calendar .ec-time-grid .ec-body .obtask-event-marks {
+.isotask-calendar .ec-time-grid .ec-body .isotask-event-marks {
 	position: absolute;
 	inset-block-start: 0;
 	inset-inline-end: 0;
@@ -1400,12 +1400,12 @@
  * literal reported bug: without it, an overflowing label was hard-clipped
  * mid-character ("09:00–10:0") instead of trailing off with "…".
  */
-.obtask-calendar .ec-time-grid .ec-body .ec-event-time {
+.isotask-calendar .ec-time-grid .ec-body .ec-event-time {
 	order: 2;
 	flex-shrink: 0;
 	margin: var(--size-4-1) 0 0 0;
 	/* 0.83em (0.92em title × 0.9, rounded), same "one step smaller than the title"
-	 * ratio as the all-day row's `.obtask-event-time` above. */
+	 * ratio as the all-day row's `.isotask-event-time` above. */
 	font-size: 0.83em;
 	color: var(--text-muted);
 	overflow: hidden;
@@ -1471,8 +1471,8 @@
  * Chromium's container-query launch) and Obsidian mobile (iOS 16.4+
  * WebKit, Android Chromium WebView).
  */
-@container obtask-event (height < 3.05em) {
-	.obtask-calendar .ec-time-grid .ec-body .ec-event-time {
+@container isotask-event (height < 3.05em) {
+	.isotask-calendar .ec-time-grid .ec-body .ec-event-time {
 		display: none;
 	}
 }
@@ -1481,19 +1481,19 @@
  * Overlapping timed blocks split their column's width between them (Event
  * Calendar's own overlap layout), and on a narrow pane a 2-3 way split
  * leaves slivers a few characters wide — where the corner mark
- * (`.obtask-event-marks`, absolutely positioned top-right) rendered ON TOP
+ * (`.isotask-event-marks`, absolutely positioned top-right) rendered ON TOP
  * of the title's only visible character, and the 1.6em title clearance for
  * it ate most of the remaining line. Below ~5em of block width (em resolves
  * against the container's own `--font-ui-smaller` base) the mark loses its
  * seat: the title — the identifying part — keeps every pixel, the pill bar
  * still colors the sliver, and the mark is one tap away on the note itself.
  */
-@container obtask-event (width < 5em) {
-	.obtask-calendar .ec-time-grid .ec-body .obtask-event-marks {
+@container isotask-event (width < 5em) {
+	.isotask-calendar .ec-time-grid .ec-body .isotask-event-marks {
 		display: none;
 	}
 
-	.obtask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .obtask-event-marks) {
+	.isotask-calendar .ec-time-grid .ec-body .ec-event-title:has(~ .isotask-event-marks) {
 		padding-inline-end: 0;
 	}
 }
@@ -1511,7 +1511,7 @@
  * test), so scoping to `.ec-week-view` alone (no extra `.ec-time-grid`
  * needed) is enough to leave `.ec-day-view` on the rule above unaffected.
  */
-.obtask-calendar .ec-week-view .ec-body .ec-event-time {
+.isotask-calendar .ec-week-view .ec-body .ec-event-time {
 	display: none;
 }
 
@@ -1520,13 +1520,13 @@
  * single non-wrapping flex row in the library. Let its segments and button
  * groups wrap so it stays usable at phone widths and in narrow panes.
  */
-.obtask-calendar .ec-toolbar {
+.isotask-calendar .ec-toolbar {
 	flex-wrap: wrap;
 	row-gap: var(--size-4-2);
 	margin-block-end: var(--size-4-3);
 }
 
-.obtask-calendar .ec-toolbar > * {
+.isotask-calendar .ec-toolbar > * {
 	flex-wrap: wrap;
 	row-gap: var(--size-4-2);
 }
@@ -1551,18 +1551,18 @@
  * rounded parent — each is just a free-standing pill with its own full
  * `--button-radius`, `gap`-separated.
  */
-.obtask-calendar .ec-button-group {
+.isotask-calendar .ec-button-group {
 	display: inline-flex;
 	gap: var(--size-2-2);
 }
 
-.obtask-calendar .ec-button-group .ec-button:not(:first-child) {
+.isotask-calendar .ec-button-group .ec-button:not(:first-child) {
 	border-start-start-radius: var(--button-radius);
 	border-end-start-radius: var(--button-radius);
 	margin-inline-start: 0;
 }
 
-.obtask-calendar .ec-button-group .ec-button:not(:last-child) {
+.isotask-calendar .ec-button-group .ec-button:not(:last-child) {
 	border-start-end-radius: var(--button-radius);
 	border-end-end-radius: var(--button-radius);
 }
@@ -1582,7 +1582,7 @@
  * the view trio and leaves the prev/next pair on the plain unfused-button
  * rules above. Anchored on `.ec-timeGridWeek` rather than `.ec-dayGridMonth`
  * specifically so this still matches in a narrow pane's compact header
- * (`obtask-calendar--compact`, below), which drops the month button from
+ * (`isotask-calendar--compact`, below), which drops the month button from
  * `headerToolbar` entirely (`event-calendar-renderer.ts`) but always keeps
  * week + day.
  *
@@ -1612,14 +1612,14 @@
  * exactly inside the track's padding box, so the inset the radius math
  * assumes is the real one.
  */
-.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) {
+.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) {
 	gap: var(--size-2-1);
 	padding: var(--size-2-1);
 	border-radius: var(--radius-m);
 	background-color: var(--background-secondary);
 }
 
-.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button {
+.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button {
 	box-sizing: border-box;
 	background-color: transparent;
 	color: var(--text-muted);
@@ -1632,7 +1632,7 @@
 	border-radius: calc(var(--radius-m) - var(--size-2-1));
 }
 
-.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button:not(:disabled):hover {
+.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button:not(:disabled):hover {
 	background-color: transparent;
 	color: var(--text-normal);
 }
@@ -1640,7 +1640,7 @@
 /* Active tab: a flat tinted overlay, not a filled-accent pill (which would
  * read as a primary action rather than "the currently open view") and not
  * a raised card (see the shadow/darkness note above). */
-.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
+.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 	font-weight: var(--font-semibold);
@@ -1648,13 +1648,13 @@
 	box-shadow: none;
 }
 
-.obtask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active:not(:disabled):hover {
+.isotask-calendar .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active:not(:disabled):hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
 /*
- * Narrow-pane header compaction. `obtask-calendar--compact` is toggled by
+ * Narrow-pane header compaction. `isotask-calendar--compact` is toggled by
  * `calendar-view.ts` off the SAME `clientWidth` measurement
  * (`domain/calendar-view-options.ts`'s `COMPACT_CALENDAR_WIDTH`) that
  * decides whether month collapses to a rolling 3-day view — a pane-width
@@ -1668,27 +1668,27 @@
  * smaller gap between the today/prev/next group and the trio, so more of
  * the toolbar fits per row.
  *
- * `.obtask-calendar.obtask-calendar--compact` (two classes on the SAME
+ * `.isotask-calendar.isotask-calendar--compact` (two classes on the SAME
  * root element the base rules above already target with one) — specificity
  * 0,3,0 vs. their 0,2,0 — so these always win regardless of source order.
  */
-.obtask-calendar.obtask-calendar--compact .ec-toolbar {
+.isotask-calendar.isotask-calendar--compact .ec-toolbar {
 	row-gap: var(--size-4-1);
 	column-gap: var(--size-4-2);
 	margin-block-end: var(--size-4-2);
 }
 
-.obtask-calendar.obtask-calendar--compact .ec-title {
+.isotask-calendar.isotask-calendar--compact .ec-title {
 	font-size: var(--font-ui-medium);
 }
 
-.obtask-calendar.obtask-calendar--compact .ec-button {
+.isotask-calendar.isotask-calendar--compact .ec-button {
 	font-size: var(--font-ui-smaller);
 	padding: var(--size-2-2) var(--size-4-2);
 }
 
-.obtask-calendar.obtask-calendar--compact .ec-button[aria-label="Previous"],
-.obtask-calendar.obtask-calendar--compact .ec-button[aria-label="Next"] {
+.isotask-calendar.isotask-calendar--compact .ec-button[aria-label="Previous"],
+.isotask-calendar.isotask-calendar--compact .ec-button[aria-label="Next"] {
 	padding: var(--size-2-2) var(--size-2-2);
 }
 
@@ -1711,12 +1711,12 @@
  * kept, unchanged, purely for the horizontal "track" reveal around Day/3
  * days' unselected labels.
  */
-.obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) {
+.isotask-calendar.isotask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) {
 	padding: 0 var(--size-2-1);
 }
 
-.obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button,
-.obtask-calendar.obtask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
+.isotask-calendar.isotask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button,
+.isotask-calendar.isotask-calendar--compact .ec-button-group:has(.ec-timeGridWeek) .ec-button.ec-active {
 	font-size: var(--font-ui-smaller);
 	padding: var(--size-2-1) var(--size-4-2);
 }
@@ -1735,7 +1735,7 @@
  * two the title identifies the task while the time is one tap away in Day
  * view. Same trade compact month already makes by hiding chip titles.
  */
-.obtask-calendar.obtask-calendar--compact .ec-all-day .obtask-event-time {
+.isotask-calendar.isotask-calendar--compact .ec-all-day .isotask-event-time {
 	display: none;
 }
 
@@ -1746,7 +1746,7 @@
  * text, matching the day-of-week header row's `--font-ui-smaller` above so
  * every axis/legend label reads at the same quiet size.
  */
-.obtask-calendar .ec-time-grid .ec-sidebar {
+.isotask-calendar .ec-time-grid .ec-sidebar {
 	font-size: var(--font-ui-smaller);
 }
 
@@ -1762,11 +1762,11 @@
  * label ("13:00" 39px) — so it alone was holding the gutter open.
  * `event-calendar-renderer.ts`'s compact `slotLabelFormat` drops the hour
  * labels to a bare zero-padded 24-hour number ("13", 16px) and its compact
- * `allDayContent` swaps the label for the `.obtask-all-day-label` span
+ * `allDayContent` swaps the label for the `.isotask-all-day-label` span
  * targeted below — between the two, the column shrinks to the hour label's
  * width plus this tightened padding.
  */
-.obtask-calendar.obtask-calendar--compact .ec-time-grid .ec-sidebar {
+.isotask-calendar.isotask-calendar--compact .ec-time-grid .ec-sidebar {
 	padding-inline: var(--size-4-1);
 }
 
@@ -1786,8 +1786,8 @@
  * confirmed against the vendored stylesheet), so neither escapes to the
  * viewport corner.
  */
-.obtask-calendar.obtask-calendar--compact .obtask-all-day-label,
-.obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event-title {
+.isotask-calendar.isotask-calendar--compact .isotask-all-day-label,
+.isotask-calendar.isotask-calendar--compact .ec-day-grid .ec-event-title {
 	position: absolute;
 	inline-size: 1px;
 	block-size: 1px;
@@ -1845,7 +1845,7 @@
  * gap instead — see its comment, and the `--ec-row-height` arithmetic below
  * for how that value folds into the capacity math.
  */
-.obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event {
+.isotask-calendar.isotask-calendar--compact .ec-day-grid .ec-event {
 	pointer-events: none;
 	background-color: var(--background-modifier-hover);
 	box-shadow: none;
@@ -1870,12 +1870,12 @@
  * wide-pane chip; the pill spans the full cell width so the two edges are
  * the cell's own.
  */
-.obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event-body {
+.isotask-calendar.isotask-calendar--compact .ec-day-grid .ec-event-body {
 	padding: 0;
 	gap: var(--size-2-1);
 }
 
-.obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-event-body::before {
+.isotask-calendar.isotask-calendar--compact .ec-day-grid .ec-event-body::before {
 	margin-inline-end: 0;
 }
 
@@ -1906,7 +1906,7 @@
  * ~30 + 4*14 + 3*2 = 92px; pill 5's at ~30 + 5*14 + 4*2 = 108px. 100px sits
  * between the two, so four pills show and a fifth or later is hidden.
  */
-.obtask-calendar.obtask-calendar--compact .ec-day-grid .ec-main.ec-uniform {
+.isotask-calendar.isotask-calendar--compact .ec-day-grid .ec-main.ec-uniform {
 	--ec-row-height: 100px;
 }
 
@@ -1919,24 +1919,24 @@
  * otherwise compete with that tap for exactly the days this cap matters
  * most on.
  */
-.obtask-calendar.obtask-calendar--compact .ec-day-foot {
+.isotask-calendar.isotask-calendar--compact .ec-day-foot {
 	display: none;
 }
 
 /*
- * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` AND
- * `var(--obtask-motion-settle, 240ms)` transition/animation above. Both
+ * Reduced-motion opt-out for every `var(--isotask-motion, 120ms)` AND
+ * `var(--isotask-motion-settle, 240ms)` transition/animation above. Both
  * custom properties inherit, so zeroing them once here collapses every
- * transition beneath `.obtask-calendar` — pickup and settle alike — to 0s
+ * transition beneath `.isotask-calendar` — pickup and settle alike — to 0s
  * with no `!important` and no per-rule media query. The feed's own
- * equivalent guard (styles/obtask.css) covers the other view; the feed
+ * equivalent guard (styles/isotask.css) covers the other view; the feed
  * list's move/enter/exit animation (auto-animate) already gates itself on
  * this same media feature, so this keeps the whole plugin consistent with
  * it.
  */
 @media (prefers-reduced-motion: reduce) {
-	.obtask-calendar {
-		--obtask-motion: 0s;
-		--obtask-motion-settle: 0s;
+	.isotask-calendar {
+		--isotask-motion: 0s;
+		--isotask-motion-settle: 0s;
 	}
 }

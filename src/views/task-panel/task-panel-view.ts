@@ -381,7 +381,7 @@ export class TaskPanelView extends ItemView {
 		});
 		setTooltip(swatch, "Set project color");
 		if (dotColor.kind === "hex") {
-			swatch.setCssProps({ "--obtask-dot-color": dotColor.value });
+			swatch.setCssProps({ "--isotask-dot-color": dotColor.value });
 		}
 		swatch.addEventListener("click", () => {
 			new ProjectColorModal(this.deps.app, projectFile, () => {

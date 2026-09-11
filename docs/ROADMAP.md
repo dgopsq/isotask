@@ -15,7 +15,7 @@ one being functionally complete.
 - [x] Feed buckets (`domain/buckets.ts`) implemented and tested.
 - [x] Settings type, defaults and `parseSettings` (valibot, per-field fallback to defaults).
 - [x] Minimal `SettingsTab` (task folder, marker key/value, week start).
-- [x] `obtask-feed`/`obtask-calendar` Bases views registered and rendering directly from parsed
+- [x] `isotask-feed`/`isotask-calendar` Bases views registered and rendering directly from parsed
       tasks (bucket headers + plain rows for the feed; a placeholder count for the calendar) — no
       row actions/menus yet.
 - [x] `adapters/obsidian/bases-entries.ts`: maps `BasesEntry[]` to parsed `Task[]` via
@@ -112,6 +112,6 @@ are not in `package.json` yet — added back when the calendar adapter and recur
 - Time estimate property.
 - Archive folder on completion.
 - Daily-note "today" embed.
-- URI handler (`obsidian://obtask/new`).
+- URI handler (`obsidian://isotask/new`).
 - Kanban Bases view (Bases can already do a kanban-ish board via `groupBy`).
 - Live Preview status widget on task links.

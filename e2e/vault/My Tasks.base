@@ -4,7 +4,7 @@ filters:
     - status != "done"
     - file.inFolder("DocsDemo")
 views:
-  - type: obtask-feed
+  - type: isotask-feed
     name: Feed
     newItemFolder: DocsDemo
     order:
@@ -15,6 +15,6 @@ views:
       - priority
       - project
       - tags
-  - type: obtask-calendar
+  - type: isotask-calendar
     name: Calendar
     newItemFolder: DocsDemo

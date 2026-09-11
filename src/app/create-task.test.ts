@@ -8,7 +8,7 @@ import type { IsoDate, IsoDateTime, TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
-import type { ObtaskSettings } from "@/domain/settings";
+import type { IsotaskSettings } from "@/domain/settings";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { Minutes, RRuleString, TaskPath } from "@/domain/task";
 
@@ -24,14 +24,14 @@ function path(value: string): TaskPath {
 	return value as TaskPath;
 }
 
-function makeDeps(overrides: Partial<ObtaskSettings> = {}): {
+function makeDeps(overrides: Partial<IsotaskSettings> = {}): {
 	readonly deps: AppDeps;
 	readonly store: FakeTaskStore;
 } {
 	const store = new FakeTaskStore({ keys: DEFAULT_PROPERTY_KEYS, statuses: DEFAULT_STATUSES });
 	const clock = new FakeClock("2026-09-02T10:00" as IsoDateTime, "2026-09-02" as IsoDate);
 	const notifier = new FakeNotifier();
-	const settings: ObtaskSettings = { ...DEFAULT_SETTINGS, ...overrides };
+	const settings: IsotaskSettings = { ...DEFAULT_SETTINGS, ...overrides };
 	return { deps: { store, clock, notifier, history: new FakeRescheduleHistory(), settings: () => settings }, store };
 }
 

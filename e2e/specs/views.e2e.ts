@@ -11,7 +11,7 @@ import { BUCKET_LABELS, buildFixtures, noteContent } from "../fixtures.ts";
 import { BUCKET_ORDER } from "@/domain/buckets";
 import type { Bucket } from "@/domain/buckets";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
-import type { ObtaskSettings } from "@/domain/settings";
+import type { IsotaskSettings } from "@/domain/settings";
 import { PALETTE, paletteColorClass } from "@/domain/project-color";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
@@ -142,7 +142,7 @@ async function waitForFrontmatter(path: string, key: string, predicate: (value: 
 	);
 }
 
-/** Clicks a feed row cell (by its `obtask-feed__*` class) in the row identified by title text (there's no per-row selector to key off otherwise). Native `.click()` inside the Obsidian window fires the same listeners a real click would. */
+/** Clicks a feed row cell (by its `isotask-feed__*` class) in the row identified by title text (there's no per-row selector to key off otherwise). Native `.click()` inside the Obsidian window fires the same listeners a real click would. */
 async function clickFeedCell(cellCls: string, title: string): Promise<void> {
 	const clicked = await browser.execute(
 		(rowCls, titleCls, cls, wantedTitle) => {
@@ -244,12 +244,12 @@ async function clickFeedStatusControl(title: string): Promise<void> {
 }
 
 /**
- * Reads a feed row's priority mark text and classes (`.obtask-feed__priority`
+ * Reads a feed row's priority mark text and classes (`.isotask-feed__priority`
  * — a clickable `feed__priority--empty` control rendering a muted icon
  * instead of a mark for a `normal` task, see `feed-view.ts#renderPriorityControl`)
- * and its project label's class list (`.obtask-feed__project`,
+ * and its project label's class list (`.isotask-feed__project`,
  * `feed-view.ts#renderProjectLink` — carries the project's resolved color
- * as a palette class or a scoped `--obtask-dot-color`, replacing the old
+ * as a palette class or a scoped `--isotask-dot-color`, replacing the old
  * leading dot), by the row's title text — same lookup technique as
  * `clickFeedPriorityControl`.
  */
@@ -465,7 +465,7 @@ async function deleteNoteIfExists(path: string): Promise<void> {
  * technique, which absorbs the same click-races-the-toolbar-reattaching
  * flake documented on that helper. The Tasks.base fixture names this view
  * instance "Feed" (`e2e/vault/Tasks.base`), not the plugin's registered
- * view-type name ("Obtask feed" — `views/bases/register.ts`).
+ * view-type name ("Isotask feed" — `views/bases/register.ts`).
  */
 async function reopenFeedView(): Promise<void> {
 	await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
@@ -556,7 +556,7 @@ describe("Views", function () {
 			// `execute()` callbacks run inside the Obsidian window, not this Node
 			// process, so the plugin-id-derived class names must be passed in as
 			// arguments rather than closed over.
-			// Headers/rows are children of the reconciled list (`.obtask-feed__list`,
+			// Headers/rows are children of the reconciled list (`.isotask-feed__list`,
 			// `feed-view.ts`'s `listEl`), not the outer view container.
 			structure = await browser.execute(
 				(listCls, bucketCls, rowCls, rowInvalidCls, titleCls) => {
@@ -701,7 +701,7 @@ describe("Views", function () {
 		 * `feed-view.ts#renderPriorityControl`): `urgent` -> "!!", `high` ->
 		 * "!" (already covered above via the "Overdue task" fixture), `normal`
 		 * -> the same clickable control with a muted "no priority" icon
-		 * (`priorityIcon("normal")`, `.obtask-feed__priority--empty`) instead
+		 * (`priorityIcon("normal")`, `.isotask-feed__priority--empty`) instead
 		 * of a `!`/`!!` text mark — no longer inert.
 		 */
 		it('renders "!!" for an urgent-priority row and a "no priority" icon control for a normal-priority row', async function () {
@@ -729,23 +729,23 @@ describe("Views", function () {
 		});
 
 		/**
-		 * The feed's project label (`.obtask-feed__project`,
+		 * The feed's project label (`.isotask-feed__project`,
 		 * `feed-view.ts#renderProjectLink`) — no more leading dot; the label
 		 * itself carries the project's color, coloured by
 		 * `domain/project-color.ts#resolveDotColor`:
 		 *
 		 * - "Overdue task" (`project: Q3 Launch`) resolves to
 		 *   `e2e/vault/Q3 Launch.md`, which sets `color: red` explicitly ->
-		 *   `obtask-color-red`.
+		 *   `isotask-color-red`.
 		 * - "Later task" (`project: Design Revamp`) resolves to
 		 *   `e2e/vault/Design Revamp.md`, which sets no `color` at all -> the
 		 *   hashed palette fallback (`hashPaletteColor`) — some
-		 *   `obtask-color-*` class, not a specific one (the hash is FROZEN
+		 *   `isotask-color-*` class, not a specific one (the hash is FROZEN
 		 *   but asserting the exact color here would just be re-deriving the
 		 *   algorithm rather than testing behaviour).
 		 * - "No date task" has no `project` frontmatter at all -> the empty
 		 *   placeholder span (`feed__project--empty`), which gets no
-		 *   `obtask-color-*` class.
+		 *   `isotask-color-*` class.
 		 *
 		 * Also asserts the old leading dot element is gone entirely.
 		 */
@@ -773,7 +773,7 @@ describe("Views", function () {
 			const noProjectMarkers = await readFeedRowMarkers(noProjectTask.title);
 			expect(noProjectMarkers?.projectClasses.some((cls) => paletteClasses.includes(cls))).toBe(false);
 
-			const dotEl = await browser.execute(() => document.querySelector(".obtask-feed__dot"));
+			const dotEl = await browser.execute(() => document.querySelector(".isotask-feed__dot"));
 			expect(dotEl).toBeNull();
 		});
 
@@ -947,7 +947,7 @@ describe("Views", function () {
 
 		/**
 		 * The feed's narrow-pane compaction feature: below `COMPACT_FEED_WIDTH`
-		 * (`domain/feed-view-options.ts`), `.obtask-feed__row` drops its subgrid
+		 * (`domain/feed-view-options.ts`), `.isotask-feed__row` drops its subgrid
 		 * columns for a two-line layout — status + title on the first line, the
 		 * metadata chips (date/priority/project/tags/generic) wrapped onto a
 		 * second — instead of the wide layout's permanent horizontal scrollbar.
@@ -1062,7 +1062,7 @@ describe("Views", function () {
 		 * Bottom` never gets a chance to apply since the row is filtered out
 		 * upstream of the view). So (a) asserts disappearance rather than
 		 * bucket position, and (b) reopens the note through the
-		 * `obtask:toggle-done` command (rather than a second click on a
+		 * `isotask:toggle-done` command (rather than a second click on a
 		 * control that no longer exists in the DOM) before asserting the row
 		 * comes back.
 		 *
@@ -1192,9 +1192,9 @@ describe("Views", function () {
 
 			it("reopens the task via the toggle-done command and its row reappears", async function () {
 				await openFile(path);
-				await browser.executeObsidianCommand("obtask:toggle-done");
+				await browser.executeObsidianCommand("isotask:toggle-done");
 
-				await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never became todo via obtask:toggle-done`);
+				await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never became todo via isotask:toggle-done`);
 				const fm = await frontmatterOf(path);
 				expect(fm?.["status"]).toEqual("todo");
 				expect(fm?.["completed"]).toBeUndefined();
@@ -1222,7 +1222,7 @@ describe("Views", function () {
 	 * alone (no manual `onDataUpdated()` call) is enough; Bases owns config
 	 * reactivity and calls back into the view itself. `feed-view.ts` needed no
 	 * change for this. Does not drive Bases' own view-options panel UI (that's
-	 * Bases' DOM, not obtask's) — flips the option programmatically instead,
+	 * Bases' DOM, not isotask's) — flips the option programmatically instead,
 	 * via an internal (undocumented, not in `obsidian.d.ts`) path found by
 	 * inspecting the runtime "bases" leaf's prototype chain: the leaf's own
 	 * view wraps a `controller` whose `.view` is the actual registered
@@ -1449,11 +1449,11 @@ describe("Views", function () {
 
 	/**
 	 * `.ec` is Event Calendar's own root class (rendered inside our
-	 * `.obtask-calendar` wrapper — see `calendar-view.ts`); `.ec-event` is
+	 * `.isotask-calendar` wrapper — see `calendar-view.ts`); `.ec-event` is
 	 * its per-event element, which carries the extra classes
 	 * `event-calendar-mapping.ts#toEventCalendarEvent` attaches
-	 * (`obtask-event`, `obtask-event--due`/`--scheduled`,
-	 * `obtask-priority-*`) alongside Event Calendar's own. Reads every
+	 * (`isotask-event`, `isotask-event--due`/`--scheduled`,
+	 * `isotask-priority-*`) alongside Event Calendar's own. Reads every
 	 * rendered event's title text + full class list in one pass so a test
 	 * can filter/assert without a second round trip into the Obsidian window.
 	 */
@@ -1472,7 +1472,7 @@ describe("Views", function () {
 	 * The week/day all-day row's chips, in DOM order (which is also their
 	 * on-screen top-to-bottom order — see `sortCalendarEvents`,
 	 * `domain/calendar-events.ts`). `time` reads `event-content.ts`'s custom
-	 * `.obtask-event-time` label (empty string for a date-only chip, which
+	 * `.isotask-event-time` label (empty string for a date-only chip, which
 	 * carries no such element), separately from `.ec-event-title`'s own
 	 * text — the title is no longer prefixed with the time, see ADR 0011's
 	 * update and the "renders a timed due..." test below.
@@ -1497,7 +1497,7 @@ describe("Views", function () {
 	 * failure modes: the title squeezed out entirely (a 390px-wide column
 	 * once rendered only the time, e.g. "11:45"), and the later wrap
 	 * regression that put the title on a line under the leading project dot.
-	 * A date-only chip (no `.obtask-event-time` node) is skipped, not
+	 * A date-only chip (no `.isotask-event-time` node) is skipped, not
 	 * asserted on — it never had either problem.
 	 */
 	async function readTimedAllDayChipLayouts(): Promise<
@@ -1652,7 +1652,7 @@ describe("Views", function () {
 			}
 		});
 
-		it("renders the Event Calendar root inside .obtask-calendar, in the default month view", async function () {
+		it("renders the Event Calendar root inside .isotask-calendar, in the default month view", async function () {
 			await expect(browser.$(`.${cssClass("calendar")} .ec`)).toExist();
 			// Month view renders an `.ec-day-grid` grid and no `.ec-week-view` —
 			// the inverse of the "week" assertion below.
@@ -1746,9 +1746,9 @@ describe("Views", function () {
 		 * Calendar event colouring follows the task's project, not its
 		 * priority (2026-08-31 rework — see `domain/project-color.ts`). "Write
 		 * M1 plan" is `priority: high` (still colours its `!` mark
-		 * `obtask-priority-high`, `event-content.ts`) but its `project:
+		 * `isotask-priority-high`, `event-content.ts`) but its `project:
 		 * "Q3 Launch"` resolves to `e2e/vault/Q3 Launch.md` (`color: red`), so
-		 * the event's dot/pill gets `obtask-color-red` — a colour completely
+		 * the event's dot/pill gets `isotask-color-red` — a colour completely
 		 * independent of the `high` priority, proving the dot no longer
 		 * reads priority at all (the pre-rework CSS keyed a `high`-priority
 		 * event's dot to `--color-orange` directly; that mapping is gone).
@@ -1885,7 +1885,7 @@ describe("Views", function () {
 		 * Day view's time grid is the same `.ec-time-grid` theme as week
 		 * (just one column instead of seven — see the `ec-week-view` test
 		 * above), so it renders the same timed blocks with the same
-		 * `@container obtask-event` height-query rule (`calendar.css`) that
+		 * `@container isotask-event` height-query rule (`calendar.css`) that
 		 * hides `.ec-event-time` in a too-short block. "Team sync" (1-hour,
 		 * `slotHeight: 32` -> ~32px block) is below the rule's 3.5em/~42px
 		 * threshold and must hide its time line; "Planning session"
@@ -1964,7 +1964,7 @@ describe("Views", function () {
 		 * zero-duration point event (a timed `due`, or a timed `scheduled`
 		 * with no `duration`) renders as an all-day chip rather than a
 		 * colliding marker in the time-grid body; per the follow-up fix, its
-		 * time is shown as a separate `.obtask-event-time` label
+		 * time is shown as a separate `.isotask-event-time` label
 		 * (`event-content.ts`) rather than prefixed onto the title — this
 		 * asserts both the chip placement (present in `.ec-all-day`, absent
 		 * from `.ec-time-grid .ec-body`) and that split rendering (the time
@@ -2035,7 +2035,7 @@ describe("Views", function () {
 			expect(chips[lateIndex]?.time).toBe("11:45");
 			expect(chips[deadlineIndex]?.time).toBe("14:30");
 
-			// Every date-only chip (no `.obtask-event-time` label, e.g. "Today
+			// Every date-only chip (no `.isotask-event-time` label, e.g. "Today
 			// task") comes before every timed chip — checked as "the last
 			// date-only chip's index is before the first timed chip's index"
 			// rather than a hard-coded date-only title list, since which
@@ -2083,7 +2083,7 @@ describe("Views", function () {
 		 */
 		async function reopenCalendarView(): Promise<void> {
 			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks.base", "", false));
-			// Wait on the toolbar, not `.obtask-feed`: the base reopens on
+			// Wait on the toolbar, not `.isotask-feed`: the base reopens on
 			// whichever view type it last showed (usually the calendar here),
 			// and views now remove their container class on unload, so the
 			// feed class is only present when the feed is actually mounted.
@@ -2497,14 +2497,14 @@ describe("Views", function () {
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: `Today task's on-disk "due" never became ${targetDate} after the drag` },
 			);
 
-			await browser.executeObsidianCommand("obtask:undo-reschedule");
+			await browser.executeObsidianCommand("isotask:undo-reschedule");
 			await browser.waitUntil(
 				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === originalDue,
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Undo last calendar reschedule" never restored the original due date' },
 			);
 			expect(await frontmatterValueOnDisk("Tasks/Today task.md", "due")).toEqual(originalDue);
 
-			await browser.executeObsidianCommand("obtask:redo-reschedule");
+			await browser.executeObsidianCommand("isotask:redo-reschedule");
 			await browser.waitUntil(
 				async () => (await frontmatterValueOnDisk("Tasks/Today task.md", "due")) === targetDate,
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: '"Redo last calendar reschedule" never re-applied the dragged due date' },
@@ -3487,7 +3487,7 @@ describe("Actions", function () {
 		});
 
 		it("marks the original done and spawns the next occurrence", async function () {
-			await browser.executeObsidianCommand("obtask:complete-task");
+			await browser.executeObsidianCommand("isotask:complete-task");
 
 			await waitForFrontmatter(originalPath, "status", (v) => v === "done", "original task never reached status=done");
 			const originalFm = await frontmatterOf(originalPath);
@@ -3513,7 +3513,7 @@ describe("Actions", function () {
 			// The original is already status=done; re-running complete-task is a
 			// same-status no-op in applyStatusChange (domain/transitions.ts), so
 			// no second spawn should appear.
-			await browser.executeObsidianCommand("obtask:complete-task");
+			await browser.executeObsidianCommand("isotask:complete-task");
 
 			// There's no state transition to poll for here (it's a no-op), so
 			// give the fire-and-forget command a moment to have run by polling
@@ -3553,7 +3553,7 @@ describe("Actions", function () {
 		});
 
 		it("adds the task marker, an open status and a created date", async function () {
-			await browser.executeObsidianCommand("obtask:convert-note-to-task");
+			await browser.executeObsidianCommand("isotask:convert-note-to-task");
 
 			await waitForFrontmatter(path, "type", (v) => v === "task", "note was never converted (type: task missing)");
 			const fm = await frontmatterOf(path);
@@ -3576,7 +3576,7 @@ describe("Actions", function () {
 		});
 
 		it("creates a task from the modal and opens it", async function () {
-			await browser.executeObsidianCommand("obtask:create-task");
+			await browser.executeObsidianCommand("isotask:create-task");
 			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
 
 			const titleInput = await inputAt(modalCls, "text", 0);
@@ -3622,7 +3622,7 @@ describe("Actions", function () {
 		});
 
 		it("suggests an existing note in the Project field and fills in its basename on selection", async function () {
-			await browser.executeObsidianCommand("obtask:create-task");
+			await browser.executeObsidianCommand("isotask:create-task");
 			await browser.$(`.${modalCls}`).waitForExist({ timeout: SELECT_TIMEOUT });
 
 			// Project lives behind "More options" — there's exactly one toggle
@@ -3669,12 +3669,12 @@ describe("Actions", function () {
 			// (`domain/status.ts#toggleStatus`), letting this test tell "settings
 			// re-read after reload" apart from "still running on the old,
 			// cached list".
-			const newSettings: ObtaskSettings = {
+			const newSettings: IsotaskSettings = {
 				...DEFAULT_SETTINGS,
 				statuses: [{ id: "waiting" as StatusId, label: "Waiting", kind: "open" }, ...DEFAULT_STATUSES],
 			};
 
-			// ObtaskPlugin exposes no public settings setter (`saveSettings` is
+			// IsotaskPlugin exposes no public settings setter (`saveSettings` is
 			// private), so settings are round-tripped the same way a user's
 			// hand-edited data.json would be: persist via the inherited public
 			// `Plugin.saveData`, then force a reload so `onload` -> `loadSettings`
@@ -3682,10 +3682,10 @@ describe("Actions", function () {
 			// obsidian.d.ts's public types, hence the cast — same allowance
 			// AGENTS.md gives `app.plugins.getPlugin` in e2e).
 			await browser.executeObsidian(
-				async ({ app, plugins }, settings: ObtaskSettings) => {
-					const plugin = plugins["obtask"];
+				async ({ app, plugins }, settings: IsotaskSettings) => {
+					const plugin = plugins["isotask"];
 					if (plugin === undefined) {
-						throw new Error("obtask plugin is not installed");
+						throw new Error("isotask plugin is not installed");
 					}
 					await plugin.saveData(settings);
 					const internalPlugins = (app as unknown as {
@@ -3694,8 +3694,8 @@ describe("Actions", function () {
 							enablePlugin: (id: string) => Promise<void>;
 						};
 					}).plugins;
-					await internalPlugins.disablePlugin("obtask");
-					await internalPlugins.enablePlugin("obtask");
+					await internalPlugins.disablePlugin("isotask");
+					await internalPlugins.enablePlugin("isotask");
 				},
 				newSettings,
 			);
@@ -3707,10 +3707,10 @@ describe("Actions", function () {
 			// Complete, then reopen: the reopen step is the one that resolves
 			// `firstOpenStatus`, so its result is what actually proves the
 			// reloaded list (with "waiting" first) was read.
-			await browser.executeObsidianCommand("obtask:complete-task");
+			await browser.executeObsidianCommand("isotask:complete-task");
 			await waitForFrontmatter(path, "status", (v) => v === "done", "expected status=done before reopening");
 
-			await browser.executeObsidianCommand("obtask:toggle-done");
+			await browser.executeObsidianCommand("isotask:toggle-done");
 			await waitForFrontmatter(path, "status", (v) => v === "waiting", 'expected status="waiting" after reload');
 			const fm = await frontmatterOf(path);
 			expect(fm?.["status"]).toEqual("waiting");
@@ -3724,7 +3724,7 @@ describe("Actions", function () {
 		it("does not overwrite an existing tasks base", async function () {
 			const contentBefore = await readFileContent(path);
 
-			await browser.executeObsidianCommand("obtask:create-tasks-base");
+			await browser.executeObsidianCommand("isotask:create-tasks-base");
 
 			// Poll rather than a single waitForExist: a `.notice` from an
 			// earlier action in this suite could still be in the DOM, so check

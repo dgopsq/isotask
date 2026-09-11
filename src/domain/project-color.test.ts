@@ -121,9 +121,9 @@ describe("paletteColorClass", () => {
 });
 
 describe("dotColorClasses", () => {
-	it("maps a palette DotColor to one obtask-color-<name> class", () => {
+	it("maps a palette DotColor to one isotask-color-<name> class", () => {
 		const dotColor: DotColor = { kind: "palette", name: "green" };
-		expect(dotColorClasses(dotColor)).toEqual(["obtask-color-green"]);
+		expect(dotColorClasses(dotColor)).toEqual(["isotask-color-green"]);
 	});
 
 	it("maps a hex DotColor to no classes (applied directly as a custom property instead — see the doc comment)", () => {

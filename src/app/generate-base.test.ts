@@ -15,11 +15,11 @@ import type { StatusId } from "@/domain/task";
  */
 const EXPECTED_DEFAULT_BASE =
 	'filters:\n  and:\n    - type == "task"\n    - status != "done"\nviews:\n' +
-	"  - type: obtask-feed\n    name: Feed\n    newItemFolder: Tasks\n    order:\n      - file.name\n      - status\n      - due\n      - scheduled\n      - priority\n      - project\n      - tags\n" +
-	"  - type: obtask-calendar\n    name: Calendar\n    newItemFolder: Tasks\n  - type: table\n" +
+	"  - type: isotask-feed\n    name: Feed\n    newItemFolder: Tasks\n    order:\n      - file.name\n      - status\n      - due\n      - scheduled\n      - priority\n      - project\n      - tags\n" +
+	"  - type: isotask-calendar\n    name: Calendar\n    newItemFolder: Tasks\n  - type: table\n" +
 	"    name: All tasks\n    order:\n      - file.name\n      - status\n      - priority\n      - due\n      - scheduled\n";
 
-const viewTypes = { feed: "obtask-feed", calendar: "obtask-calendar" };
+const viewTypes = { feed: "isotask-feed", calendar: "isotask-calendar" };
 
 describe("renderTasksBase", () => {
 	it("matches e2e/vault/Tasks.base byte for byte with the default settings", () => {
@@ -51,7 +51,7 @@ describe("renderTasksBase", () => {
 		const keys = { ...DEFAULT_PROPERTY_KEYS, due: "deadline" };
 		const result = renderTasksBase(keys, DEFAULT_STATUSES, viewTypes, "Tasks");
 		expect(result).toContain(
-			"  - type: obtask-feed\n    name: Feed\n    newItemFolder: Tasks\n    order:\n      - file.name\n      - status\n      - deadline\n      - scheduled\n      - priority\n      - project\n      - tags\n",
+			"  - type: isotask-feed\n    name: Feed\n    newItemFolder: Tasks\n    order:\n      - file.name\n      - status\n      - deadline\n      - scheduled\n      - priority\n      - project\n      - tags\n",
 		);
 	});
 

@@ -33,7 +33,7 @@ Positive:
 Negative:
 - Event Calendar's internal rendering uses Svelte; that runtime is bundled but scoped entirely
   inside the adapter and invisible to the rest of the app, consistent with ADR 0004's "no
-  framework for obtask's own UI" — it isn't obtask's own UI, it's a wrapped third-party widget.
+  framework for isotask's own UI" — it isn't isotask's own UI, it's a wrapped third-party widget.
 - The port's method surface has to anticipate what a calendar widget can do generically (mount,
   set events, click/drop/resize callbacks); an Event-Calendar-specific feature that doesn't fit
   the port abstraction can't be used without widening the port.

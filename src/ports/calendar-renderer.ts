@@ -69,7 +69,7 @@ export interface CalendarHandle {
 	 */
 	readonly getView: () => CalendarViewKind;
 	/**
-	 * Added in M3 Wave 3: the `obtask-calendar` view resolves `firstDay:
+	 * Added in M3 Wave 3: the `isotask-calendar` view resolves `firstDay:
 	 * "default"` to `getWeekStart()` and re-applies it on every
 	 * `onDataUpdated` (a `firstDay` config change re-renders like any other
 	 * option), without remounting — remounting would lose the user's

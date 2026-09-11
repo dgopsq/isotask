@@ -27,7 +27,7 @@ time-grid pill) — that slot now belongs to project color (ADR 0015). Instead,
 `domain/task.ts#priorityMarks` renders a text mark at the right of a card: `normal` -> `""`, `high`
 -> `"!"`, `urgent` -> `"!!"`, colored via the existing `priorityChipClass` mapping (`high` ->
 `--color-orange`, `urgent` -> `--color-red`). A `normal` task's control still occupies its grid
-cell — an empty, inert placeholder span (`obtask-feed__priority obtask-feed__priority--empty`),
+cell — an empty, inert placeholder span (`isotask-feed__priority isotask-feed__priority--empty`),
 not a fully-omitted element, so a mixed-priority feed's later columns (project, tags) stay
 column-aligned across rows — but it renders no mark, no click target, and no color. Editing
 priority (the row's priority menu, the task panel, the "Set priority" command) is unaffected by
@@ -55,7 +55,7 @@ Negative:
   unmarked makes `low`/`normal` indistinguishable anyway.
 - **Match Apple's exact scale (`low` = `!`, `medium` = `!!`, `high` = `!!!`).** Rejected: this
   still needs a distinct `none` state below `low`, i.e. 4 levels — the problem above, just
-  renamed. Keeping obtask's existing `high`/`urgent` identifiers and dropping only `low` avoids
+  renamed. Keeping isotask's existing `high`/`urgent` identifiers and dropping only `low` avoids
   renaming everything that already uses `Priority`.
 - **Keep priority driving dot/bar color, add project color as a second dot.** Rejected: one card
   has one dot slot (ADR 0015); two independently-colored dots read as noise, not two signals.

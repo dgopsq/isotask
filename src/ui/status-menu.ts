@@ -9,7 +9,7 @@ import type { StatusId } from "@/domain/task";
  * status isn't `done`-kind, "Reopen" when it is. Picks the target via
  * `domain/status.ts#toggleStatus`; adds nothing when there's no configured
  * target to toggle to (e.g. no `done`/`open` status configured). Shared by
- * the feed row's context menu and the file-menu "Obtask" section.
+ * the feed row's context menu and the file-menu "Isotask" section.
  */
 export function addDoneMenuItem(
 	menu: Menu,

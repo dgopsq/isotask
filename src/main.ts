@@ -1,7 +1,7 @@
 import { Plugin } from "obsidian";
 
 import "@/styles/calendar.css";
-import "@/styles/obtask.css";
+import "@/styles/isotask.css";
 
 import { EventCalendarRenderer } from "@/adapters/calendar/event-calendar/event-calendar-renderer";
 import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
@@ -25,9 +25,9 @@ import { makeToggleDone } from "@/app/toggle-done";
 import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
 import { parseSettings } from "@/domain/settings";
-import type { ObtaskSettings } from "@/domain/settings";
+import type { IsotaskSettings } from "@/domain/settings";
 import { VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
-import { ObtaskSettingTab } from "@/settings/settings-tab";
+import { IsotaskSettingTab } from "@/settings/settings-tab";
 import { registerViews } from "@/views/bases/register";
 import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
 import { TASK_PANEL_ICON, TaskPanelView } from "@/views/task-panel/task-panel-view";
@@ -35,12 +35,12 @@ import { TASK_PANEL_ICON, TaskPanelView } from "@/views/task-panel/task-panel-vi
 /**
  * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads
  * settings, builds the adapters and `app` use-cases, registers the Bases
- * views, commands, the "Obtask" file/editor-menu section and the settings
+ * views, commands, the "Isotask" file/editor-menu section and the settings
  * tab. Everything registered through `register*`/`add*` is torn down
  * automatically on unload — there is nothing to clean up manually here.
  */
-export default class ObtaskPlugin extends Plugin {
-	private pluginSettings: ObtaskSettings = parseSettings(undefined);
+export default class IsotaskPlugin extends Plugin {
+	private pluginSettings: IsotaskSettings = parseSettings(undefined);
 
 	override async onload(): Promise<void> {
 		await this.loadSettings();
@@ -167,7 +167,7 @@ export default class ObtaskPlugin extends Plugin {
 		});
 
 		this.addSettingTab(
-			new ObtaskSettingTab(this.app, this, {
+			new IsotaskSettingTab(this.app, this, {
 				getSettings: () => this.pluginSettings,
 				setSettings: (settings) => this.saveSettings(settings),
 			}),
@@ -179,7 +179,7 @@ export default class ObtaskPlugin extends Plugin {
 		this.pluginSettings = parseSettings(raw);
 	}
 
-	private async saveSettings(settings: ObtaskSettings): Promise<void> {
+	private async saveSettings(settings: IsotaskSettings): Promise<void> {
 		this.pluginSettings = settings;
 		await this.saveData(settings);
 	}

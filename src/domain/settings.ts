@@ -7,7 +7,7 @@ import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
 
-export interface ObtaskSettings {
+export interface IsotaskSettings {
 	readonly version: 1;
 	readonly taskFolder: string;
 	readonly tasksBasePath: string;
@@ -25,7 +25,7 @@ export interface ObtaskSettings {
 	readonly taskPanelIntroduced: boolean;
 }
 
-export const DEFAULT_SETTINGS: ObtaskSettings = {
+export const DEFAULT_SETTINGS: IsotaskSettings = {
 	version: 1,
 	taskFolder: "Tasks",
 	tasksBasePath: "Tasks.base",
@@ -111,14 +111,14 @@ function toStatusConfig(status: ParsedStatusConfig): StatusConfig {
 }
 
 /**
- * Parses persisted plugin data into `ObtaskSettings`, falling back to the
+ * Parses persisted plugin data into `IsotaskSettings`, falling back to the
  * default for any field that's missing or fails validation — so a corrupt
  * or hand-edited `data.json` never breaks the plugin. `statuses` falls back
  * as a whole (rather than item-by-item): it must be a non-empty list of
  * status configs with unique ids and at least one `open` and one `done`
  * kind, or the entire list reverts to `DEFAULT_STATUSES`.
  */
-export function parseSettings(raw: unknown): ObtaskSettings {
+export function parseSettings(raw: unknown): IsotaskSettings {
 	if (typeof raw !== "object" || raw === null) {
 		return DEFAULT_SETTINGS;
 	}
@@ -127,7 +127,7 @@ export function parseSettings(raw: unknown): ObtaskSettings {
 		return {
 			...parsed,
 			statuses: parsed.statuses.map(toStatusConfig),
-		} satisfies ObtaskSettings;
+		} satisfies IsotaskSettings;
 	} catch {
 		return DEFAULT_SETTINGS;
 	}

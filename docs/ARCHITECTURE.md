@@ -1,6 +1,6 @@
 # Architecture
 
-This design was decided on 2026-08-29. Obtask is hexagonal (ports and adapters) with a
+This design was decided on 2026-08-29. Isotask is hexagonal (ports and adapters) with a
 functional core / imperative shell split. There is no framework and no Effect — the core is
 plain TypeScript functions over immutable data.
 
@@ -38,11 +38,11 @@ src/
                note-scoped commands use `checkCallback` + the active file's frontmatter to hide
                themselves off a non-task note.
   settings/    SettingsTab (Setting API), settings type + defaults + migration.
-  styles/      obtask.css, calendar.css (theme-variable mappings only).
+  styles/      isotask.css, calendar.css (theme-variable mappings only).
   main.ts      composition root.
 ```
 
-**`ObtaskSettings` lives in `src/domain/settings.ts`**, not `src/adapters/obsidian/settings.ts`: it's
+**`IsotaskSettings` lives in `src/domain/settings.ts`**, not `src/adapters/obsidian/settings.ts`: it's
 pure valibot validation with no Obsidian dependency, so the domain layer owns it (`app` may not
 import `adapters`, and `AppDeps.settings()` needs the type). `src/adapters/obsidian/settings.ts`
 re-exports it unchanged so existing `@/adapters/obsidian/settings` imports keep working.
@@ -55,7 +55,7 @@ arguments, wired up in `main.ts`.
 ## Data flow: Bases feed view render path
 
 ```
-Bases (.base file)                     obtask-feed BasesView
+Bases (.base file)                     isotask-feed BasesView
 ┌─────────────────────┐   entries      ┌──────────────────────────────┐
 │ filters/sort/group   ├───────────────▶ for each entry:              │
 │ (owned by Bases)     │                │   entry.file                │
@@ -110,7 +110,7 @@ via `BasesViewConfig.get(key)` inside `onDataUpdated()`, parsed by
 
 **Finding (verified empirically in `e2e/specs/views.e2e.ts`'s "Feed view options" probe, per the
 "live DOM probe recipe" in `docs/CONVENTIONS.md`): editing a view option re-renders the view with
-no extra plumbing on obtask's side.** `BasesViewConfig.set(key, value)` alone — with no manual
+no extra plumbing on isotask's side.** `BasesViewConfig.set(key, value)` alone — with no manual
 `onDataUpdated()` call — is enough; Bases owns config reactivity and calls back into the view
 itself once the config changes. `FeedBasesView` needed no `onConfigChanged`-style hook (there
 isn't one in the public `BasesView` API — the abstract class exposes only `onDataUpdated()`); it
@@ -122,7 +122,7 @@ calling `config.set()` on it directly, rather than driving Bases' own options-pa
 ## Data flow: Bases calendar view render path
 
 ```
-Bases (.base file)                     obtask-calendar BasesView
+Bases (.base file)                     isotask-calendar BasesView
 ┌─────────────────────┐   entries      ┌──────────────────────────────────┐
 │ filters/sort/group   ├───────────────▶ for each group, for each entry:   │
 │ (owned by Bases)     │                │   entry.file                    │
@@ -155,7 +155,7 @@ group) but not for a single continuous timeline, so `eventsForTask` is called ac
 entries and every task's events land on the same calendar — there is no per-group calendar
 section.
 
-**Mount happens once, not on every render.** The first `onDataUpdated` creates the `.obtask-calendar`
+**Mount happens once, not on every render.** The first `onDataUpdated` creates the `.isotask-calendar`
 root and calls `CalendarRenderer.mount(...)`; every subsequent `onDataUpdated` (a real data change,
 or a view-option change via `config.set()` — same reactivity finding as the feed, above) instead
 calls the already-mounted `CalendarHandle`'s `setEvents`/`setView`/`setFirstDay`. Destroying and
@@ -188,7 +188,7 @@ There is no `effectiveCalendarView`/view-remap function any more: `computeEffect
 Bases-configured `initialView` straight through to `CalendarHandle.setView`/the initial `mount()`
 call, compact or not. Month used to collapse into the renderer's rolling 3-day view below the
 threshold (too narrow for a 7-column CHIP grid); it no longer does, because compact month doesn't
-need 7 columns of chips any more — `styles/calendar.css`'s `.obtask-calendar--compact .ec-day-grid`
+need 7 columns of chips any more — `styles/calendar.css`'s `.isotask-calendar--compact .ec-day-grid`
 rules render every event as a small dot instead (the title stays in the DOM, clipped to 1px, so
 assistive tech still gets it; only the existing project-coloured `::before` dot (ADR 0015) — already drawn for
 the wide-pane "dot + title" chip — stays visible), and `pointer-events: none` on every event lets a
@@ -234,7 +234,7 @@ user's navigated-to date survives the swap. The same probe found the resulting 3
 `currentRange` derivation only snaps to `firstDay` for whole-week/month durations, never a plain
 `{ days: 3 }` one) — confirmed by driving `next()`/`prev()` and reading `getView().currentStart`.
 
-`styles/calendar.css`'s `obtask-calendar--compact` class is toggled by the SAME `clientWidth`
+`styles/calendar.css`'s `isotask-calendar--compact` class is toggled by the SAME `clientWidth`
 computation (never a CSS media query, which would key off the *viewport*, not the pane) so the
 header's smaller typography/padding can't drift from the JS's own breakpoint.
 
@@ -280,7 +280,7 @@ CalendarRenderer adapter (event-calendar) fires its native drop/resize callback
         │  - event-calendar-mapping.ts#fromEventCalendarDrop: the widget's new
         │    position (JS Dates + allDay) back into domain start/end TaskDates
         ▼
-obtask-calendar BasesView — callbacks.onEventMoved
+isotask-calendar BasesView — callbacks.onEventMoved
         │
         ▼
 app/reschedule-task.ts (use-case)
@@ -364,7 +364,7 @@ one line here). On `onload()` it:
 2. Constructs adapters (`ObsidianTaskStore`, `ObsidianClock`, `ObsidianNotifier`,
    `EventCalendarRenderer`, ...), each closed over `this.app`.
 3. Registers Bases views via `this.registerBasesView(type, { name, icon, factory, options })` for
-   `obtask-feed` and `obtask-calendar`.
+   `isotask-feed` and `isotask-calendar`.
 4. Registers commands, the settings tab, file-menu and editor-menu entries, and the optional
    ribbon icon.
 
@@ -377,8 +377,8 @@ those methods.
 ## Why views never filter
 
 Bases already owns which notes appear, their order, grouping, and property visibility — that is
-the point of building on Bases instead of a bespoke query engine. `obtask-feed` and
-`obtask-calendar` render exactly the entry set Bases hands them; the feed view's own bucket
+the point of building on Bases instead of a bespoke query engine. `isotask-feed` and
+`isotask-calendar` render exactly the entry set Bases hands them; the feed view's own bucket
 computation is presentation (mapping already-selected tasks to time buckets and rows), not
 filtering. If a view silently dropped or reordered entries beyond what its declared view options
 say, it would diverge from what the user configured in the `.base` file and from what every other

@@ -6,7 +6,7 @@ Accepted, 2026-08-29
 
 ## Context
 
-`ObtaskSettingTab` implemented the deprecated imperative `display()` override because the
+`IsotaskSettingTab` implemented the deprecated imperative `display()` override because the
 declarative `getSettingDefinitions()` API (settings search, inline validation, `SettingGroup`)
 needs Obsidian 1.13.0, while `minAppVersion` was 1.10.0 (set by the Bases API, see ADR 0001). The
 maintainer decided to raise the floor rather than keep straddling both APIs: "good to be on the
@@ -14,7 +14,7 @@ edge."
 
 ## Decision
 
-Raise `minAppVersion` to `1.13.0` and rewrite `ObtaskSettingTab` to implement
+Raise `minAppVersion` to `1.13.0` and rewrite `IsotaskSettingTab` to implement
 `getSettingDefinitions()`, `getControlValue()`, and `setControlValue()` instead of `display()`.
 The three existing settings (task folder, marker key/value, week start) are unchanged; they now
 read and write through `deps.getSettings`/`deps.setSettings` from `getControlValue`/

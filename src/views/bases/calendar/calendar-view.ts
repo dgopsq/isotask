@@ -83,7 +83,7 @@ export class CalendarBasesView extends BasesView {
 	private readonly deps: CalendarBasesViewDeps;
 	private handle: CalendarHandle | undefined;
 	private invalidLineEl: HTMLElement | undefined;
-	/** The `.obtask-calendar` root the renderer is mounted into — kept so `obtask-calendar--compact` can be toggled on it from `onResize` as well as `onDataUpdated`. */
+	/** The `.isotask-calendar` root the renderer is mounted into — kept so `isotask-calendar--compact` can be toggled on it from `onResize` as well as `onDataUpdated`. */
 	private calendarRootEl: HTMLElement | undefined;
 	/**
 	 * The view/firstDay/compact last pushed to the handle. `onDataUpdated`
@@ -370,7 +370,7 @@ export class CalendarBasesView extends BasesView {
 
 	/**
 	 * Pushes onto the handle whichever of view/firstDay/compact actually
-	 * changed since the last push, and keeps the `obtask-calendar--compact`
+	 * changed since the last push, and keeps the `isotask-calendar--compact`
 	 * class (which `styles/calendar.css` keys its header compaction off of)
 	 * in sync with the same `compact` value the JS just computed — one
 	 * source of truth for the breakpoint instead of a second, drifting CSS

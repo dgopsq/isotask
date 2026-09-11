@@ -26,7 +26,7 @@ through) -> a **frozen** djb2a hash of the project name onto the same 8-entry pa
 
 Palette colors apply as one of 8 pre-declared static CSS classes. A hex color has no such class —
 Obsidian's plugin guidelines forbid a plugin creating stylesheet rules at runtime — so it's applied
-as a scoped `--obtask-dot-color` custom property directly on the element via `setCssProps`, at the
+as a scoped `--isotask-dot-color` custom property directly on the element via `setCssProps`, at the
 one place each renderer (feed row, calendar `eventDidMount`) actually holds the DOM node. Editing
 is via `ui/project-color-modal.ts` (palette swatches, "Automatic" to clear the property, or a
 custom hex field), writing through `processFrontMatter` on the *project* note; reachable from the
@@ -58,7 +58,7 @@ Negative:
 The first negative consequence above (hex repaints only on remount) is fixed.
 `event-calendar-renderer.ts` now keeps a `Map<eventId, HTMLElement>` of every element
 `eventDidMount` has handed back; its `setEvents` walks that map on every later data update to set
-or remove `--obtask-dot-color` directly on each still-connected element (pruning any entry whose
+or remove `--isotask-dot-color` directly on each still-connected element (pruning any entry whose
 element Event Calendar has since torn down). A calendar event's hex color now repaints
 live — hex -> hex, hex -> palette, and hex -> neutral — the same as a palette class already did;
 no Event Calendar update hook turned out to be needed. `docs/DOMAIN-MODEL.md`'s "Project color"
@@ -71,7 +71,7 @@ chip/label in the feed row's meta area, visible only when the project property i
 Bases toolbar's Properties order. Rationale: a leading dot plus a separate uncolored project chip
 was redundant, and the dot had no legend to explain what color meant. The label is self-describing.
 Calendar cards (month dot, due ring, time-grid pill) are unchanged. The custom property
-`--obtask-dot-color` keeps its name for continuity. `docs/DOMAIN-MODEL.md`'s "Project color"
+`--isotask-dot-color` keeps its name for continuity. `docs/DOMAIN-MODEL.md`'s "Project color"
 section has been updated to match this.
 
 ## Alternatives considered

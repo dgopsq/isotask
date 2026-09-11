@@ -51,7 +51,7 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   `innerHTML` or `outerHTML`.
 - Use `setIcon` for icons, `Setting` for settings-style rows (including inside modals where it
   fits), and `Menu` for context/dropdown menus — don't hand-roll these Obsidian already provides.
-- CSS classes: kebab-case, prefixed `obtask-` (e.g. `obtask-feed-row`, `obtask-status-dot`). No
+- CSS classes: kebab-case, prefixed `isotask-` (e.g. `isotask-feed-row`, `isotask-status-dot`). No
   inline `style=` attributes; put styling in `src/styles/*.css`. A value only known at render time
   (e.g. a project's custom hex color) is never a style string or a runtime-created `<style>`/
   `<link>` element (Obsidian's plugin guidelines forbid the latter) — apply it as a CSS custom
@@ -93,7 +93,7 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   leap-year dates (Feb 29), and week-boundary edge cases (Sunday vs. Monday week start, midnight
   boundaries).
 - `pnpm dev:link <vault>` symlinks `main.js`, `styles.css` and `manifest.json` into
-  `<vault>/.obsidian/plugins/obtask` for manual, exploratory testing; then `pnpm dev` and reload
+  `<vault>/.obsidian/plugins/isotask` for manual, exploratory testing; then `pnpm dev` and reload
   the plugin in Obsidian after each build.
 - e2e (`wdio-obsidian-service`, launching a real Obsidian window) lives under `e2e/` and is not
   part of `pnpm check` — it's slow (downloads and boots real Obsidian) and needs a display, so it
@@ -145,7 +145,7 @@ function parseTask(fm: ParsedFrontmatter): Result<Task, TaskParseError[]> { /* .
   (don't rely on injected globals). Use `browser.executeObsidian(({ app }) => ...)` to drive the
   Obsidian API (e.g. open a base with `app.workspace.openLinkText(...)`), and select by the
   plugin's own CSS classes via `cssClass(...)` from `@/plugin-id` (e.g. `` `.${cssClass("feed")}` ``)
-  rather than a hardcoded `obtask-*` string, so a rename doesn't silently break selectors. Note
+  rather than a hardcoded `isotask-*` string, so a rename doesn't silently break selectors. Note
   that `browser.execute(...)` callbacks run inside the Obsidian window, not the Node process
   running the spec, so anything from outside the callback (including a `cssClass(...)` result)
   must be passed in as an extra argument to `execute()`, not closed over. Keep selector waits tight
@@ -173,24 +173,24 @@ afterwards; never commit it.
 
 ## Renaming the plugin
 
-"Obtask" is provisional. Every code-level use of the plugin id/name/CSS prefix is centralised in
+"Isotask" is provisional. Every code-level use of the plugin id/name/CSS prefix is centralised in
 `src/plugin-id.ts`, derived from `manifest.json` (`PLUGIN_ID`, `PLUGIN_NAME`, `VIEW_TYPE_FEED`,
 `VIEW_TYPE_CALENDAR`, `CSS_PREFIX`, `cssClass()`), and `scripts/link-vault.mjs` reads the id from
 `manifest.json` directly — so most of a rename is a single edit plus a search/replace. Checklist:
 
 - `manifest.json`: `id`, `name`, `description`.
-- `package.json`: `name` (and `description` if it still says "Obtask").
-- `src/styles/*.css`: search/replace the `obtask-` class prefix (see the comment at the top of
-  `src/styles/obtask.css`) — CSS class names are literal strings, not derived from
+- `package.json`: `name` (and `description` if it still says "Isotask").
+- `src/styles/*.css`: search/replace the `isotask-` class prefix (see the comment at the top of
+  `src/styles/isotask.css`) — CSS class names are literal strings, not derived from
   `src/plugin-id.ts`.
 - `scripts/link-vault.mjs`: no literal to change — it already reads the vault plugin folder name
   from `manifest.json`.
-- `e2e/vault/Tasks.base`: the checked-in fixture base's view type ids (`obtask-feed`,
-  `obtask-calendar`) are literals, not generated — update them by hand.
+- `e2e/vault/Tasks.base`: the checked-in fixture base's view type ids (`isotask-feed`,
+  `isotask-calendar`) are literals, not generated — update them by hand.
 - `README.md` / `docs/**`: any prose that names the plugin.
 
 **Warning — Bases view type ids are persisted data.** A user's `.base` file stores the view type
-id (`obtask-feed`/`obtask-calendar`) verbatim. Once the plugin has a public release, changing
+id (`isotask-feed`/`isotask-calendar`) verbatim. Once the plugin has a public release, changing
 `PLUGIN_ID` breaks every `.base` file that already references the old view type id — Obsidian will
 no longer recognise the view. A rename after that point needs a migration that keeps registering
 the old view type ids as aliases (pointing at the same view factories) alongside the new ones,

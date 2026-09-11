@@ -157,11 +157,11 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 			// A second `priority: high` task, due yesterday (within the current
 			// month, so it always renders in the calendar's default month
 			// view). `priority: high` gives its `!` mark
-			// (`domain/task.ts#priorityMarks`) the `obtask-priority-high`
+			// (`domain/task.ts#priorityMarks`) the `isotask-priority-high`
 			// colour class — but as of the project-color rework (2026-08-31),
 			// the event's *dot* colour no longer comes from priority at all:
 			// `project: "Q3 Launch"` resolves to `e2e/vault/Q3 Launch.md`
-			// (`color: red`), so the dot renders `obtask-color-red` regardless
+			// (`color: red`), so the dot renders `isotask-color-red` regardless
 			// of this task's `high` priority — the two colour sources
 			// (mark vs. dot) are independent, which
 			// `views.e2e.ts`'s calendar describe block asserts on this fixture.
