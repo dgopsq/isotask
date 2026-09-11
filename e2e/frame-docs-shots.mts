@@ -8,9 +8,9 @@ import sharp from "sharp";
 const ACCENT = "#8a5cf5";
 const RADIUS = 20;
 const STROKE_WIDTH = 2;
-const STROKE_OPACITY = 0.55;
+const STROKE_OPACITY = 0.7;
 const GLOW_BLUR_SIGMA = 40;
-const GLOW_OPACITY = 0.22;
+const GLOW_OPACITY = 0.32;
 const PADDING = 64;
 
 const targets = [
