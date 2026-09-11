@@ -29,7 +29,7 @@ export function priorityRank(priority: Priority): number {
 
 /**
  * CSS class suffix for a priority chip, e.g. `"priority-urgent"` — callers
- * prefix it (`cssClass(priorityChipClass(priority))` -> `"obtask-priority-urgent"`).
+ * prefix it (`cssClass(priorityChipClass(priority))` -> `"isotask-priority-urgent"`).
  * One class per `Priority` value so a stylesheet can map each to a theme
  * colour variable; kept here (not scattered in DOM code) so the feed row and
  * the M3 calendar can share the same mapping.
@@ -55,7 +55,7 @@ export function priorityLabel(priority: Priority): string {
  * `urgent`. Rendered at the right edge of a feed row (`views/bases/feed/feed-view.ts`)
  * and, for a non-normal event, appended to a calendar event's content
  * (`adapters/calendar/event-calendar/event-content.ts`) — colour comes from
- * `priorityChipClass` (`styles/obtask.css`), this only supplies the text.
+ * `priorityChipClass` (`styles/isotask.css`), this only supplies the text.
  */
 export function priorityMarks(priority: Priority): string {
 	switch (priority) {

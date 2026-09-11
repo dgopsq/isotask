@@ -6,7 +6,7 @@ import { FakeClock, FakeNotifier, FakeRescheduleHistory, FakeTaskStore } from "@
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
-import type { ObtaskSettings } from "@/domain/settings";
+import type { IsotaskSettings } from "@/domain/settings";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusId, TaskPath } from "@/domain/task";
 
@@ -18,7 +18,7 @@ function statusId(value: string): StatusId {
 	return value as StatusId;
 }
 
-function makeDeps(overrides: Partial<ObtaskSettings> = {}): {
+function makeDeps(overrides: Partial<IsotaskSettings> = {}): {
 	readonly deps: AppDeps;
 	readonly store: FakeTaskStore;
 	readonly notifier: FakeNotifier;
@@ -27,7 +27,7 @@ function makeDeps(overrides: Partial<ObtaskSettings> = {}): {
 	const store = new FakeTaskStore({ keys: DEFAULT_PROPERTY_KEYS, statuses: DEFAULT_STATUSES });
 	const notifier = new FakeNotifier();
 	const clock = new FakeClock("2026-09-02T10:00" as IsoDateTime, "2026-09-02" as IsoDate);
-	const settings: ObtaskSettings = { ...DEFAULT_SETTINGS, ...overrides };
+	const settings: IsotaskSettings = { ...DEFAULT_SETTINGS, ...overrides };
 	return { deps: { store, clock, notifier, history: new FakeRescheduleHistory(), settings: () => settings }, store, notifier, clock };
 }
 

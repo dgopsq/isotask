@@ -3,7 +3,7 @@ filters:
     - type == "task"
     - status != "done"
 views:
-  - type: obtask-feed
+  - type: isotask-feed
     name: Feed
     newItemFolder: Tasks
     order:
@@ -14,7 +14,7 @@ views:
       - priority
       - project
       - tags
-  - type: obtask-calendar
+  - type: isotask-calendar
     name: Calendar
     newItemFolder: Tasks
   - type: table

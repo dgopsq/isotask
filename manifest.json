@@ -1,6 +1,6 @@
 {
-	"id": "obtask",
-	"name": "Obtask",
+	"id": "isotask",
+	"name": "Isotask",
 	"version": "0.1.0",
 	"minAppVersion": "1.13.0",
 	"description": "Notes as tasks: due dates, recurrence, priorities, and feed and calendar views built on Bases.",

@@ -16,10 +16,10 @@ export const VIEW_TYPE_FEED = `${PLUGIN_ID}-feed`;
 export const VIEW_TYPE_CALENDAR = `${PLUGIN_ID}-calendar`;
 export const VIEW_TYPE_TASK_PANEL = `${PLUGIN_ID}-task-panel`;
 
-/** Prefix every plugin-defined CSS class must use (see `src/styles/obtask.css`). */
+/** Prefix every plugin-defined CSS class must use (see `src/styles/isotask.css`). */
 export const CSS_PREFIX: string = PLUGIN_ID;
 
-/** Builds a prefixed CSS class name, e.g. `cssClass("feed")` -> `"obtask-feed"`. */
+/** Builds a prefixed CSS class name, e.g. `cssClass("feed")` -> `"isotask-feed"`. */
 export function cssClass(name: string): string {
 	return `${CSS_PREFIX}-${name}`;
 }

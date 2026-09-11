@@ -6,7 +6,7 @@ Accepted, 2026-08-29
 
 ## Context
 
-Obtask needs recurring tasks (e.g. "every Monday"). Two design axes: (a) what grammar describes
+Isotask needs recurring tasks (e.g. "every Monday"). Two design axes: (a) what grammar describes
 the recurrence, and (b) what happens to the note when a recurring task is completed — advance the
 existing note in place, or create a new note for the next occurrence and keep the completed one as
 history.

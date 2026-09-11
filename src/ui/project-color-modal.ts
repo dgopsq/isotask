@@ -114,7 +114,7 @@ export class ProjectColorModal extends Modal {
 		);
 	}
 
-	/** Reflects `this.hexError` onto the persistent `errorEl` — text plus a `--hidden` modifier class (`calendar.css`-style theme-only CSS, `obtask.css`) rather than an inline style. */
+	/** Reflects `this.hexError` onto the persistent `errorEl` — text plus a `--hidden` modifier class (`calendar.css`-style theme-only CSS, `isotask.css`) rather than an inline style. */
 	private syncErrorEl(): void {
 		if (this.errorEl === undefined) {
 			return;

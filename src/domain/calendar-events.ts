@@ -28,7 +28,7 @@ export interface CalendarEvent {
 	 * value, since this module never touches the metadata cache. Consumed
 	 * by `event-calendar-mapping.ts#toEventCalendarEvent`
 	 * (`domain/project-color.ts#dotColorClasses`) to pick the CSS class
-	 * that sets `--obtask-dot-color` on the rendered event.
+	 * that sets `--isotask-dot-color` on the rendered event.
 	 */
 	readonly dotColor: DotColor;
 }

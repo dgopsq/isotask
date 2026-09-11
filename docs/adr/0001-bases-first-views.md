@@ -6,7 +6,7 @@ Accepted, 2026-08-29
 
 ## Context
 
-Obtask needs a feed view and a calendar view over task notes. Obsidian 1.10+ ships **Bases**: a
+Isotask needs a feed view and a calendar view over task notes. Obsidian 1.10+ ships **Bases**: a
 first-class mechanism for defining filtered/sorted/grouped views over notes via `.base` files,
 with a `Plugin.registerBasesView` API for plugins to contribute custom view *renderers* while
 Bases keeps ownership of filtering, sorting, grouping, and the toolbar. The plugin could instead
@@ -14,7 +14,7 @@ ignore Bases and own its own query/filter engine end to end via standalone `Item
 
 ## Decision
 
-Build both views as Bases view types (`obtask-feed`, `obtask-calendar`) registered via
+Build both views as Bases view types (`isotask-feed`, `isotask-calendar`) registered via
 `registerBasesView`. Bases owns which notes appear, order, grouping, and property visibility; the
 plugin owns rendering and task actions only. Views never filter — see `docs/ARCHITECTURE.md`.
 

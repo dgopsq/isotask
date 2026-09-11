@@ -45,7 +45,7 @@ import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 /**
  * How long the status control's optimistic UI (`renderStatusControl`) holds
  * before actually writing the new status — long enough for the ink fill and
- * halo (`styles/obtask.css`) to land, so the row's move (ADR 0016) starts
+ * halo (`styles/isotask.css`) to land, so the row's move (ADR 0016) starts
  * right as the fill completes. Reopening just shrinks the fill, so it gets a
  * shorter hold. Both are skipped (delay 0) under
  * `prefers-reduced-motion: reduce`.
@@ -261,7 +261,7 @@ export class FeedBasesView extends BasesView {
 		this.rendered.clear();
 		this.listEl.remove();
 		this.viewContainerEl.removeClass(cssClass("feed"), cssClass("feed--no-meta"), cssClass("feed--compact"));
-		this.viewContainerEl.style.removeProperty("--obtask-feed-meta-columns");
+		this.viewContainerEl.style.removeProperty("--isotask-feed-meta-columns");
 		super.onunload();
 	}
 
@@ -276,7 +276,7 @@ export class FeedBasesView extends BasesView {
 		// field's doc comment for why this can't just be computed once up
 		// front.
 		this.lastProjectPaths = new Set<string>();
-		this.viewContainerEl.setCssProps({ "--obtask-feed-meta-columns": String(columns.length) });
+		this.viewContainerEl.setCssProps({ "--isotask-feed-meta-columns": String(columns.length) });
 		this.viewContainerEl.toggleClass(cssClass("feed--no-meta"), columns.length === 0);
 		this.applyCompact();
 
@@ -447,11 +447,11 @@ export class FeedBasesView extends BasesView {
 			void this.deps.app.workspace.openLinkText(task.path, "", false);
 		});
 
-		// `display: contents` in wide mode (`styles/obtask.css`), so its
-		// children stay direct subgrid items of `.obtask-feed__row` and
+		// `display: contents` in wide mode (`styles/isotask.css`), so its
+		// children stay direct subgrid items of `.isotask-feed__row` and
 		// nothing about the wide layout changes — it exists purely so
 		// compact mode has a single element to turn into the wrapped
-		// second line (`.obtask-feed--compact .obtask-feed__meta`).
+		// second line (`.isotask-feed--compact .isotask-feed__meta`).
 		const metaEl = rowEl.createDiv({ cls: cssClass("feed__meta") });
 
 		for (const column of columns) {
@@ -482,7 +482,7 @@ export class FeedBasesView extends BasesView {
 	}
 
 	/**
-	 * Toggles `obtask-feed--compact` (`styles/obtask.css`) off the pane's own
+	 * Toggles `isotask-feed--compact` (`styles/isotask.css`) off the pane's own
 	 * `clientWidth` — see `domain/feed-view-options.ts`'s `COMPACT_FEED_WIDTH`
 	 * doc comment. `clientWidth` is `0` before the container has ever been
 	 * laid out (e.g. a view created in a background/hidden tab), treated as
@@ -554,8 +554,8 @@ export class FeedBasesView extends BasesView {
 	/**
 	 * Priority control: Apple Reminders-style — `high`/`urgent` render a
 	 * small `!`/`!!` mark (`domain/task.ts#priorityMarks`) coloured by one
-	 * `obtask-priority-<value>` class per `domain/task.ts#priorityChipClass`
-	 * (`styles/obtask.css`); `normal` renders the same control with a muted
+	 * `isotask-priority-<value>` class per `domain/task.ts#priorityChipClass`
+	 * (`styles/isotask.css`); `normal` renders the same control with a muted
 	 * "no priority" icon instead of a mark (`priorityIcon("normal")`,
 	 * `ui/priority-menu.ts` — currently "minus"), styled by
 	 * `feed__priority--empty`. Same clickable-icon/button-like pattern as
@@ -615,7 +615,7 @@ export class FeedBasesView extends BasesView {
 	 *
 	 * Colored in the project's resolved color
 	 * (`domain/project-color.ts#resolveDotColor`) — the palette class or a
-	 * scoped `--obtask-dot-color` custom property for a hex color, same
+	 * scoped `--isotask-dot-color` custom property for a hex color, same
 	 * mechanism the calendar's own dot/ring/pill use — on both the resolved
 	 * link and the unresolved plain-text span, so every project label is
 	 * colored regardless of link resolution. The row no longer carries a
@@ -664,7 +664,7 @@ export class FeedBasesView extends BasesView {
 			// `eventDidMount` (`event-calendar-renderer.ts`) does for its own
 			// `.ec-event` root.
 			if (dotColor.kind === "hex") {
-				span.setCssProps({ "--obtask-dot-color": dotColor.value });
+				span.setCssProps({ "--isotask-dot-color": dotColor.value });
 			}
 			return;
 		}
@@ -675,7 +675,7 @@ export class FeedBasesView extends BasesView {
 			href: project,
 		});
 		if (dotColor.kind === "hex") {
-			link.setCssProps({ "--obtask-dot-color": dotColor.value });
+			link.setCssProps({ "--isotask-dot-color": dotColor.value });
 		}
 		comp.registerDomEvent(link, "click", (evt) => {
 			evt.preventDefault();

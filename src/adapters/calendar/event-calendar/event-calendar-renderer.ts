@@ -17,7 +17,7 @@ import { cssClass } from "@/plugin-id";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer, CalendarViewKind } from "@/ports/calendar-renderer";
 
 /**
- * Sets or clears `--obtask-dot-color` on a mounted `.ec-event` element to
+ * Sets or clears `--isotask-dot-color` on a mounted `.ec-event` element to
  * match `event`'s current `dotColor` — `undefined` (no event, or a
  * `palette`/`neutral` `dotColor`) REMOVES the property rather than leaving a
  * stale hex behind. Removing an inline custom property this way (rather than
@@ -28,9 +28,9 @@ import type { CalendarHandle, CalendarOptions, CalendarRenderer, CalendarViewKin
 function applyHexDotColor(el: HTMLElement, event: CalendarEvent | undefined): void {
 	const hex = event === undefined ? undefined : hexDotColorOf(event);
 	if (hex === undefined) {
-		el.style.removeProperty("--obtask-dot-color");
+		el.style.removeProperty("--isotask-dot-color");
 	} else {
-		el.setCssProps({ "--obtask-dot-color": hex });
+		el.setCssProps({ "--isotask-dot-color": hex });
 	}
 }
 
@@ -56,7 +56,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 
 		// Every element `eventDidMount` has ever handed back, keyed by the
 		// same event id `eventsById` uses — lets `setEvents` (below) repaint
-		// `--obtask-dot-color` on an element Event Calendar decided to REUSE
+		// `--isotask-dot-color` on an element Event Calendar decided to REUSE
 		// across a data update (see `eventDidMount`'s doc comment above) rather
 		// than only being able to set the property once, at mount. Cleared in
 		// `destroy()` so no detached element outlives the calendar.
@@ -211,7 +211,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// — a bare text node, nothing CSS can select on its own. Supplying
 			// our own `domNodes` here (the same `Content` shape `eventContent`
 			// already returns, see `event-content.ts`) wraps the text in a
-			// `createSpan` carrying an `obtask-` class instead, which
+			// `createSpan` carrying an `isotask-` class instead, which
 			// `calendar.css` then visually-hides (absolutely positioned, 1x1,
 			// clipped — NOT `display: none`/`visibility: hidden`, which would
 			// drop it from the accessibility tree and leave the all-day row
@@ -251,7 +251,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			const dayMaxEventsOption: Pick<Calendar.Options, "dayMaxEvents"> = isCompact ? { dayMaxEvents: true } : {};
 
 			// Compact month's per-event pill (`calendar.css`'s
-			// `.obtask-calendar--compact .ec-day-grid .ec-event`) needs a
+			// `.isotask-calendar--compact .ec-day-grid .ec-event`) needs a
 			// visible gap between two stacked pills in the same day cell so
 			// each dot+mark reads as its own row rather than one fused block
 			// — but that gap can't be a plain CSS margin: Event Calendar
@@ -301,7 +301,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// instead of stacking them, which read as one collided rectangle.
 				slotEventOverlap: false,
 				// Overrides rendering only for a timed all-day chip (one carrying
-				// `extendedProps.obtaskTime`, see `event-calendar-mapping.ts`); for
+				// `extendedProps.isotaskTime`, see `event-calendar-mapping.ts`); for
 				// every other event `eventContent` returns `undefined`, which Event
 				// Calendar treats as "use the default rendering" — see
 				// `event-content.ts`'s doc comment for how that fallback was
@@ -309,7 +309,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				eventContent,
 				// Applies a `hex` `DotColor` (`hexDotColorOf`,
 				// `event-calendar-mapping.ts`) directly onto the mounted `.ec-event`
-				// element as a `--obtask-dot-color` custom property — see
+				// element as a `--isotask-dot-color` custom property — see
 				// `domain/project-color.ts#dotColorClasses`'s doc comment for why a
 				// hex value can't just be a static class the way a palette color is
 				// (Obsidian's plugin guidelines forbid a plugin registering its own
@@ -320,8 +320,8 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// Calendar's own event root — the same element `classNames` above
 				// is applied to (confirmed against
 				// the vendored `@event-calendar/core@5.12.0/dist/index.js`'s
-				// `BaseEvent` component) — so `--obtask-dot-color` reaches
-				// `.ec-event-body::before` the same way a `.obtask-color-*` class's
+				// `BaseEvent` component) — so `--isotask-dot-color` reaches
+				// `.ec-event-body::before` the same way a `.isotask-color-*` class's
 				// value would, by inheritance.
 				//
 				// `eventDidMount` is a mount-only hook (Svelte's `onMount`) — Event
@@ -331,7 +331,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				// Every mounted element is therefore also stashed in
 				// `mountedElements` (below), keyed by event id, and `setEvents`
 				// (the handle returned further down) walks that map after every
-				// data update to set or REMOVE `--obtask-dot-color` directly —
+				// data update to set or REMOVE `--isotask-dot-color` directly —
 				// that's what makes hex->hex, hex->palette, and hex->neutral all
 				// repaint live instead of only on a real remount. A palette color
 				// needs none of this: `classNames` is reactive to the `event`

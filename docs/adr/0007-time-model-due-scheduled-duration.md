@@ -7,7 +7,7 @@ Accepted, 2026-08-29
 ## Context
 
 Task-management tools conflate "when is this due" and "when do I plan to work on it" to varying
-degrees, or offer only one date. Obtask also needs a way to represent timed work blocks for the
+degrees, or offer only one date. Isotask also needs a way to represent timed work blocks for the
 calendar view, not just all-day deadlines.
 
 ## Decision

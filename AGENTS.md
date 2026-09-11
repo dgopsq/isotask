@@ -2,7 +2,7 @@
 
 ## What this is
 
-Obtask is an Obsidian plugin: one markdown note = one task, all task data lives in frontmatter
+Isotask is an Obsidian plugin: one markdown note = one task, all task data lives in frontmatter
 properties, and every view (feed, calendar) is registered as an Obsidian Bases view. The plugin
 adds semantics (status, due, recurrence) and renderers on top of Bases; it owns no data store and
 no query language.
@@ -29,7 +29,7 @@ no query language.
   occurrence, which creates a new note).
 - CSS: theme variables only (`--background-primary`, `--text-normal`, `--interactive-accent`,
   `--color-*`, …). No hardcoded colors.
-- All plugin-defined CSS classes are prefixed `obtask-`.
+- All plugin-defined CSS classes are prefixed `isotask-`.
 - The plugin must work on mobile (touch interactions, no desktop-only APIs).
 
 ## Commands
@@ -55,13 +55,13 @@ src/
   adapters/
     obsidian/  TaskStore, Clock, Notifier, settings persistence — implement the ports
     calendar/event-calendar/  CalendarRenderer implementation (only importer of @event-calendar/*)
-  views/bases/feed/      obtask-feed BasesView (thin: entries -> domain -> render -> dispatch)
-  views/bases/calendar/  obtask-calendar BasesView
+  views/bases/feed/      isotask-feed BasesView (thin: entries -> domain -> render -> dispatch)
+  views/bases/calendar/  isotask-calendar BasesView
   views/task-panel/      sidebar ItemView: task fields as a form for the active note
   ui/          DOM renderers + modals (TaskCreateModal, DateModal, RecurrencePicker, StatusMenu)
   commands/    registerCommands: wires every plugin command to an app/ use-case
   settings/    SettingsTab, settings type + defaults + migration
-  styles/      obtask.css, calendar.css (theme-variable mappings only)
+  styles/      isotask.css, calendar.css (theme-variable mappings only)
   main.ts      composition root: builds adapters, registers views/commands/menus/settings
 ```
 
@@ -79,10 +79,10 @@ src/
 ## Workflow expectations
 
 - **Worktrees + PRs**: every task happens on a branch in its own worktree, never directly on
-  `main`. `pnpm wt feat/<name>` creates `../obtask.worktrees/feat-<name>` (branched off `main`)
+  `main`. `pnpm wt feat/<name>` creates `../isotask.worktrees/feat-<name>` (branched off `main`)
   and installs dependencies there in seconds — pnpm hardlinks from its global store (no
   duplicated packages) and the Obsidian e2e cache is shared across worktrees
-  (`~/.cache/obtask/obsidian-cache`, override with `OBSIDIAN_CACHE`). Finish with `pnpm check`
+  (`~/.cache/isotask/obsidian-cache`, override with `OBSIDIAN_CACHE`). Finish with `pnpm check`
   and the full `pnpm test:e2e`, push, open a PR (`gh pr create`), merge via PR only, then
   `pnpm wt rm <branch>`.
 - Run `pnpm check` before finishing any task.

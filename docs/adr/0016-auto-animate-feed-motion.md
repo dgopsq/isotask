@@ -15,7 +15,7 @@ this is presentation-layer, but it adds a runtime dependency, which per AGENTS.m
 
 ## Decision
 
-(1) The feed view now renders into an inner `.obtask-feed__list` element and reconciles keyed
+(1) The feed view now renders into an inner `.isotask-feed__list` element and reconciles keyed
 top-level children (rows keyed by task path, headers/placeholders by group+bucket) across renders,
 reusing row elements and re-rendering only their contents; per-row Obsidian `Component`s own row
 listeners. (2) `@formkit/auto-animate` (v0.10.0, ~3 kB min+gzip, zero dependencies, MIT) is
@@ -37,8 +37,8 @@ Positive:
 Negative:
 - New runtime dependency bundled by esbuild; no network access, plain DOM APIs, mobile-safe
   (MutationObserver and Web Animations API are available in Obsidian's Electron and iOS/Android
-  WebViews). The library inline-sets `position: relative` on a static parent; `styles/obtask.css`
-  sets it on `.obtask-feed__list` instead to keep the no-inline-styles rule intact.
+  WebViews). The library inline-sets `position: relative` on a static parent; `styles/isotask.css`
+  sets it on `.isotask-feed__list` instead to keep the no-inline-styles rule intact.
 - Exit animations briefly re-insert an absolutely-positioned copy of a removed row; the
   reconciler tracks its own keyed map, not live children, so this is benign but needs documenting.
 

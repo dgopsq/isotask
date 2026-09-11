@@ -12,7 +12,7 @@ import type { RescheduleEntry } from "@/ports/reschedule-history";
  * to find there. An absent key (`undefined`) and an explicit `null` both
  * mean "not set", so they compare equal to each other. Anything that isn't
  * a primitive (i.e. an array — the only non-primitive `FrontmatterValue`) is
- * treated as changed rather than compared structurally: obtask only ever
+ * treated as changed rather than compared structurally: isotask only ever
  * writes strings and numbers through a reschedule gesture, so seeing an
  * array here means some other write touched the property, and the
  * conservative answer is "stale".

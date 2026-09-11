@@ -1,18 +1,18 @@
-# Obtask
+# Isotask
 
 [Install](#install) · [Quick start](#quick-start) · [Docs](#docs) · [Development](#development)
 
-[![CI](https://github.com/dgopsq/obtask/actions/workflows/ci.yml/badge.svg)](https://github.com/dgopsq/obtask/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/dgopsq/obtask)](https://github.com/dgopsq/obtask/releases)
-[![License](https://img.shields.io/github/license/dgopsq/obtask)](LICENSE)
+[![CI](https://github.com/dgopsq/isotask/actions/workflows/ci.yml/badge.svg)](https://github.com/dgopsq/isotask/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/dgopsq/isotask)](https://github.com/dgopsq/isotask/releases)
+[![License](https://img.shields.io/github/license/dgopsq/isotask)](LICENSE)
 
 <p align="center">
-  <img src="docs/assets/feed.png" width="73%" alt="Obtask feed view">
-  <img src="docs/assets/feed-mobile.png" width="23.7%" alt="Obtask feed view on mobile">
+  <img src="docs/assets/feed.png" width="73%" alt="Isotask feed view">
+  <img src="docs/assets/feed-mobile.png" width="23.7%" alt="Isotask feed view on mobile">
 </p>
 <p align="center">
-  <img src="docs/assets/calendar.png" width="73%" alt="Obtask calendar view">
-  <img src="docs/assets/calendar-mobile.png" width="23.7%" alt="Obtask calendar view on mobile">
+  <img src="docs/assets/calendar.png" width="73%" alt="Isotask calendar view">
+  <img src="docs/assets/calendar-mobile.png" width="23.7%" alt="Isotask calendar view on mobile">
 </p>
 
 **Your notes are your tasks.** Frontmatter in, feed and calendar out, built on Obsidian Bases.
@@ -63,10 +63,10 @@ Not yet listed; a submission is in progress.
 ### Manual
 
 Download `main.js`, `manifest.json`, and `styles.css` from the
-[latest release](https://github.com/dgopsq/obtask/releases/latest) into
-`<vault>/.obsidian/plugins/obtask/`, then reload Obsidian and enable Obtask in Settings.
+[latest release](https://github.com/dgopsq/isotask/releases/latest) into
+`<vault>/.obsidian/plugins/isotask/`, then reload Obsidian and enable Isotask in Settings.
 
-Obtask requires Obsidian 1.13.0 or later (Bases).
+Isotask requires Obsidian 1.13.0 or later (Bases).
 
 To update, repeat the manual steps above with the new release's files.
 

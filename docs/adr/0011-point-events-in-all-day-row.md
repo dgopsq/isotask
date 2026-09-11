@@ -22,7 +22,7 @@ shown as a separate muted label in front of the title ("09:00" next to "Budget r
 and a `duration`. `domain/calendar-events.ts#scheduledEvent`/`#dueEvent` set `allDay: true` for
 every case except a timed-with-duration `scheduled`, but keep `start`'s time component either way
 — the mapping layer (`event-calendar-mapping.ts#toEventCalendarEvent`) is what turns that
-surviving time into `extendedProps.obtaskTime`, only when `allDay && isDateTime(start)`; the
+surviving time into `extendedProps.isotaskTime`, only when `allDay && isDateTime(start)`; the
 renderer's `eventContent` (`event-content.ts`) reads it back to build the label. The renderer also
 sets `slotEventOverlap: false`, so two real blocks that do overlap in time lay out side by side
 instead of stacking on top of each other.

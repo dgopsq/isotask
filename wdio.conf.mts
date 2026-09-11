@@ -71,5 +71,5 @@ export const config: WebdriverIO.Config = {
 	// otherwise be re-downloaded per worktree. Safe to share: versions are
 	// written once and then only read. `OBSIDIAN_CACHE` overrides (CI, or a
 	// deliberate per-checkout cache).
-	cacheDir: process.env["OBSIDIAN_CACHE"] ?? resolve(homedir(), ".cache", "obtask", "obsidian-cache"),
+	cacheDir: process.env["OBSIDIAN_CACHE"] ?? resolve(homedir(), ".cache", "isotask", "obsidian-cache"),
 };

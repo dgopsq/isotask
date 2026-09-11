@@ -13,8 +13,8 @@ framework, and the bundle budget is tight (~150 kB minified total).
 
 ## Decision
 
-Build all obtask UI with Obsidian's own DOM helpers (`createEl`/`createDiv`/`createSpan`,
-`Setting`, `Menu`, `Modal`, `setIcon`). No React/Svelte/Vue/etc. for obtask's own UI code. (The
+Build all isotask UI with Obsidian's own DOM helpers (`createEl`/`createDiv`/`createSpan`,
+`Setting`, `Menu`, `Modal`, `setIcon`). No React/Svelte/Vue/etc. for isotask's own UI code. (The
 Event Calendar adapter, per ADR 0006, brings its own internal rendering — that is opaque to the
 plugin, isolated behind the `CalendarRenderer` port.)
 

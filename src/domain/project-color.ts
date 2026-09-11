@@ -4,14 +4,14 @@ import { cssClass } from "@/plugin-id";
  * Project color resolution — pure domain logic mapping a project note's own
  * `color` frontmatter value (or its absence) to a `DotColor`, the thing
  * every card surface (feed row leading dot, calendar month dot/due-ring,
- * time-grid pill) ultimately keys its `--obtask-dot-color` custom property
+ * time-grid pill) ultimately keys its `--isotask-dot-color` custom property
  * off of. The shell (`adapters/obsidian/project-color-lookup.ts`) is what
  * actually reads a project note's frontmatter; this module never touches
  * the filesystem, the metadata cache, or the DOM — `resolveDotColor` takes
  * the raw frontmatter value as a plain `unknown` input.
  */
 
-/** The eight palette names a project's `color` frontmatter can name, mapped 1:1 to Obsidian's `--color-*` theme variables (`styles/obtask.css`). */
+/** The eight palette names a project's `color` frontmatter can name, mapped 1:1 to Obsidian's `--color-*` theme variables (`styles/isotask.css`). */
 export const PALETTE = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"] as const;
 
 export type PaletteName = (typeof PALETTE)[number];
@@ -25,8 +25,8 @@ export type ProjectColor =
  * What a card's dot/bar ultimately renders. Either the resolved color of
  * the task's project (`ProjectColor`), or `neutral` — a task with no
  * project at all, which falls back to `var(--text-faint)` wherever
- * `--obtask-dot-color` is consumed (`styles/calendar.css`,
- * `styles/obtask.css`) rather than getting a class at all.
+ * `--isotask-dot-color` is consumed (`styles/calendar.css`,
+ * `styles/isotask.css`) rather than getting a class at all.
  */
 export type DotColor = ProjectColor | { readonly kind: "neutral" };
 
@@ -109,7 +109,7 @@ export function resolveDotColor(rawColor: unknown, project: string | undefined):
 	return { kind: "palette", name: hashPaletteColor(project) };
 }
 
-/** CSS class suffix for a palette color, e.g. `"color-red"` — callers prefix it (`cssClass(paletteColorClass("red"))` -> `"obtask-color-red"`), mirroring `task.ts#priorityChipClass`. One class per `PaletteName` so `styles/obtask.css` can map each to a `--color-*` theme variable. */
+/** CSS class suffix for a palette color, e.g. `"color-red"` — callers prefix it (`cssClass(paletteColorClass("red"))` -> `"isotask-color-red"`), mirroring `task.ts#priorityChipClass`. One class per `PaletteName` so `styles/isotask.css` can map each to a `--color-*` theme variable. */
 export function paletteColorClass(name: PaletteName): string {
 	return `color-${name}`;
 }
@@ -117,8 +117,8 @@ export function paletteColorClass(name: PaletteName): string {
 /**
  * `DotColor` -> the (already `cssClass`-prefixed) CSS classes it maps to,
  * ready to add straight to an element's class list or an Event Calendar
- * `classNames` array. `palette` -> one `obtask-color-<name>` class
- * (`styles/obtask.css`'s 8-entry mapping to `--color-*`); `hex` and
+ * `classNames` array. `palette` -> one `isotask-color-<name>` class
+ * (`styles/isotask.css`'s 8-entry mapping to `--color-*`); `hex` and
  * `neutral` both map to no classes at all.
  *
  * `hex` has no class of its own — and, unlike palette, there is no
@@ -129,7 +129,7 @@ export function paletteColorClass(name: PaletteName): string {
  * `no-forbidden-elements` — all plugin CSS must come from the static,
  * built-in `styles.css`), which rules out registering a rule for it at
  * runtime the way `paletteColorClass` classes are pre-declared. Instead,
- * a `hex` `DotColor` is applied directly as a scoped `--obtask-dot-color`
+ * a `hex` `DotColor` is applied directly as a scoped `--isotask-dot-color`
  * custom property on the specific element/event that needs it — the feed
  * (`views/bases/feed/feed-view.ts#renderProjectLink`, via Obsidian's own
  * `setCssProps`) and the calendar (`event-calendar-mapping.ts`'s

@@ -1,7 +1,7 @@
 import type { App, Plugin, SettingDefinitionItem } from "obsidian";
 import { PluginSettingTab } from "obsidian";
 
-import type { ObtaskSettings } from "@/adapters/obsidian/settings";
+import type { IsotaskSettings } from "@/adapters/obsidian/settings";
 import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
 
@@ -57,8 +57,8 @@ const SCALAR_SETTINGS: Readonly<
 	Record<
 		ScalarSettingKey,
 		{
-			readonly get: (settings: ObtaskSettings) => unknown;
-			readonly set: (settings: ObtaskSettings, value: unknown) => ObtaskSettings;
+			readonly get: (settings: IsotaskSettings) => unknown;
+			readonly set: (settings: IsotaskSettings, value: unknown) => IsotaskSettings;
 		}
 	>
 > = {
@@ -89,8 +89,8 @@ function isScalarSetting(key: string): key is ScalarSettingKey {
 }
 
 export interface SettingsTabDeps {
-	readonly getSettings: () => ObtaskSettings;
-	readonly setSettings: (settings: ObtaskSettings) => Promise<void>;
+	readonly getSettings: () => IsotaskSettings;
+	readonly setSettings: (settings: IsotaskSettings) => Promise<void>;
 }
 
 /**
@@ -104,7 +104,7 @@ export interface SettingsTabDeps {
  * (open/done, see ADR 0017) with no user-facing way to pick or configure a
  * status. Only the `status` property key remains editable, below.
  */
-export class ObtaskSettingTab extends PluginSettingTab {
+export class IsotaskSettingTab extends PluginSettingTab {
 	private readonly deps: SettingsTabDeps;
 
 	constructor(app: App, plugin: Plugin, deps: SettingsTabDeps) {

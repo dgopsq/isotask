@@ -4,7 +4,7 @@ import {
 	fromEventCalendarDrop,
 	fromEventCalendarView,
 	hexDotColorOf,
-	isObtaskEventExtendedProps,
+	isIsotaskEventExtendedProps,
 	toEventCalendarEvent,
 	toEventCalendarFirstDay,
 	toEventCalendarView,
@@ -110,32 +110,32 @@ describe("toEventCalendarEvent", () => {
 	it("builds classNames from source and priority", () => {
 		const input = event({ start: date("2026-09-10"), source: "scheduled", priority: "urgent" });
 		const mapped = toEventCalendarEvent(input);
-		expect(mapped.classNames).toEqual(["obtask-event", "obtask-event--scheduled", "obtask-priority-urgent"]);
+		expect(mapped.classNames).toEqual(["isotask-event", "isotask-event--scheduled", "isotask-priority-urgent"]);
 	});
 
 	it("prefixes the due source class distinctly from scheduled", () => {
 		const input = event({ start: date("2026-09-10"), source: "due" });
 		const mapped = toEventCalendarEvent(input);
-		expect(mapped.classNames).toContain("obtask-event--due");
+		expect(mapped.classNames).toContain("isotask-event--due");
 	});
 
 	describe("dotColor classNames", () => {
 		it("appends no class for a neutral dotColor", () => {
 			const input = event({ start: date("2026-09-10"), dotColor: { kind: "neutral" } });
 			const mapped = toEventCalendarEvent(input);
-			expect(mapped.classNames).toEqual(["obtask-event", "obtask-event--due", "obtask-priority-normal"]);
+			expect(mapped.classNames).toEqual(["isotask-event", "isotask-event--due", "isotask-priority-normal"]);
 		});
 
-		it("appends an obtask-color-<name> class for a palette dotColor", () => {
+		it("appends an isotask-color-<name> class for a palette dotColor", () => {
 			const input = event({ start: date("2026-09-10"), dotColor: { kind: "palette", name: "green" } });
 			const mapped = toEventCalendarEvent(input);
-			expect(mapped.classNames).toContain("obtask-color-green");
+			expect(mapped.classNames).toContain("isotask-color-green");
 		});
 
 		it("appends no class for a hex dotColor — relayed via extendedProps.hexDotColor instead (see the doc comment)", () => {
 			const input = event({ start: date("2026-09-10"), dotColor: { kind: "hex", value: "#a1b2c3" } });
 			const mapped = toEventCalendarEvent(input);
-			expect(mapped.classNames).toEqual(["obtask-event", "obtask-event--due", "obtask-priority-normal"]);
+			expect(mapped.classNames).toEqual(["isotask-event", "isotask-event--due", "isotask-priority-normal"]);
 		});
 	});
 
@@ -159,21 +159,21 @@ describe("toEventCalendarEvent", () => {
 		});
 	});
 
-	it("keeps the title unprefixed and sets obtaskTime for a timed all-day point event", () => {
+	it("keeps the title unprefixed and sets isotaskTime for a timed all-day point event", () => {
 		const input = event({ start: date("2026-09-10T09:00"), allDay: true, title: "Budget report" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Budget report");
-		expect(mapped.extendedProps).toEqual({ obtaskTime: "09:00", priority: "normal" });
+		expect(mapped.extendedProps).toEqual({ isotaskTime: "09:00", priority: "normal" });
 	});
 
-	it("does not set obtaskTime for a date-only all-day event", () => {
+	it("does not set isotaskTime for a date-only all-day event", () => {
 		const input = event({ start: date("2026-09-10"), allDay: true, title: "Budget report" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Budget report");
 		expect(mapped.extendedProps).toEqual({ priority: "normal" });
 	});
 
-	it("does not set obtaskTime for a timed block (not all-day)", () => {
+	it("does not set isotaskTime for a timed block (not all-day)", () => {
 		const input = event({ start: date("2026-09-10T09:00"), end: date("2026-09-10T09:30"), allDay: false, title: "Team sync" });
 		const mapped = toEventCalendarEvent(input);
 		expect(mapped.title).toBe("Team sync");
@@ -309,42 +309,42 @@ describe("fromEventCalendarDrop", () => {
 	});
 });
 
-describe("isObtaskEventExtendedProps", () => {
-	it("accepts an object with no obtaskTime key", () => {
-		expect(isObtaskEventExtendedProps({})).toBe(true);
+describe("isIsotaskEventExtendedProps", () => {
+	it("accepts an object with no isotaskTime key", () => {
+		expect(isIsotaskEventExtendedProps({})).toBe(true);
 	});
 
-	it("accepts an object with a string obtaskTime", () => {
-		expect(isObtaskEventExtendedProps({ obtaskTime: "09:00" })).toBe(true);
+	it("accepts an object with a string isotaskTime", () => {
+		expect(isIsotaskEventExtendedProps({ isotaskTime: "09:00" })).toBe(true);
 	});
 
-	it("rejects an object with a non-string obtaskTime", () => {
-		expect(isObtaskEventExtendedProps({ obtaskTime: 900 })).toBe(false);
+	it("rejects an object with a non-string isotaskTime", () => {
+		expect(isIsotaskEventExtendedProps({ isotaskTime: 900 })).toBe(false);
 	});
 
 	it("accepts an object with a valid priority", () => {
-		expect(isObtaskEventExtendedProps({ priority: "urgent" })).toBe(true);
+		expect(isIsotaskEventExtendedProps({ priority: "urgent" })).toBe(true);
 	});
 
 	it("rejects an object with an unrecognized priority string", () => {
-		expect(isObtaskEventExtendedProps({ priority: "low" })).toBe(false);
+		expect(isIsotaskEventExtendedProps({ priority: "low" })).toBe(false);
 	});
 
 	it("rejects an object with a non-string priority", () => {
-		expect(isObtaskEventExtendedProps({ priority: 1 })).toBe(false);
+		expect(isIsotaskEventExtendedProps({ priority: 1 })).toBe(false);
 	});
 
 	it("rejects non-object values", () => {
-		expect(isObtaskEventExtendedProps(null)).toBe(false);
-		expect(isObtaskEventExtendedProps("09:00")).toBe(false);
-		expect(isObtaskEventExtendedProps(undefined)).toBe(false);
+		expect(isIsotaskEventExtendedProps(null)).toBe(false);
+		expect(isIsotaskEventExtendedProps("09:00")).toBe(false);
+		expect(isIsotaskEventExtendedProps(undefined)).toBe(false);
 	});
 
 	it("accepts an object with a string hexDotColor", () => {
-		expect(isObtaskEventExtendedProps({ hexDotColor: "#a1b2c3" })).toBe(true);
+		expect(isIsotaskEventExtendedProps({ hexDotColor: "#a1b2c3" })).toBe(true);
 	});
 
 	it("rejects an object with a non-string hexDotColor", () => {
-		expect(isObtaskEventExtendedProps({ hexDotColor: 123 })).toBe(false);
+		expect(isIsotaskEventExtendedProps({ hexDotColor: 123 })).toBe(false);
 	});
 });

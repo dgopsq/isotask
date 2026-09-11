@@ -36,7 +36,7 @@ export const DEFAULT_CALENDAR_VIEW_OPTIONS: CalendarViewOptions = {
  * LAYOUT threshold on the calendar pane's own `clientWidth`
  * (`views/bases/calendar/calendar-view.ts`), never on `is-mobile`: a narrow
  * split pane on desktop crosses it too, and a full-width pane on a phone in
- * landscape doesn't. `styles/calendar.css`'s `obtask-calendar--compact`
+ * landscape doesn't. `styles/calendar.css`'s `isotask-calendar--compact`
  * class is toggled off the same computed value so the CSS breakpoint and
  * the JS one can't drift apart.
  *
@@ -44,7 +44,7 @@ export const DEFAULT_CALENDAR_VIEW_OPTIONS: CalendarViewOptions = {
  * no `effectiveCalendarView` any more — every `CalendarViewKind` renders as
  * itself, compact or not): a compact month cell is too narrow for a chip's
  * title, but plenty wide for a small dot, and dots are what
- * `styles/calendar.css`'s `.obtask-calendar--compact .ec-day-grid` rules
+ * `styles/calendar.css`'s `.isotask-calendar--compact .ec-day-grid` rules
  * render instead — see `docs/DOMAIN-MODEL.md`'s narrow-pane compaction
  * section. Week still collapses to a rolling 3-day window when compact
  * (`event-calendar-renderer.ts`'s `views.timeGridWeek.duration`), which is a

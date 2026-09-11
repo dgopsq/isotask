@@ -1,11 +1,11 @@
 /*
- * Obtask styles. Theme variables only — no hardcoded colors (docs/CONVENTIONS.md).
+ * Isotask styles. Theme variables only — no hardcoded colors (docs/CONVENTIONS.md).
  *
- * Class prefix `obtask-` must match PLUGIN_ID in manifest.json (see
+ * Class prefix `isotask-` must match PLUGIN_ID in manifest.json (see
  * src/plugin-id.ts); renaming = one search/replace here.
  */
 
-.obtask-feed {
+.isotask-feed {
 	/*
 	 * Cap on the metadata cells that can carry arbitrarily long values
 	 * (project, tags, generic): each ellipsizes past it, so its max-content
@@ -16,21 +16,21 @@
 	 * title to zero (the narrow-pane answer is the planned two-line
 	 * collapse, not tighter squeezing).
 	 */
-	--obtask-feed-meta-col-max: 180px;
-	--obtask-feed-title-min: 200px;
+	--isotask-feed-meta-col-max: 180px;
+	--isotask-feed-title-min: 200px;
 	padding: var(--size-4-2);
 }
 
 /*
- * The actual grid — a dedicated child of `.obtask-feed` (`feed-view.ts`'s
+ * The actual grid — a dedicated child of `.isotask-feed` (`feed-view.ts`'s
  * `listEl`) rather than the view container itself, so the container can be
  * emptied once on construction and the reconciler never has to touch it
- * again. `--obtask-feed-meta-columns` is still set on `.obtask-feed` (the
+ * again. `--isotask-feed-meta-columns` is still set on `.isotask-feed` (the
  * view container) and reaches this rule by inheritance.
  *
  * Two leading tracks are status and title, ahead of the meta columns — the
  * project color no longer gets a leading dot track of its own (removed in
- * favor of coloring the project label's text, `.obtask-feed__project`
+ * favor of coloring the project label's text, `.isotask-feed__project`
  * below). Wide mode has no explicit `grid-column` anywhere on a row's
  * children — this template's column order and each row's DOM order
  * (status, title, meta) just have to keep matching.
@@ -40,36 +40,36 @@
  * — authoring it here keeps that off the inline-style path and stable
  * across container reuse.
  */
-.obtask-feed__list {
+.isotask-feed__list {
 	display: grid;
-	grid-template-columns: max-content minmax(min(var(--obtask-feed-title-min), 50%), 1fr) repeat(var(--obtask-feed-meta-columns, 1), max-content);
+	grid-template-columns: max-content minmax(min(var(--isotask-feed-title-min), 50%), 1fr) repeat(var(--isotask-feed-meta-columns, 1), max-content);
 	column-gap: var(--size-4-2);
 	position: relative;
 }
 
-/* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. Leading track matches `.obtask-feed__list`'s own (see the comment there). */
-.obtask-feed--no-meta .obtask-feed__list {
+/* `repeat(0, …)` is invalid CSS, so the no-metadata-columns case gets its own template. Leading track matches `.isotask-feed__list`'s own (see the comment there). */
+.isotask-feed--no-meta .isotask-feed__list {
 	grid-template-columns: max-content minmax(0, 1fr);
 }
 
-.obtask-feed__group,
-.obtask-feed__bucket,
-.obtask-feed__bucket-empty {
+.isotask-feed__group,
+.isotask-feed__bucket,
+.isotask-feed__bucket-empty {
 	grid-column: 1 / -1;
 }
 
-.obtask-feed__group,
-.obtask-feed__bucket,
-.obtask-feed__bucket-empty {
+.isotask-feed__group,
+.isotask-feed__bucket,
+.isotask-feed__bucket-empty {
 	padding-inline: var(--size-4-2);
 }
 
-.obtask-feed__group {
+.isotask-feed__group {
 	margin: var(--size-4-4) 0 var(--size-4-1) 0;
 	color: var(--text-normal);
 }
 
-.obtask-feed__bucket {
+.isotask-feed__bucket {
 	/*
 	 * Top margin is the gap between one bucket section and the next, so it
 	 * has to be generous enough to read as a section break rather than just
@@ -86,13 +86,13 @@
 /*
  * A bucket heading is the first thing in its section — either the very
  * first element the feed renders (no Bases grouping configured) or the
- * first bucket right under a `.obtask-feed__group` header — so it must not
+ * first bucket right under a `.isotask-feed__group` header — so it must not
  * carry the inter-bucket top margin above; that would double up with the
  * group header's own spacing (or, with no group header at all, show up as
  * a stray gap before anything has been drawn).
  */
-.obtask-feed__bucket:first-child,
-.obtask-feed__group + .obtask-feed__bucket {
+.isotask-feed__bucket:first-child,
+.isotask-feed__group + .isotask-feed__bucket {
 	margin-top: 0;
 }
 
@@ -109,7 +109,7 @@
  * a `start`-justified grid item sizes to its own max-content and simply
  * overflows its track instead of eliding.
  */
-.obtask-feed__row {
+.isotask-feed__row {
 	grid-column: 1 / -1;
 	display: grid;
 	grid-template-columns: subgrid;
@@ -121,8 +121,8 @@
 
 /* Scoped like the hover rule below — an `--invalid` row never hover-tints,
  * so it has no background change for this to ease. */
-.obtask-feed__row:not(.obtask-feed__row--invalid) {
-	transition: background-color var(--obtask-motion, 120ms) ease;
+.isotask-feed__row:not(.isotask-feed__row--invalid) {
+	transition: background-color var(--isotask-motion, 120ms) ease;
 }
 
 /*
@@ -133,11 +133,11 @@
  * selection state. Excludes `--invalid` rows: those are flex, not grid, and
  * carry no context-menu affordance of their own to surface.
  */
-.obtask-feed__row:not(.obtask-feed__row--invalid):hover {
+.isotask-feed__row:not(.isotask-feed__row--invalid):hover {
 	background-color: var(--background-modifier-hover);
 }
 
-.obtask-feed__row--invalid {
+.isotask-feed__row--invalid {
 	display: flex;
 	gap: var(--size-4-2);
 	align-items: baseline;
@@ -152,17 +152,17 @@
  * `white-space`/`overflow` of its own just wraps overflowing text. Applies
  * in both wide (subgrid cell, minmax(min(200px, 50%), 1fr) track) and
  * compact (its own `minmax(0, 1fr)` column) layouts alike — neither
- * `.obtask-feed--compact .obtask-feed__title` below overrides these three
+ * `.isotask-feed--compact .isotask-feed__title` below overrides these three
  * properties, only `grid-column`/`grid-row`.
  */
-.obtask-feed__title,
-.obtask-feed__project,
-.obtask-feed__tags,
-.obtask-feed__generic {
+.isotask-feed__title,
+.isotask-feed__project,
+.isotask-feed__tags,
+.isotask-feed__generic {
 	justify-self: stretch;
 }
 
-.obtask-feed__title {
+.isotask-feed__title {
 	min-width: 0;
 	overflow: hidden;
 	white-space: nowrap;
@@ -172,21 +172,21 @@
 
 /*
  * Custom-drawn circle checkbox (`feed-view.ts#renderStatusControl`), replacing
- * a plain icon button. The visible ring (`.obtask-feed__check`) is inset from
+ * a plain icon button. The visible ring (`.isotask-feed__check`) is inset from
  * this hit area — 5px padding/negative margin gives an ~28px touch target
  * around an 18px visual circle without affecting row layout.
  */
-.obtask-feed__status {
+.isotask-feed__status {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	padding: var(--size-4-1);
 	margin: calc(var(--size-4-1) * -1);
 	cursor: pointer;
-	transition: transform var(--obtask-motion, 120ms) ease;
+	transition: transform var(--isotask-motion, 120ms) ease;
 }
 
-.obtask-feed__check {
+.isotask-feed__check {
 	inline-size: 18px;
 	block-size: 18px;
 	border-radius: 50%;
@@ -195,7 +195,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	transition: border-color var(--obtask-motion, 120ms) ease;
+	transition: border-color var(--isotask-motion, 120ms) ease;
 }
 
 /*
@@ -204,7 +204,7 @@
  * (120ms). Covers the border (`inset: -1.5px`) so the filled state is one
  * solid disc.
  */
-.obtask-feed__check::before {
+.isotask-feed__check::before {
 	content: "";
 	position: absolute;
 	inset: -1.5px;
@@ -212,18 +212,18 @@
 	background-color: var(--interactive-accent);
 	transform: scale(0);
 	transition:
-		transform var(--obtask-motion-uncheck, 120ms) cubic-bezier(0.22, 1, 0.36, 1),
-		background-color var(--obtask-motion, 120ms) ease;
+		transform var(--isotask-motion-uncheck, 120ms) cubic-bezier(0.22, 1, 0.36, 1),
+		background-color var(--isotask-motion, 120ms) ease;
 }
 
-.obtask-feed__check svg {
+.isotask-feed__check svg {
 	position: relative;
 	width: 12px;
 	height: 12px;
 	stroke-width: 2.5;
 	color: var(--text-faint);
 	opacity: 0;
-	transition: opacity var(--obtask-motion, 120ms) ease;
+	transition: opacity var(--isotask-motion, 120ms) ease;
 }
 
 /*
@@ -232,32 +232,32 @@
  * put), a filled disc shifts to Obsidian's own `--interactive-accent-hover`
  * like any accent button.
  */
-.obtask-feed__status:not(.obtask-feed__status--checked):hover .obtask-feed__check svg {
+.isotask-feed__status:not(.isotask-feed__status--checked):hover .isotask-feed__check svg {
 	opacity: 1;
 }
 
-.obtask-feed__status--checked:hover .obtask-feed__check {
+.isotask-feed__status--checked:hover .isotask-feed__check {
 	border-color: var(--interactive-accent-hover);
 }
 
-.obtask-feed__status--checked:hover .obtask-feed__check::before {
+.isotask-feed__status--checked:hover .isotask-feed__check::before {
 	background-color: var(--interactive-accent-hover);
 }
 
-.obtask-feed__status--checked .obtask-feed__check {
+.isotask-feed__status--checked .isotask-feed__check {
 	border-color: var(--interactive-accent);
 }
 
-.obtask-feed__status--checked .obtask-feed__check::before {
+.isotask-feed__status--checked .isotask-feed__check::before {
 	transform: scale(1);
-	transition-duration: var(--obtask-motion-check, 160ms);
+	transition-duration: var(--isotask-motion-check, 160ms);
 }
 
 /* The check fades in over the tail of the fill. */
-.obtask-feed__status--checked .obtask-feed__check svg {
+.isotask-feed__status--checked .isotask-feed__check svg {
 	opacity: 1;
 	color: var(--text-on-accent);
-	transition: opacity var(--obtask-motion-check-tail, 70ms) ease var(--obtask-motion-check-delay, 90ms);
+	transition: opacity var(--isotask-motion-check-tail, 70ms) ease var(--isotask-motion-check-delay, 90ms);
 }
 
 /*
@@ -267,17 +267,17 @@
  * reopening). Disabled under reduced motion, see the media query at the end
  * of this file.
  */
-.obtask-feed__status--completing .obtask-feed__check::after {
+.isotask-feed__status--completing .isotask-feed__check::after {
 	content: "";
 	position: absolute;
 	inset: -1.5px;
 	border-radius: 50%;
 	border: 2px solid var(--interactive-accent);
 	pointer-events: none;
-	animation: obtask-check-halo 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	animation: isotask-check-halo 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes obtask-check-halo {
+@keyframes isotask-check-halo {
 	from {
 		transform: scale(1);
 		opacity: 0.7;
@@ -288,22 +288,22 @@
 	}
 }
 
-.obtask-feed__date {
+.isotask-feed__date {
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	cursor: pointer;
 	/* `transition` lives in the shared clickable-text rule further down. */
 }
 
-.obtask-feed__date--empty {
+.isotask-feed__date--empty {
 	font-style: italic;
 }
 
-.obtask-feed__error {
+.isotask-feed__error {
 	font-size: var(--font-ui-small);
 }
 
-.obtask-feed__bucket-empty {
+.isotask-feed__bucket-empty {
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	font-style: italic;
@@ -315,10 +315,10 @@
  * at the right of a feed row's meta line — a compact one/two-character
  * chip, not a full chip-with-icon like the other feed controls. `normal`
  * renders the same control with a muted "no priority" icon instead of a
- * mark (`feed-view.ts#renderPriorityControl`, `.obtask-feed__priority--empty`
+ * mark (`feed-view.ts#renderPriorityControl`, `.isotask-feed__priority--empty`
  * below).
  */
-.obtask-feed__priority {
+.isotask-feed__priority {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -335,7 +335,7 @@
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-semibold);
 	cursor: pointer;
-	transition: transform var(--obtask-motion, 120ms) ease;
+	transition: transform var(--isotask-motion, 120ms) ease;
 }
 
 /*
@@ -346,7 +346,7 @@
  * the `!`/`!!` mark, styled the same clickable control as every other
  * priority value.
  */
-.obtask-feed__priority--empty {
+.isotask-feed__priority--empty {
 	color: var(--text-faint);
 }
 
@@ -358,38 +358,38 @@
  * neighbouring subgrid cells) — and works identically for a touch tap, not
  * just a mouse click.
  */
-.obtask-feed__status:active,
-.obtask-feed__date:active,
-.obtask-feed__project--empty:active,
-.obtask-feed__tags--empty:active,
-.obtask-feed__priority:active {
+.isotask-feed__status:active,
+.isotask-feed__date:active,
+.isotask-feed__project--empty:active,
+.isotask-feed__tags--empty:active,
+.isotask-feed__priority:active {
 	transform: scale(0.96);
 }
 
 /*
  * Priority -> theme colour mapping (domain/task.ts#priorityChipClass).
  * `normal` has no rule here — it never renders one of these classes
- * (`.obtask-feed__priority--empty` above covers its colour instead). Not
- * scoped under .obtask-feed so the calendar view can reuse the same classes
+ * (`.isotask-feed__priority--empty` above covers its colour instead). Not
+ * scoped under .isotask-feed so the calendar view can reuse the same classes
  * for its own event marks (event-content.ts).
  */
-.obtask-priority-urgent {
+.isotask-priority-urgent {
 	color: var(--color-red);
 }
 
-.obtask-priority-high {
+.isotask-priority-high {
 	color: var(--color-orange);
 }
 
 /*
  * Project-color palette -> theme colour mapping
  * (domain/project-color.ts#PALETTE/#paletteColorClass). Sets
- * `--obtask-dot-color`, not a direct `color`/`background-color` — every
- * actual dot/ring/pill/bar/label rule (the feed's `.obtask-feed__project`
+ * `--isotask-dot-color`, not a direct `color`/`background-color` — every
+ * actual dot/ring/pill/bar/label rule (the feed's `.isotask-feed__project`
  * below, and `styles/calendar.css`'s month dot/due-ring/time-grid pill)
  * reads that custom property, inherited down from whichever of these classes an
  * ancestor element carries, with a `var(--text-faint)` fallback of its own
- * for a project-less (`neutral`) task. Not scoped under `.obtask-feed`: the
+ * for a project-less (`neutral`) task. Not scoped under `.isotask-feed`: the
  * calendar reuses these same 8 classes on its own event root
  * (`event-calendar-mapping.ts#toEventCalendarEvent`), same pattern as the
  * priority classes just above. A hex `color` doesn't get a class here at
@@ -398,59 +398,59 @@
  * stylesheet rules at runtime) — it's applied directly as this same custom
  * property, scoped to just the element/event that needs it.
  */
-.obtask-color-red {
-	--obtask-dot-color: var(--color-red);
+.isotask-color-red {
+	--isotask-dot-color: var(--color-red);
 }
 
-.obtask-color-orange {
-	--obtask-dot-color: var(--color-orange);
+.isotask-color-orange {
+	--isotask-dot-color: var(--color-orange);
 }
 
-.obtask-color-yellow {
-	--obtask-dot-color: var(--color-yellow);
+.isotask-color-yellow {
+	--isotask-dot-color: var(--color-yellow);
 }
 
-.obtask-color-green {
-	--obtask-dot-color: var(--color-green);
+.isotask-color-green {
+	--isotask-dot-color: var(--color-green);
 }
 
-.obtask-color-cyan {
-	--obtask-dot-color: var(--color-cyan);
+.isotask-color-cyan {
+	--isotask-dot-color: var(--color-cyan);
 }
 
-.obtask-color-blue {
-	--obtask-dot-color: var(--color-blue);
+.isotask-color-blue {
+	--isotask-dot-color: var(--color-blue);
 }
 
-.obtask-color-purple {
-	--obtask-dot-color: var(--color-purple);
+.isotask-color-purple {
+	--isotask-dot-color: var(--color-purple);
 }
 
-.obtask-color-pink {
-	--obtask-dot-color: var(--color-pink);
+.isotask-color-pink {
+	--isotask-dot-color: var(--color-pink);
 }
 
 /*
  * The three metadata cells that can carry arbitrarily long values. Each is
- * capped at --obtask-feed-meta-col-max and ellipsizes past it, so its
+ * capped at --isotask-feed-meta-col-max and ellipsizes past it, so its
  * max-content track hugs the cap instead of the full value.
  */
-.obtask-feed__project {
-	max-width: var(--obtask-feed-meta-col-max);
+.isotask-feed__project {
+	max-width: var(--isotask-feed-meta-col-max);
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	color: var(--obtask-dot-color, var(--text-accent));
+	color: var(--isotask-dot-color, var(--text-accent));
 	font-size: var(--font-ui-small);
 }
 
 /*
  * Wins over the base rule's `color` above by source order alone (same class
  * specificity, so ordering decides) — the "Set project" placeholder is
- * never a resolved project, so it never carries `--obtask-dot-color`
+ * never a resolved project, so it never carries `--isotask-dot-color`
  * either.
  */
-.obtask-feed__project--empty {
+.isotask-feed__project--empty {
 	color: var(--text-faint);
 	font-style: italic;
 }
@@ -460,10 +460,10 @@
  * "Set tags" placeholders deliberately do NOT carry Obsidian's
  * `clickable-icon` (no padding, no hover background) — only the priority
  * control, which is an icon/mark, keeps that chrome. `cursor: pointer` is
- * the whole affordance, same as `.obtask-feed__date`.
+ * the whole affordance, same as `.isotask-feed__date`.
  */
-.obtask-feed__project--empty,
-.obtask-feed__tags--empty {
+.isotask-feed__project--empty,
+.isotask-feed__tags--empty {
 	cursor: pointer;
 }
 
@@ -472,18 +472,18 @@
  * "Set tags"): the text brightens from faint to normal, no background —
  * the row's own hover tint is the only surface change.
  */
-.obtask-feed__date,
-.obtask-feed__project--empty,
-.obtask-feed__tags--empty {
+.isotask-feed__date,
+.isotask-feed__project--empty,
+.isotask-feed__tags--empty {
 	/* `transform` for the shared `:active` press feedback below. */
 	transition:
-		color var(--obtask-motion, 120ms) ease,
-		transform var(--obtask-motion, 120ms) ease;
+		color var(--isotask-motion, 120ms) ease,
+		transform var(--isotask-motion, 120ms) ease;
 }
 
-.obtask-feed__date:hover,
-.obtask-feed__project--empty:hover,
-.obtask-feed__tags--empty:hover {
+.isotask-feed__date:hover,
+.isotask-feed__project--empty:hover,
+.isotask-feed__tags--empty:hover {
 	color: var(--text-normal);
 }
 
@@ -492,41 +492,41 @@
  * inline content so the container's own text-overflow can elide them, with
  * the inter-tag gap coming from margins instead of flex `gap`.
  */
-.obtask-feed__tags {
-	max-width: var(--obtask-feed-meta-col-max);
+.isotask-feed__tags {
+	max-width: var(--isotask-feed-meta-col-max);
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
 
-.obtask-feed__tags--empty {
+.isotask-feed__tags--empty {
 	color: var(--text-faint);
 	font-style: italic;
 }
 
-.obtask-feed__tag {
+.isotask-feed__tag {
 	color: var(--text-accent);
 	font-size: var(--font-ui-small);
 }
 
-.obtask-feed__tag + .obtask-feed__tag {
+.isotask-feed__tag + .isotask-feed__tag {
 	margin-inline-start: var(--size-4-1);
 }
 
-.obtask-feed__generic {
+.isotask-feed__generic {
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--size-4-1);
-	max-width: var(--obtask-feed-meta-col-max);
+	max-width: var(--isotask-feed-meta-col-max);
 	font-size: var(--font-ui-small);
 }
 
-.obtask-feed__generic-label {
+.isotask-feed__generic-label {
 	color: var(--text-faint);
 	white-space: nowrap;
 }
 
-.obtask-feed__generic-value {
+.isotask-feed__generic-value {
 	min-width: 0;
 	overflow: hidden;
 	white-space: nowrap;
@@ -537,18 +537,18 @@
 /*
  * `display: contents` makes this wrapper transparent to the grid: in wide
  * mode its children (date/priority/project/tags/generic chips) stay direct
- * subgrid items of `.obtask-feed__row`, exactly as if `renderRow` had
+ * subgrid items of `.isotask-feed__row`, exactly as if `renderRow` had
  * appended them to the row itself — nothing about the wide layout changes.
- * `.obtask-feed--compact` below turns it back into a real box, which is what
+ * `.isotask-feed--compact` below turns it back into a real box, which is what
  * lets the chips wrap onto a second line as a unit instead of each staying
  * pinned to its own grid column.
  */
-.obtask-feed__meta {
+.isotask-feed__meta {
 	display: contents;
 }
 
 /*
- * Narrow-pane two-line compaction. `obtask-feed--compact` is toggled by
+ * Narrow-pane two-line compaction. `isotask-feed--compact` is toggled by
  * `feed-view.ts` off the pane's own `clientWidth`
  * (`domain/feed-view-options.ts`'s `COMPACT_FEED_WIDTH`) — a pane-width
  * fact, not `is-mobile`, so a narrow split pane on desktop gets this too.
@@ -556,24 +556,24 @@
  * readable title, so this drops the grid down to two rows per task: status
  * + title on the first line, the wrapped metadata chips on the second.
  */
-.obtask-feed--compact .obtask-feed__list {
+.isotask-feed--compact .isotask-feed__list {
 	display: block;
 }
 
 /*
  * `:not(--invalid)`: an invalid row only ever holds a title and an error
  * span (`feed-view.ts`'s `onDataUpdated`, not `renderRow`) — it never grows
- * a `.obtask-feed__meta` wrapper, so it has no two-line shape to collapse
- * into. Left on its own pre-existing `.obtask-feed__row--invalid` flex rule
+ * a `.isotask-feed__meta` wrapper, so it has no two-line shape to collapse
+ * into. Left on its own pre-existing `.isotask-feed__row--invalid` flex rule
  * rather than picking up this grid.
  *
  * Two explicit columns: status stays pinned to line 1 (`grid-row: 1`
  * below) while title and the wrapped meta chips share column 2, title on
  * row 1 and meta on row 2 — no leading dot track any more (the project
- * color now lives in the meta line's own `.obtask-feed__project` label
+ * color now lives in the meta line's own `.isotask-feed__project` label
  * instead of a separate leading element).
  */
-.obtask-feed--compact .obtask-feed__row:not(.obtask-feed__row--invalid) {
+.isotask-feed--compact .isotask-feed__row:not(.isotask-feed__row--invalid) {
 	display: grid;
 	grid-template-columns: max-content minmax(0, 1fr);
 	column-gap: var(--size-4-2);
@@ -581,17 +581,17 @@
 	align-items: center;
 }
 
-.obtask-feed--compact .obtask-feed__status {
+.isotask-feed--compact .isotask-feed__status {
 	grid-column: 1;
 	grid-row: 1;
 }
 
-.obtask-feed--compact .obtask-feed__title {
+.isotask-feed--compact .isotask-feed__title {
 	grid-column: 2;
 	grid-row: 1;
 }
 
-.obtask-feed--compact .obtask-feed__meta {
+.isotask-feed--compact .isotask-feed__meta {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -610,24 +610,24 @@
  * all. The empty date chip ("Set date") stays the one placeholder visible
  * in compact — it's a click affordance, not just alignment filler.
  */
-.obtask-feed--compact .obtask-feed__project--empty,
-.obtask-feed--compact .obtask-feed__tags--empty,
-.obtask-feed--compact .obtask-feed__generic--empty {
+.isotask-feed--compact .isotask-feed__project--empty,
+.isotask-feed--compact .isotask-feed__tags--empty,
+.isotask-feed--compact .isotask-feed__generic--empty {
 	display: none;
 }
 
-.obtask-calendar {
+.isotask-calendar {
 	padding: var(--size-4-4);
 	color: var(--text-muted);
 }
 
-.obtask-recurrence-modal-description,
-.obtask-create-task-modal-repeat-description {
+.isotask-recurrence-modal-description,
+.isotask-create-task-modal-repeat-description {
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 }
 
-.obtask-suggest-path {
+.isotask-suggest-path {
 	color: var(--text-muted);
 	font-size: var(--font-smaller);
 }
@@ -638,35 +638,35 @@
  * the surrounding states — no custom control chrome to keep in sync with
  * the theme.
  */
-.obtask-panel {
+.isotask-panel {
 	padding: var(--size-4-2);
 }
 
-.obtask-panel__title {
+.isotask-panel__title {
 	margin: 0 0 var(--size-4-2) 0;
 	color: var(--text-normal);
 }
 
-.obtask-panel__empty {
+.isotask-panel__empty {
 	color: var(--text-faint);
 	font-style: italic;
 	padding: var(--size-4-2) 0;
 }
 
-.obtask-panel__error-heading {
+.isotask-panel__error-heading {
 	color: var(--text-error);
 	font-size: var(--font-ui-small);
 	margin-bottom: var(--size-4-1);
 }
 
-.obtask-panel__error-list {
+.isotask-panel__error-list {
 	margin: 0;
 	padding-left: var(--size-4-4);
 	color: var(--text-error);
 	font-size: var(--font-ui-small);
 }
 
-.obtask-panel__error {
+.isotask-panel__error {
 	margin-bottom: var(--size-4-1);
 }
 
@@ -674,18 +674,18 @@
  * Project color picker (`ui/project-color-modal.ts`). The swatch row is
  * shared by the modal's own palette grid and the compact swatch button the
  * feed/task panel/command entry points sit next to; both key their actual
- * color off one of the `.obtask-color-*` custom-property classes above (or
- * a scoped `--obtask-dot-color` set directly, for a hex project color —
+ * color off one of the `.isotask-color-*` custom-property classes above (or
+ * a scoped `--isotask-dot-color` set directly, for a hex project color —
  * same as every other dot/pill surface).
  */
-.obtask-swatch-row {
+.isotask-swatch-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--size-4-2);
 	padding: var(--size-4-1) 0 var(--size-4-3) 0;
 }
 
-.obtask-swatch {
+.isotask-swatch {
 	/*
 	 * ~24px colored circle (`background-clip: content-box` confines the fill
 	 * to the box-sizing: content-box "content" square), padded out to a
@@ -698,21 +698,21 @@
 	box-sizing: content-box;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 50%;
-	background-color: var(--obtask-dot-color, var(--text-faint));
+	background-color: var(--isotask-dot-color, var(--text-faint));
 	background-clip: content-box;
 	cursor: pointer;
-	transition: border-color var(--obtask-motion, 120ms) ease, box-shadow var(--obtask-motion, 120ms) ease;
+	transition: border-color var(--isotask-motion, 120ms) ease, box-shadow var(--isotask-motion, 120ms) ease;
 }
 
-.obtask-swatch:hover {
+.isotask-swatch:hover {
 	border-color: var(--text-faint);
 }
 
-.obtask-swatch--selected {
+.isotask-swatch--selected {
 	border-color: transparent;
 	box-shadow:
 		0 0 0 2px var(--background-primary),
-		0 0 0 4px var(--obtask-dot-color, var(--text-faint));
+		0 0 0 4px var(--isotask-dot-color, var(--text-faint));
 }
 
 /*
@@ -720,13 +720,13 @@
  * project link — same swatch, sized down to sit inline with a button/link
  * rather than in the modal's own grid.
  */
-.obtask-swatch--compact {
+.isotask-swatch--compact {
 	inline-size: var(--size-4-3);
 	block-size: var(--size-4-3);
 	padding: var(--size-4-2);
 }
 
-.obtask-project-color-modal-error {
+.isotask-project-color-modal-error {
 	color: var(--text-error);
 	font-size: var(--font-ui-small);
 	margin: 0 0 var(--size-4-2) 0;
@@ -738,40 +738,40 @@
  * whole modal (which would drop focus out of the hex field mid-edit) — this
  * hides it, rather than the div being absent, when there's nothing to show.
  */
-.obtask-project-color-modal-error--hidden {
+.isotask-project-color-modal-error--hidden {
 	display: none;
 }
 
 /*
- * Reduced-motion opt-out for every `var(--obtask-motion, 120ms)` transition
- * above. `--obtask-motion` inherits, so zeroing it once at these two roots
+ * Reduced-motion opt-out for every `var(--isotask-motion, 120ms)` transition
+ * above. `--isotask-motion` inherits, so zeroing it once at these two roots
  * (the feed container and the swatch itself — the compact swatch button
- * lives outside `.obtask-feed`, e.g. the task panel's Project field, so it
+ * lives outside `.isotask-feed`, e.g. the task panel's Project field, so it
  * needs its own root) collapses every transition beneath them to 0s with no
  * `!important` and no per-rule media query. The feed list's own move/enter/
  * exit animation (auto-animate) already gates itself on this same media
  * feature, so this keeps the whole view consistent with it.
  */
 @media (prefers-reduced-motion: reduce) {
-	.obtask-feed,
-	.obtask-swatch {
-		--obtask-motion: 0s;
-		--obtask-motion-check: 0s;
-		--obtask-motion-uncheck: 0s;
-		--obtask-motion-check-tail: 0s;
-		--obtask-motion-check-delay: 0s;
+	.isotask-feed,
+	.isotask-swatch {
+		--isotask-motion: 0s;
+		--isotask-motion-check: 0s;
+		--isotask-motion-uncheck: 0s;
+		--isotask-motion-check-tail: 0s;
+		--isotask-motion-check-delay: 0s;
 	}
 
 	/*
 	 * The status control's completion halo
-	 * (`.obtask-feed__status--completing`, above) are one-shot `animation`s, not
-	 * `transition`s, so `--obtask-motion` doesn't reach them — disabled here
+	 * (`.isotask-feed__status--completing`, above) are one-shot `animation`s, not
+	 * `transition`s, so `--isotask-motion` doesn't reach them — disabled here
 	 * instead, at matching specificity, and placed after those rules in file
 	 * order so the cascade picks this one with no `!important` needed.
 	 * `feed-view.ts` also skips the animation hold (delay 0) under this same
 	 * media query, so the end state (checked/struck) still lands immediately.
 	 */
-	.obtask-feed__status--completing .obtask-feed__check::after {
+	.isotask-feed__status--completing .isotask-feed__check::after {
 		animation: none;
 	}
 }

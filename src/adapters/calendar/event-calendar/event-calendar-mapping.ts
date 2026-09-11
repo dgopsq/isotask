@@ -73,28 +73,28 @@ export function toEventCalendarFirstDay(firstDay: Weekday): 0 | 1 | 2 | 3 | 4 | 
  * back by `event-content.ts`'s `eventContent` function — the domain event
  * itself isn't otherwise available inside `eventContent`
  * (`Calendar.EventContentInfo` only carries Event Calendar's own `Event`
- * shape). `priority` backs the trailing `!`/`!!` marks span; `obtaskTime`
+ * shape). `priority` backs the trailing `!`/`!!` marks span; `isotaskTime`
  * backs the timed-all-day-chip time label; `hexDotColor` backs
  * `event-calendar-renderer.ts`'s `eventDidMount` (see `toEventCalendarEvent`'s
  * doc comment for why a hex `DotColor` is relayed this way rather than as a
  * class).
  */
-export interface ObtaskEventExtendedProps {
-	readonly obtaskTime?: string;
+export interface IsotaskEventExtendedProps {
+	readonly isotaskTime?: string;
 	readonly priority?: Priority;
 	readonly hexDotColor?: string;
 }
 
-/** Type guard for reading `Calendar.Event["extendedProps"]` (`Record<string, unknown>`) back out as `ObtaskEventExtendedProps`. */
-export function isObtaskEventExtendedProps(value: unknown): value is ObtaskEventExtendedProps {
+/** Type guard for reading `Calendar.Event["extendedProps"]` (`Record<string, unknown>`) back out as `IsotaskEventExtendedProps`. */
+export function isIsotaskEventExtendedProps(value: unknown): value is IsotaskEventExtendedProps {
 	if (typeof value !== "object" || value === null) {
 		return false;
 	}
-	const obtaskTime: unknown = (value as Record<string, unknown>)["obtaskTime"];
+	const isotaskTime: unknown = (value as Record<string, unknown>)["isotaskTime"];
 	const priority: unknown = (value as Record<string, unknown>)["priority"];
 	const hexDotColor: unknown = (value as Record<string, unknown>)["hexDotColor"];
 	return (
-		(obtaskTime === undefined || typeof obtaskTime === "string") &&
+		(isotaskTime === undefined || typeof isotaskTime === "string") &&
 		(priority === undefined || (typeof priority === "string" && (PRIORITIES as readonly string[]).includes(priority))) &&
 		(hexDotColor === undefined || typeof hexDotColor === "string")
 	);
@@ -122,10 +122,10 @@ export function hexDotColorOf(event: CalendarEvent): string | undefined {
  *
  * A zero-duration point event's `start` keeps its time-of-day even though
  * it's `allDay` (`calendar-events.ts`), so the all-day row can't show it on
- * the grid — its time is passed through `extendedProps.obtaskTime` instead,
+ * the grid — its time is passed through `extendedProps.isotaskTime` instead,
  * rendered as a separate muted label in front of the title by
  * `event-content.ts`'s `eventContent`. A genuinely date-only all-day event
- * (a plain `IsoDate` `start`) carries no `obtaskTime`. `extendedProps.priority`
+ * (a plain `IsoDate` `start`) carries no `isotaskTime`. `extendedProps.priority`
  * is always set (regardless of `allDay`/timed) — `eventContent` reads it to
  * decide whether to append a trailing `!`/`!!` marks span.
  *
@@ -137,7 +137,7 @@ export function hexDotColorOf(event: CalendarEvent): string | undefined {
  * arbitrary runtime value (`dotColorClasses`'s doc comment) — so it's
  * relayed instead through `extendedProps.hexDotColor` (`hexDotColorOf`), a
  * plain string `event-calendar-renderer.ts`'s `eventDidMount` reads back to
- * set `--obtask-dot-color` directly on the mounted `.ec-event` element via
+ * set `--isotask-dot-color` directly on the mounted `.ec-event` element via
  * `setCssProps`, and its `setEvents` repaints on every later data update
  * (see that file for how it keeps a mounted-element map for exactly this).
  */
@@ -146,12 +146,12 @@ export function toEventCalendarEvent(event: CalendarEvent): Calendar.EventInput 
 	const end = event.end === undefined ? start : toJsDate(event.end);
 	const timedAllDay = event.allDay && isDateTime(event.start);
 	const hexDotColor = hexDotColorOf(event);
-	// Typed as `Record<string, unknown>` (rather than `ObtaskEventExtendedProps`)
+	// Typed as `Record<string, unknown>` (rather than `IsotaskEventExtendedProps`)
 	// to match `Calendar.EventInput["extendedProps"]`'s own type exactly —
-	// `ObtaskEventExtendedProps` is for the read side (`isObtaskEventExtendedProps`
+	// `IsotaskEventExtendedProps` is for the read side (`isIsotaskEventExtendedProps`
 	// below), which narrows the untyped `unknown` Event Calendar hands back.
 	const extendedProps: Record<string, unknown> = {
-		...(timedAllDay ? { obtaskTime: formatTime(event.start) } : {}),
+		...(timedAllDay ? { isotaskTime: formatTime(event.start) } : {}),
 		priority: event.priority,
 		...(hexDotColor === undefined ? {} : { hexDotColor }),
 	};
@@ -214,7 +214,7 @@ export function fromEventCalendarDrop(event: CalendarEvent, drop: EventCalendarD
 	}
 	// Per ADR 0011 a `scheduled` datetime with no `duration` renders as an
 	// all-day chip that still carries its time (surfaced via
-	// `extendedProps.obtaskTime`). Event Calendar normalises an all-day
+	// `extendedProps.isotaskTime`). Event Calendar normalises an all-day
 	// event's `start` to midnight, so taking it verbatim would silently
 	// destroy the user's `14:30`. `withDatePart` takes the new day from the
 	// drop and the time-of-day from the original domain event; a genuinely

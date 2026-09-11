@@ -120,13 +120,13 @@ malformed hex (`#gg0000`, `#12345`) — never errors and never affects the task'
 
 Palette colors apply as one of 8 pre-declared static CSS classes. A hex color has no such class —
 Obsidian's plugin guidelines forbid a plugin registering stylesheet rules at runtime — so it's
-applied as a scoped `--obtask-dot-color` custom property directly on the element via Obsidian's
+applied as a scoped `--isotask-dot-color` custom property directly on the element via Obsidian's
 `setCssProps`, at the one place each renderer (the feed row, the calendar's `eventDidMount`) holds
 the actual DOM node. The calendar's `eventDidMount` is mount-only (Svelte's `onMount`), so it alone
 can't repaint an already-mounted event when a project's hex color changes underneath it — the
 renderer (`adapters/calendar/event-calendar/event-calendar-renderer.ts`) additionally tracks every
 mounted event element in a `Map` keyed by event id, and its `setEvents` walks that map on every
-later data update to set or remove `--obtask-dot-color` directly, matching whatever the new event
+later data update to set or remove `--isotask-dot-color` directly, matching whatever the new event
 list says. That's what makes a calendar event's hex color repaint live the same way a palette
 class already does.
 
@@ -344,9 +344,9 @@ Each task can contribute up to two calendar events, controlled by the `events` v
 - A chip whose underlying date carries a time component (a timed `due`, or a timed `scheduled`
   with no `duration`) shows its time as a separate muted label in front of the title, e.g. "09:00"
   next to "Budget report" (`event-calendar-mapping.ts#toEventCalendarEvent` sets
-  `extendedProps.obtaskTime` via `domain/dates.ts#formatTime`; the adapter's `event-content.ts`
-  renders it as `.obtask-event-time`, styled in `styles/calendar.css`) — the time-grid position is
-  not shown, only the day and the label. A genuinely date-only chip carries no `obtaskTime` and
+  `extendedProps.isotaskTime` via `domain/dates.ts#formatTime`; the adapter's `event-content.ts`
+  renders it as `.isotask-event-time`, styled in `styles/calendar.css`) — the time-grid position is
+  not shown, only the day and the label. A genuinely date-only chip carries no `isotaskTime` and
   shows no label.
 - Chips are ordered within the calendar by `domain/calendar-events.ts#sortCalendarEvents`
   (start, then title, then id) before being handed to the renderer — Event Calendar normalises
@@ -361,13 +361,13 @@ independent, smaller signals instead of the event background:
 
 - **The leading dot/ring** follows the task's **project**, not its priority (see "Project color"
   above): `due` renders as a ring, `scheduled` as a filled dot, both colored via
-  `--obtask-dot-color`, which `domain/calendar-events.ts#CalendarEvent.dotColor` carries and
+  `--isotask-dot-color`, which `domain/calendar-events.ts#CalendarEvent.dotColor` carries and
   `event-calendar-mapping.ts#toEventCalendarEvent` applies as a class
   (`domain/project-color.ts#dotColorClasses`) or, for a hex project color, a `setCssProps` custom
   property set by the renderer's `eventDidMount` and kept live by its `setEvents` repaint (see
   "Project color" above).
 - **The trailing `!`/`!!` marks** (present only for `high`/`urgent`) follow the task's
-  **priority**, reusing the same `obtask-priority-high`/`obtask-priority-urgent` color classes the
+  **priority**, reusing the same `isotask-priority-high`/`isotask-priority-urgent` color classes the
   feed's priority mark uses (`domain/task.ts#priorityChipClass`), attached by
   `event-content.ts#eventContent` — see "Priority" above.
 
@@ -386,7 +386,7 @@ gets the same treatment as a phone, and a full-width pane on a phone in landscap
 **Month renders as a dot grid, not a fallback view.** There is no `effectiveCalendarView`/view
 remap any more — every `CalendarViewKind` (day/week/month) renders as itself at every pane width,
 and the header switcher always lists all three. Below the threshold, `styles/calendar.css`'s
-`.obtask-calendar--compact .ec-day-grid` rules turn month's chips into small dots instead: each
+`.isotask-calendar--compact .ec-day-grid` rules turn month's chips into small dots instead: each
 event's title stays in the DOM (clip-to-1px visually hidden, the same treatment the compact
 time-axis gutter's "all-day" label already used, see below) so assistive tech still gets it, while
 on screen only the existing priority-coloured dot (`.ec-event-body::before`, drawn for the
@@ -425,7 +425,7 @@ the widest content any row puts in it, so shortening the hour labels alone would
 nothing. Three things shrink together: `slotLabelFormat` becomes `{ hour: "2-digit", hour12: false }`
 so hours render as a bare zero-padded 24-hour number ("13", 16px, matching `domain/dates.ts#formatTime`'s
 own convention — `hour12` must be pinned, since a 12-hour locale would render the wider "1 PM"); the
-"all-day" label is replaced via `allDayContent` with a span carrying an `obtask-` class, which
+"all-day" label is replaced via `allDayContent` with a span carrying an `isotask-` class, which
 `calendar.css` then visually hides; and the sidebar padding is tightened. The label is hidden with
 the clip-to-1px treatment rather than `display: none`, so it stays in the accessibility tree and the
 all-day row is still announced — an out-of-flow element contributes no width, which is what actually
@@ -436,11 +436,11 @@ one shared span.
 At the compact 3-day view's ~86px column width, a timed all-day chip's time label and title no
 longer fit on one line (the title was squeezed out entirely — a chip read as bare "11:45" with no
 task name). `styles/calendar.css` stacks the two onto separate lines under
-`.obtask-calendar--compact` (CSS-only: `.ec-event-body` gets `flex-wrap: wrap` and the title
+`.isotask-calendar--compact` (CSS-only: `.ec-event-body` gets `flex-wrap: wrap` and the title
 `flex-basis: 100%`, forcing it onto its own line via the standard flexbox "wrap" trick — no change
-to `event-content.ts`'s DOM). A date-only chip (no `.obtask-event-time` node) is unaffected, since
-the rule is scoped via a `.obtask-event-time ~ .ec-event-title` sibling combinator. Wide panes are
-untouched — the rule only applies under `.obtask-calendar--compact`. The compact grid's own height
+to `event-content.ts`'s DOM). A date-only chip (no `.isotask-event-time` node) is unaffected, since
+the rule is scoped via a `.isotask-event-time ~ .ec-event-title` sibling combinator. Wide panes are
+untouched — the rule only applies under `.isotask-calendar--compact`. The compact grid's own height
 stays `"auto"` (unbounded, same as wide panes) — a bounded height would give Event Calendar an
 internal scroller, which would pin the day-header and all-day rows in place while the hourly slots
 scrolled beneath them; instead the whole grid scrolls away with the pane. This costs little because

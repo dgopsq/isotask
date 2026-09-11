@@ -70,15 +70,15 @@ export function taskEditMenuCtx(deps: RegisterTaskMenusDeps): TaskEditMenuCtx {
 	};
 }
 
-/** Appends a separated, labelled "Obtask" section (`ui/task-edit-menu.ts#buildTaskEditMenu`'s full property list) to an already-open file/editor menu. */
-function addObtaskSection(menu: Menu, task: Task, deps: RegisterTaskMenusDeps): void {
+/** Appends a separated, labelled "Isotask" section (`ui/task-edit-menu.ts#buildTaskEditMenu`'s full property list) to an already-open file/editor menu. */
+function addIsotaskSection(menu: Menu, task: Task, deps: RegisterTaskMenusDeps): void {
 	menu.addSeparator();
-	menu.addItem((item) => item.setTitle("Obtask").setIsLabel(true));
+	menu.addItem((item) => item.setTitle("Isotask").setIsLabel(true));
 	buildTaskEditMenu(menu, task, taskEditMenuCtx(deps));
 }
 
 /**
- * Registers an "Obtask" section on the file-menu (file explorer, tab
+ * Registers an "Isotask" section on the file-menu (file explorer, tab
  * context menu, …) and the editor-menu (in-editor right-click) for any
  * task note, built from `ui/task-edit-menu.ts#buildTaskEditMenu` — every
  * property editable wherever the plugin owns UI, per `AGENTS.md`.
@@ -93,7 +93,7 @@ export function registerTaskMenus(plugin: Plugin, deps: RegisterTaskMenusDeps): 
 			if (task === undefined) {
 				return;
 			}
-			addObtaskSection(menu, task, deps);
+			addIsotaskSection(menu, task, deps);
 		}),
 	);
 
@@ -107,7 +107,7 @@ export function registerTaskMenus(plugin: Plugin, deps: RegisterTaskMenusDeps): 
 			if (task === undefined) {
 				return;
 			}
-			addObtaskSection(menu, task, deps);
+			addIsotaskSection(menu, task, deps);
 		}),
 	);
 }
