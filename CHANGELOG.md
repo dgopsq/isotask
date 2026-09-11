@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1](https://github.com/dgopsq/isotask/compare/0.1.0...0.1.1) (2026-09-11)
+
+
+### Bug fixes
+
+* **e2e:** poll for the spawned occurrence's body instead of reading once ([#12](https://github.com/dgopsq/isotask/issues/12)) ([be690c0](https://github.com/dgopsq/isotask/commit/be690c08f483e6d055614ccb888e6c1726f32242))
+* **release:** drop sticky release-as, list chores in changelog ([#14](https://github.com/dgopsq/isotask/issues/14)) ([c89a873](https://github.com/dgopsq/isotask/commit/c89a8737bdaf451d74735d0a4bff332aa8d95f70))
+
+
+### Maintenance
+
+* rename plugin to Isotask ([#11](https://github.com/dgopsq/isotask/issues/11)) ([4860b9e](https://github.com/dgopsq/isotask/commit/4860b9ec77564e31de7dfa1402f0b5668339664e))
+
 ## [0.1.0](https://github.com/dgopsq/isotask/compare/0.1.0...0.1.0) (2026-09-11)
 
 
