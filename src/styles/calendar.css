@@ -530,11 +530,9 @@
 	border-end-start-radius: var(--radius-s) calc(var(--radius-s) + var(--size-4-1) + 1px);
 	border-end-end-radius: var(--radius-s) calc(var(--radius-s) + var(--size-4-1) + 1px);
 	box-shadow: none;
-	/* Painted background stops at the padding box (background-clip above); a shadow painted
-	 * on this box itself would float past it with a gap — moved to ::after below instead. */
+	/* none, not the lift shadow: box-shadow paints outside the transparent gap border; ::after below carries it. */
 	--isotask-lift-shadow: none;
-	/* overflow: hidden here would clip that ::after shadow at this box's own edge;
-	 * .ec-event-body's overflow: hidden (further down) already does the real content clip. */
+	/* visible, not hidden: hidden would clip the ::after shadow; .ec-event-body already clips content. */
 	overflow: visible;
 	/* Same hover ease + drag/drop opacity/box-shadow/scale settle as the
 	 * day-grid/all-day rule above — see its comment for why, including the
@@ -697,12 +695,7 @@
 	color: var(--text-normal);
 }
 
-/*
- * Lift shadow layer for time-grid blocks, painted on ::after rather than the element
- * itself — see the --isotask-lift-shadow: none comment above for why. inset: 0 resolves
- * against .ec-event's padding box (it's position: relative), flush with the painted
- * background's own edge; border-radius: inherit matches the asymmetric bottom corners.
- */
+/* Shadow layer for time-grid blocks: inset: 0 spans the padding box, i.e. exactly the painted background. */
 .isotask-calendar .ec-time-grid .ec-body .ec-event::after {
 	content: "";
 	position: absolute;
@@ -904,8 +897,7 @@
 	--isotask-lift-scale: 1.05;
 	--isotask-lift-tilt: 0.6deg;
 	--isotask-ghost-scale: 0.97;
-	/* -value is the real shadow; --isotask-lift-shadow is what every rule reads, and the
-	 * time-grid block below nulls it locally so only its own ::after shadow layer paints. */
+	/* Rules read --isotask-lift-shadow; the time grid nulls it and its ::after reads -value instead. */
 	--isotask-lift-shadow-value: 0 2px 8px var(--background-modifier-box-shadow);
 	--isotask-lift-shadow: var(--isotask-lift-shadow-value);
 }
@@ -923,8 +915,7 @@
  * settle un-press/drop keeps: releasing removes the `:active` match, so the
  * base rule's own (slower) transition governs the way back down instead.
  */
-/* iOS fires :active at touchstart, ~500ms before EC's own drag start — gated to pointer
- * devices so touch doesn't show this lift AND the drag-start lift below out of sync. */
+/* Pointer only: iOS sets :active at touchstart, long before the drag starts, giving a double lift. */
 @media (hover: hover) {
 	.isotask-calendar:not(.isotask-calendar--resizing) .ec-event:active:not(.ec-ghost) {
 		scale: var(--isotask-lift-scale);
@@ -999,9 +990,7 @@
 	animation: isotask-set var(--isotask-motion-settle, 240ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Same landing beat as isotask-set above, replayed on the ::after shadow layer — the
- * element-level keyframe's own box-shadow resolves to none in the time grid now, so this
- * is the only thing that actually fades there. */
+/* Landing shadow for the time grid, where the element-level keyframe's shadow resolves to none. */
 @keyframes isotask-set-shadow {
 	from {
 		box-shadow: var(--isotask-lift-shadow-value);
@@ -1034,18 +1023,12 @@
 	box-shadow: var(--isotask-lift-shadow);
 }
 
-/* Resting state for the time-grid shadow layer — the element-level box-shadow above
- * resolves to none there, so this is the ::after equivalent of the rule just above. */
+
 .isotask-calendar .ec.ec-dragging .ec-time-grid .ec-body .ec-event.ec-preview::after {
 	box-shadow: var(--isotask-lift-shadow-value);
 }
 
-/*
- * Touch has no press-then-handoff the way desktop's :active does (see the
- * @media (hover: hover) rule above) — the preview clone is the first lift touch ever
- * sees, and a plain transition can't animate a value on a freshly inserted element, so
- * this plays an explicit entrance instead, into the same resting state set above.
- */
+/* Touch lifts at drag start; an animation, not a transition, since the preview is a freshly inserted element. */
 @media (hover: none) {
 	.isotask-calendar .ec.ec-dragging .ec-event.ec-preview {
 		animation: isotask-lift var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1932,7 +1915,6 @@
 .isotask-calendar.isotask-calendar--compact .ec-day-grid .ec-event-body::before {
 	margin-inline-end: 0;
 }
-
 
 /*
  * Caps how many dots a busy day cell shows at a small, deterministic number
