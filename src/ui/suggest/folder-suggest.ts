@@ -1,5 +1,5 @@
-import type { App } from "obsidian";
-import { AbstractInputSuggest, TFolder } from "obsidian";
+import type { App, TFolder } from "obsidian";
+import { AbstractInputSuggest } from "obsidian";
 
 import { matchesQuery } from "./match";
 
@@ -16,7 +16,7 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	}
 
 	protected override getSuggestions(query: string): TFolder[] {
-		const folders = this.app.vault.getAllLoadedFiles().filter((file): file is TFolder => file instanceof TFolder);
+		const folders = this.app.vault.getAllFolders(true);
 		const matched = folders.filter((folder) => matchesQuery(folder.path, query));
 		return matched.slice(0, MAX_SUGGESTIONS);
 	}

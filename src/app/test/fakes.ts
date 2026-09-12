@@ -1,6 +1,6 @@
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
-import { isTaskNote, parseTask } from "@/domain/frontmatter";
+import { parseTask } from "@/domain/frontmatter";
 import type { History } from "@/domain/history";
 import { emptyHistory, pushRedone, pushUndone, record, takeRedo, takeUndo } from "@/domain/history";
 import type { PropertyKeys } from "@/domain/property-keys";
@@ -60,20 +60,6 @@ export class FakeTaskStore implements TaskStore {
 		}
 		const result = parseTask(path, basenameOf(path), note.frontmatter, this.keys, this.statuses);
 		return result.ok ? ok(result.value) : err({ kind: "invalid-task", path, errors: result.error });
-	};
-
-	list = async (): Promise<readonly Task[]> => {
-		const tasks: Task[] = [];
-		for (const [path, note] of this.notes) {
-			if (!isTaskNote(note.frontmatter, this.keys)) {
-				continue;
-			}
-			const result = parseTask(path, basenameOf(path), note.frontmatter, this.keys, this.statuses);
-			if (result.ok) {
-				tasks.push(result.value);
-			}
-		}
-		return tasks;
 	};
 
 	updateProperties = async (path: TaskPath, patch: FrontmatterPatch): Promise<Result<void, TaskStoreError>> => {

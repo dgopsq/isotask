@@ -20,8 +20,6 @@ export interface NewTaskFile {
 export interface TaskStore {
 	/** Reads and parses a single task note (via `domain/frontmatter.ts`). */
 	readonly read: (path: TaskPath) => Promise<Result<Task, TaskStoreError>>;
-	/** All task notes in the vault (marker match); notes that fail to parse are skipped. */
-	readonly list: () => Promise<readonly Task[]>;
 	/** Applies a frontmatter patch via `processFrontMatter` (`null` removes a key). */
 	readonly updateProperties: (path: TaskPath, patch: FrontmatterPatch) => Promise<Result<void, TaskStoreError>>;
 	/** Creates a new task note; fails idempotently if the target path already exists. */
