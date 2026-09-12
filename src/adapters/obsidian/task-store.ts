@@ -11,7 +11,7 @@ import {
 	shouldDropOverlayEntry,
 } from "@/adapters/obsidian/task-store-helpers";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
-import { isTaskNote, parseTask } from "@/domain/frontmatter";
+import { parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
@@ -104,29 +104,6 @@ export class VaultTaskStore implements TaskStore {
 		const raw = (await this.frontmatterOf(file)) ?? {};
 		const result = parseTask(path, file.basename, raw, this.deps.getPropertyKeys(), this.deps.getStatuses());
 		return result.ok ? ok(result.value) : err({ kind: "invalid-task", path, errors: result.error });
-	}
-
-	async list(): Promise<readonly Task[]> {
-		const keys = this.deps.getPropertyKeys();
-		const statuses = this.deps.getStatuses();
-		const tasks: Task[] = [];
-
-		for (const file of this.deps.app.vault.getMarkdownFiles()) {
-			const cacheFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
-			const raw = lookupFrontmatter(cacheFm, this.recentWrites, file.path, Date.now(), RECENT_WRITE_TTL_MS);
-			if (raw === undefined || !isTaskNote(raw, keys)) {
-				continue;
-			}
-			const result = parseTask(file.path as TaskPath, file.basename, raw, keys, statuses);
-			if (result.ok) {
-				tasks.push(result.value);
-			}
-			// Notes that match the marker but fail to parse are skipped here;
-			// `adapters/obsidian/bases-entries.ts` is where they're surfaced as
-			// "invalid" rows for the feed view.
-		}
-
-		return tasks;
 	}
 
 	async updateProperties(path: TaskPath, patch: FrontmatterPatch): Promise<Result<void, TaskStoreError>> {
