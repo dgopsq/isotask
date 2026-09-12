@@ -1,5 +1,5 @@
 import type { App, QueryController } from "obsidian";
-import { BasesView, Scope, TFile } from "obsidian";
+import { BasesView, Platform, Scope, TFile } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import { projectFilePath, projectRawColor } from "@/adapters/obsidian/project-color-lookup";
@@ -284,7 +284,10 @@ export class CalendarBasesView extends BasesView {
 							// popped our scope and left Cmd+Z dead at exactly the
 							// moment an undo became available. Take focus back so
 							// the keystroke is armed for the gesture just made.
-							this.viewContainerEl.focus();
+							// Not on mobile: no keyboard to arm, and a focused container keeps the next touch drag from moving on iOS.
+							if (!Platform.isMobileApp) {
+								this.viewContainerEl.focus();
+							}
 							this.deps.haptics.trigger("medium");
 							return true;
 						}
