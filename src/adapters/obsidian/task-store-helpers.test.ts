@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { applyFrontmatterPatch, extractBody, setAllFrontmatterValues } from "@/adapters/obsidian/task-store-helpers";
+import {
+	applyFrontmatterPatch,
+	extractBody,
+	frontmatterReflectsPatch,
+	setAllFrontmatterValues,
+} from "@/adapters/obsidian/task-store-helpers";
 
 describe("applyFrontmatterPatch", () => {
 	it("sets keys present in the patch", () => {
@@ -39,6 +44,24 @@ describe("setAllFrontmatterValues", () => {
 		const fm: Record<string, unknown> = { status: "todo" };
 		setAllFrontmatterValues(fm, { status: "done" });
 		expect(fm).toEqual({ status: "done" });
+	});
+});
+
+describe("frontmatterReflectsPatch", () => {
+	it("is true when the cache already has every patched primitive value", () => {
+		expect(frontmatterReflectsPatch({ status: "done", priority: "high" }, { status: "done" })).toBe(true);
+	});
+
+	it("is false when the cache is missing a patched key", () => {
+		expect(frontmatterReflectsPatch({ status: "todo" }, { status: "done" })).toBe(false);
+	});
+
+	it("is true for a null patch value when the key is already absent", () => {
+		expect(frontmatterReflectsPatch({ status: "todo" }, { due: null })).toBe(true);
+	});
+
+	it("is false for a null patch value when the key is still present", () => {
+		expect(frontmatterReflectsPatch({ status: "todo", due: "2026-08-29" }, { due: null })).toBe(false);
 	});
 });
 

@@ -18,8 +18,8 @@ import { resolveDotColor } from "@/domain/project-color";
 import type { PropertyKeys } from "@/domain/property-keys";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
-import type { Task } from "@/domain/task";
-import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
+import type { Task, TaskPath } from "@/domain/task";
+import { refreshAfterMetadataResolved, refreshWhenCached } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
@@ -222,17 +222,20 @@ export class CalendarBasesView extends BasesView {
 		// the same calendar.
 		const events: CalendarEvent[] = [];
 		let invalidCount = 0;
+		const uncachedPaths: TaskPath[] = [];
 		// Rebuilt below as `resolveTaskDotColor` runs per task — see the
 		// field's doc comment for why this can't just be computed once up
 		// front.
 		this.lastProjectPaths = new Set<string>();
 		for (const group of this.data.groupedData) {
-			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
+			const { tasks, invalid, uncached } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
 			invalidCount += invalid.length;
+			uncachedPaths.push(...uncached);
 			for (const { task } of tasks) {
 				events.push(...eventsForTask(task, { source: options.events }, this.resolveTaskDotColor(task)));
 			}
 		}
+		refreshWhenCached(this, this.deps.app, uncachedPaths);
 
 		let handle = this.handle;
 		if (handle === undefined) {

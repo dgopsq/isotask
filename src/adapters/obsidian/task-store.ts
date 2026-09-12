@@ -1,7 +1,12 @@
-import type { App, TFile } from "obsidian";
-import { getFrontMatterInfo, normalizePath, parseYaml } from "obsidian";
+import type { App, EventRef, TFile } from "obsidian";
+import { getFrontMatterInfo, normalizePath, Notice, parseYaml } from "obsidian";
 
-import { applyFrontmatterPatch, extractBody, setAllFrontmatterValues } from "@/adapters/obsidian/task-store-helpers";
+import {
+	applyFrontmatterPatch,
+	extractBody,
+	frontmatterReflectsPatch,
+	setAllFrontmatterValues,
+} from "@/adapters/obsidian/task-store-helpers";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
 import { parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
@@ -21,6 +26,14 @@ function describeError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
+interface FrontmatterAttempt {
+	readonly frontmatter: Record<string, unknown> | undefined;
+	readonly cacheDefined: boolean;
+	readonly cacheFmDefined: boolean;
+	readonly contentLength: number | undefined;
+	readonly fmInfoExists: boolean | undefined;
+}
+
 /**
  * `TaskStore` over Vault + MetadataCache + `fileManager.processFrontMatter`
  * (`docs/ARCHITECTURE.md#ports`). Frontmatter is written only through
@@ -33,25 +46,114 @@ export class VaultTaskStore implements TaskStore {
 		this.deps = deps;
 	}
 
-	/** Cache can lag a just-written file (e.g. right after `processFrontMatter`); fall back to reading and parsing the file itself. */
-	private async frontmatterOf(file: TFile): Promise<Record<string, unknown> | undefined> {
-		const cached = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
-		if (cached !== undefined) {
-			return cached;
+	private wait(ms: number): Promise<void> {
+		return new Promise((resolve) => {
+			window.setTimeout(resolve, ms);
+		});
+	}
+
+	private async attemptFrontmatterLookup(file: TFile): Promise<FrontmatterAttempt> {
+		const cache = this.deps.app.metadataCache.getFileCache(file);
+		const cacheFm = cache?.frontmatter;
+		if (cacheFm !== undefined) {
+			return {
+				frontmatter: cacheFm,
+				cacheDefined: cache !== null,
+				cacheFmDefined: true,
+				contentLength: undefined,
+				fmInfoExists: undefined,
+			};
 		}
 
 		const content = await this.deps.app.vault.cachedRead(file);
 		const info = getFrontMatterInfo(content);
+		const base = { cacheDefined: cache !== null, cacheFmDefined: false, contentLength: content.length, fmInfoExists: info.exists };
 		if (!info.exists) {
-			return undefined;
+			return { frontmatter: undefined, ...base };
 		}
 
 		try {
 			const parsed: unknown = parseYaml(info.frontmatter);
-			return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+			const frontmatter = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+			return { frontmatter, ...base };
 		} catch {
-			return undefined;
+			return { frontmatter: undefined, ...base };
 		}
+	}
+
+	/** Cache (and even the freshly-read file) can lag right after a write, especially over iCloud sync; retry a few times before giving up. */
+	private async frontmatterOf(file: TFile): Promise<Record<string, unknown> | undefined> {
+		const maxRetries = 3;
+		let currentFile = file;
+		let lastAttempt: FrontmatterAttempt | undefined;
+		let sameFileAsPrevious = true;
+
+		for (let attempt = 0; attempt <= maxRetries; attempt++) {
+			const result = await this.attemptFrontmatterLookup(currentFile);
+			lastAttempt = result;
+			if (result.frontmatter !== undefined) {
+				return result.frontmatter;
+			}
+
+			if (attempt === maxRetries) {
+				break;
+			}
+
+			await this.wait(200);
+			const refreshed = this.deps.app.vault.getFileByPath(currentFile.path);
+			sameFileAsPrevious = refreshed === currentFile;
+			if (refreshed !== null) {
+				currentFile = refreshed;
+			}
+		}
+
+		// TEMP: removed before merge.
+		const contentLen = lastAttempt?.contentLength === undefined ? "n/a" : String(lastAttempt.contentLength);
+		const fmInfoExists = lastAttempt?.fmInfoExists === undefined ? "n/a" : String(lastAttempt.fmInfoExists);
+		new Notice(
+			`isotask diag: path=${file.path} cacheFm=${lastAttempt?.cacheFmDefined ? "yes" : "no"} cache=${lastAttempt?.cacheDefined ? "yes" : "no"} contentLen=${contentLen} fmInfoExists=${fmInfoExists} attempts=${String(maxRetries + 1)} sameFile=${sameFileAsPrevious ? "yes" : "no"}`,
+			10000,
+		);
+		return undefined;
+	}
+
+	/**
+	 * Resolves once the metadata cache reflects a just-written patch, or after `timeoutMs` —
+	 * timing out isn't an error, callers proceed regardless (iCloud can stall the "changed" event).
+	 */
+	private async awaitCacheSettled(file: TFile, patch: FrontmatterPatch, timeoutMs = 2000): Promise<void> {
+		const cachedFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+		if (frontmatterReflectsPatch(cachedFm, patch)) {
+			return;
+		}
+
+		return new Promise((resolve) => {
+			let settled = false;
+			let ref: EventRef | undefined;
+			let timer: number | undefined;
+
+			const cleanup = (): void => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				if (ref !== undefined) {
+					this.deps.app.metadataCache.offref(ref);
+				}
+				if (timer !== undefined) {
+					window.clearTimeout(timer);
+				}
+				resolve();
+			};
+
+			// Compare by path, not reference: iCloud can hand back a new TFile instance for the same file.
+			ref = this.deps.app.metadataCache.on("changed", (changedFile) => {
+				if (changedFile.path === file.path) {
+					cleanup();
+				}
+			});
+			timer = window.setTimeout(cleanup, timeoutMs);
+		});
 	}
 
 	async read(path: TaskPath): Promise<Result<Task, TaskStoreError>> {
@@ -75,6 +177,7 @@ export class VaultTaskStore implements TaskStore {
 			await this.deps.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 				applyFrontmatterPatch(frontmatter, patch);
 			});
+			await this.awaitCacheSettled(file, patch);
 			return ok(undefined);
 		} catch (error) {
 			return err({ kind: "io-error", path, message: describeError(error) });
@@ -99,6 +202,7 @@ export class VaultTaskStore implements TaskStore {
 			await this.deps.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 				setAllFrontmatterValues(frontmatter, draft.frontmatter);
 			});
+			await this.awaitCacheSettled(file, draft.frontmatter);
 			if (draft.body.length > 0) {
 				await this.deps.app.vault.process(file, (data) => data + draft.body);
 			}

@@ -32,7 +32,7 @@ import type { StatusConfig } from "@/domain/status";
 import { findStatus, isTerminal, toggleStatus } from "@/domain/status";
 import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
 import { describeTaskParseError, priorityChipClass, priorityMarks } from "@/domain/task";
-import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
+import { refreshAfterMetadataResolved, refreshWhenCached } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
 import { CreateTaskModal } from "@/ui/create-task-modal";
@@ -282,6 +282,7 @@ export class FeedBasesView extends BasesView {
 
 		const used = new Set<string>();
 		let cursor: Element | null = this.listEl.firstElementChild;
+		const uncachedPaths: TaskPath[] = [];
 
 		// `createEl`/`createDiv` below are Obsidian's DETACHED global helpers
 		// (same pattern as `createSpan` in
@@ -327,7 +328,8 @@ export class FeedBasesView extends BasesView {
 				mountText(`g:${groupKey}`, "h3", cssClass("feed__group"), groupLabel);
 			}
 
-			const { tasks, invalid } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
+			const { tasks, invalid, uncached } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
+			uncachedPaths.push(...uncached);
 			const entryByPath = new Map(tasks.map((row) => [row.task.path, row.entry] as const));
 			const buckets = groupIntoBuckets(
 				tasks.map((row) => row.task),
@@ -386,6 +388,8 @@ export class FeedBasesView extends BasesView {
 				}
 			}
 		}
+
+		refreshWhenCached(this, this.deps.app, uncachedPaths);
 
 		// Removal is what autoAnimate turns into the exit animation;
 		// deleting from `this.rendered` mid-iteration is fine in JS (the

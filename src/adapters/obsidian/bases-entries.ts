@@ -19,6 +19,8 @@ export interface TaskWithEntry {
 export interface BasesEntriesResult {
 	readonly tasks: readonly TaskWithEntry[];
 	readonly invalid: readonly InvalidTaskEntry[];
+	/** Paths whose `metadataCache` entry doesn't exist yet — not yet parsed at all, distinct from `invalid` (parsed and rejected). See `refreshWhenCached` in `views/bases/refresh-after-resolved.ts`. */
+	readonly uncached: readonly TaskPath[];
 }
 
 /**
@@ -28,7 +30,9 @@ export interface BasesEntriesResult {
  * file body) as the source of raw frontmatter for `domain/frontmatter.ts`.
  * Entries whose note isn't a task at all (marker mismatch) are silently
  * skipped; entries that look like a task but fail to parse are reported as
- * `invalid` per `docs/DOMAIN-MODEL.md`'s parse-error policy.
+ * `invalid` per `docs/DOMAIN-MODEL.md`'s parse-error policy. Entries whose
+ * `metadataCache` entry isn't indexed yet are reported as `uncached` instead
+ * of being parsed against an empty frontmatter and misread as a mismatch.
  *
  * `BasesEntry.getValue()` was considered as an alternative source (it can't
  * be stale the way `metadataCache` momentarily can be, right after a vault
@@ -49,12 +53,20 @@ export function tasksFromBasesEntries(
 ): BasesEntriesResult {
 	const tasks: TaskWithEntry[] = [];
 	const invalid: InvalidTaskEntry[] = [];
+	const uncached: TaskPath[] = [];
 
 	for (const entry of entries) {
 		const file = entry.file;
 		const path = file.path as TaskPath;
-		const raw = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-		const result = parseTask(path, file.basename, raw, keys, statuses);
+		const cache = app.metadataCache.getFileCache(file);
+		// Covers both "not indexed yet" (no cache entry at all) and "cache
+		// entry exists but frontmatter hasn't landed" (seen on iOS: a
+		// just-written note's cache can arrive before its frontmatter does).
+		if (cache?.frontmatter === undefined) {
+			uncached.push(path);
+			continue;
+		}
+		const result = parseTask(path, file.basename, cache.frontmatter, keys, statuses);
 
 		if (result.ok) {
 			tasks.push({ task: result.value, entry });
@@ -67,5 +79,5 @@ export function tasksFromBasesEntries(
 		}
 	}
 
-	return { tasks, invalid };
+	return { tasks, invalid, uncached };
 }

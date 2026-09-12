@@ -38,6 +38,27 @@ export function setAllFrontmatterValues(
 	}
 }
 
+/** Arrays count as satisfied (no deep equality); a false negative only means waiting for the cache event. */
+export function frontmatterReflectsPatch(
+	frontmatter: Record<string, unknown> | undefined,
+	patch: FrontmatterPatch,
+): boolean {
+	const entries = Object.entries(patch);
+	if (frontmatter === undefined) {
+		return entries.length === 0;
+	}
+
+	return entries.every(([key, value]) => {
+		if (value === null) {
+			return frontmatter[key] === undefined;
+		}
+		if (Array.isArray(value)) {
+			return true;
+		}
+		return frontmatter[key] === value;
+	});
+}
+
 /**
  * Extracts a note's body (everything after the frontmatter block) given the
  * full file content and the frontmatter offsets from Obsidian's
