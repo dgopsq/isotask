@@ -1024,7 +1024,7 @@
 }
 
 
-.isotask-calendar .ec.ec-dragging .ec-time-grid .ec-body .ec-event.ec-preview::after {
+.isotask-calendar .ec.ec-dragging.ec-time-grid .ec-body .ec-event.ec-preview::after {
 	box-shadow: var(--isotask-lift-shadow-value);
 }
 
@@ -1034,7 +1034,7 @@
 		animation: isotask-lift var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 
-	.isotask-calendar .ec.ec-dragging .ec-time-grid .ec-body .ec-event.ec-preview::after {
+	.isotask-calendar .ec.ec-dragging.ec-time-grid .ec-body .ec-event.ec-preview::after {
 		animation: isotask-lift-shadow var(--isotask-motion, 160ms) ease;
 	}
 }
