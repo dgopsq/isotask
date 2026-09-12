@@ -109,6 +109,11 @@ describe("parseSettings", () => {
 		expect(parseSettings({ taskPanelIntroduced: "yes" }).taskPanelIntroduced).toBe(DEFAULT_SETTINGS.taskPanelIntroduced);
 	});
 
+	it("keeps a valid hapticsEnabled flag and falls back an invalid one", () => {
+		expect(parseSettings({ hapticsEnabled: false }).hapticsEnabled).toBe(false);
+		expect(parseSettings({ hapticsEnabled: "no" }).hapticsEnabled).toBe(DEFAULT_SETTINGS.hapticsEnabled);
+	});
+
 	it("falls back version when not literal 1, without touching other fields", () => {
 		const result = parseSettings({ version: 2, taskFolder: "Tasks 2" });
 		expect(result.version).toBe(1);

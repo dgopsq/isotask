@@ -23,6 +23,7 @@ export interface IsotaskSettings {
 	 * auto-opened at most once per vault, even if the user closes it again.
 	 */
 	readonly taskPanelIntroduced: boolean;
+	readonly hapticsEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: IsotaskSettings = {
@@ -35,6 +36,7 @@ export const DEFAULT_SETTINGS: IsotaskSettings = {
 	spawnFilenameTemplate: "{{title}} {{due}}",
 	weekStart: 0,
 	taskPanelIntroduced: false,
+	hapticsEnabled: true,
 };
 
 function fallbackString(defaultValue: string) {
@@ -99,6 +101,7 @@ const SettingsSchema = v.object({
 	spawnFilenameTemplate: fallbackString(DEFAULT_SETTINGS.spawnFilenameTemplate),
 	weekStart: WeekdaySchema,
 	taskPanelIntroduced: v.fallback(v.boolean(), DEFAULT_SETTINGS.taskPanelIntroduced),
+	hapticsEnabled: v.fallback(v.boolean(), DEFAULT_SETTINGS.hapticsEnabled),
 });
 
 function toStatusConfig(status: ParsedStatusConfig): StatusConfig {

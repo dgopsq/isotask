@@ -22,6 +22,7 @@ import type { Task } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
+import type { Haptics } from "@/ports/haptics";
 import type { Notifier } from "@/ports/notifier";
 import type { RescheduleHistory } from "@/ports/reschedule-history";
 import { CreateTaskModal } from "@/ui/create-task-modal";
@@ -43,6 +44,7 @@ export interface CalendarBasesViewDeps {
 	readonly rescheduleTask: RescheduleTask;
 	readonly renderer: CalendarRenderer;
 	readonly notifier: Notifier;
+	readonly haptics: Haptics;
 	readonly history: RescheduleHistory;
 	readonly undoReschedule: UndoReschedule;
 	readonly redoReschedule: RedoReschedule;
@@ -265,6 +267,9 @@ export class CalendarBasesView extends BasesView {
 						}
 						void this.deps.app.workspace.openLinkText(event.taskPath, "", false);
 					},
+					onEventGrabbed: () => {
+						this.deps.haptics.trigger("light");
+					},
 					onEventMoved: async (event, start, end) => {
 						// `CalendarEvent.source` is already `"due" | "scheduled"`,
 						// i.e. exactly the `DateField` the use-case wants — the
@@ -280,9 +285,11 @@ export class CalendarBasesView extends BasesView {
 							// moment an undo became available. Take focus back so
 							// the keystroke is armed for the gesture just made.
 							this.viewContainerEl.focus();
+							this.deps.haptics.trigger("medium");
 							return true;
 						}
 						this.deps.notifier.error(describeAppError(result.error));
+						this.deps.haptics.trigger("error");
 						return false;
 					},
 					onSlotClick: (date) => {

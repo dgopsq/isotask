@@ -134,6 +134,12 @@ export class EventCalendarRenderer implements CalendarRenderer {
 		const eventDropOption: Pick<Calendar.Options, "eventDrop"> = onEventMoved === undefined ? {} : { eventDrop: applyMove };
 		const eventResizeOption: Pick<Calendar.Options, "eventResize"> = onEventMoved === undefined ? {} : { eventResize: applyMove };
 
+		const onEventGrabbed = options.callbacks.onEventGrabbed;
+		const eventDragStartOption: Pick<Calendar.Options, "eventDragStart"> =
+			onEventGrabbed === undefined ? {} : { eventDragStart: () => { onEventGrabbed(); } };
+		const eventResizeStartOption: Pick<Calendar.Options, "eventResizeStart"> =
+			onEventGrabbed === undefined ? {} : { eventResizeStart: () => { onEventGrabbed(); } };
+
 		const dateClickOption: Pick<Calendar.Options, "dateClick"> =
 			onSlotClick === undefined
 				? {}
@@ -382,6 +388,8 @@ export class EventCalendarRenderer implements CalendarRenderer {
 				...eventClickOption,
 				...eventDropOption,
 				...eventResizeOption,
+				...eventDragStartOption,
+				...eventResizeStartOption,
 				...dateClickOption,
 				...slotLabelFormatOption,
 				...allDayContentOption,
