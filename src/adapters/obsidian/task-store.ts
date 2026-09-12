@@ -1,5 +1,5 @@
-import type { App } from "obsidian";
-import { getFrontMatterInfo, normalizePath } from "obsidian";
+import type { App, TFile } from "obsidian";
+import { getFrontMatterInfo, normalizePath, parseYaml } from "obsidian";
 
 import { applyFrontmatterPatch, extractBody, setAllFrontmatterValues } from "@/adapters/obsidian/task-store-helpers";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
@@ -23,8 +23,7 @@ function describeError(error: unknown): string {
 
 /**
  * `TaskStore` over Vault + MetadataCache + `fileManager.processFrontMatter`
- * (`docs/ARCHITECTURE.md#ports`). Frontmatter is read from the metadata
- * cache (never by re-parsing the file body) and written only through
+ * (`docs/ARCHITECTURE.md#ports`). Frontmatter is written only through
  * `processFrontMatter`, per `AGENTS.md`'s Obsidian guideline rules.
  */
 export class VaultTaskStore implements TaskStore {
@@ -34,13 +33,34 @@ export class VaultTaskStore implements TaskStore {
 		this.deps = deps;
 	}
 
+	/** Cache can lag a just-written file (e.g. right after `processFrontMatter`); fall back to reading and parsing the file itself. */
+	private async frontmatterOf(file: TFile): Promise<Record<string, unknown> | undefined> {
+		const cached = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		const content = await this.deps.app.vault.cachedRead(file);
+		const info = getFrontMatterInfo(content);
+		if (!info.exists) {
+			return undefined;
+		}
+
+		try {
+			const parsed: unknown = parseYaml(info.frontmatter);
+			return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
 	async read(path: TaskPath): Promise<Result<Task, TaskStoreError>> {
 		const file = this.deps.app.vault.getFileByPath(normalizePath(path));
 		if (file === null) {
 			return err({ kind: "not-found", path });
 		}
 
-		const raw = this.deps.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+		const raw = (await this.frontmatterOf(file)) ?? {};
 		const result = parseTask(path, file.basename, raw, this.deps.getPropertyKeys(), this.deps.getStatuses());
 		return result.ok ? ok(result.value) : err({ kind: "invalid-task", path, errors: result.error });
 	}
@@ -113,7 +133,7 @@ export class VaultTaskStore implements TaskStore {
 			return err({ kind: "not-found", path });
 		}
 
-		const raw = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+		const raw = await this.frontmatterOf(file);
 		if (raw === undefined) {
 			return err({ kind: "invalid-task", path, errors: [{ kind: "not-a-task" }] });
 		}
