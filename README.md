@@ -54,6 +54,13 @@ migrate away from: the notes are still just notes.
 - **Property keys**: every frontmatter key above, plus the marker key/value that identifies a note
   as a task, individually renameable.
 
+## What the plugin reads
+
+Isotask never reads note bodies and never sends anything off-device. It lists vault files
+only where a picker needs them: the project note picker (markdown notes), the tag picker
+(tags from the metadata cache) and the folder picker (folder paths). Task data is read from
+the metadata cache of the notes your Bases views already select.
+
 ## Install
 
 ### Community plugins
