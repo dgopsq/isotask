@@ -86,6 +86,9 @@ src/
   and the full `pnpm test:e2e`, push, open a PR (`gh pr create`), merge via PR only, then
   `pnpm wt rm <branch>`.
 - Run `pnpm check` before finishing any task.
+- Do not run `pnpm test:e2e` locally for changes that touch only comments, docs, assets, or scripts
+  outside `src/` (e.g. screenshot post-processing under `e2e/`). CI runs the suite on every PR;
+  `pnpm typecheck` + `pnpm lint` is enough there. Prioritise speed.
 - Add or extend vitest tests for anything in `src/domain` or `src/app`.
 - Write an ADR (`docs/adr/NNNN-title.md`, see `docs/adr/README.md` for format) for any change to
   the data model, statuses semantics, recurrence semantics, or a new runtime dependency.
