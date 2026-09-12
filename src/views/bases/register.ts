@@ -16,6 +16,7 @@ import type { Weekday } from "@/domain/dates";
 import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
+import type { TaskPath } from "@/domain/task";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { CalendarRenderer } from "@/ports/calendar-renderer";
 import type { Notifier } from "@/ports/notifier";
@@ -116,6 +117,7 @@ function calendarViewOptions(getWeekStart: () => Weekday): BasesAllOptions[] {
 
 export interface RegisterViewsDeps {
 	readonly app: App;
+	readonly peekFrontmatter: (path: TaskPath) => Readonly<Record<string, unknown>> | undefined;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
@@ -144,6 +146,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 		factory: (controller, containerEl) =>
 			new FeedBasesView(controller, containerEl, {
 				app: deps.app,
+				peekFrontmatter: deps.peekFrontmatter,
 				getPropertyKeys: deps.getPropertyKeys,
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,
@@ -167,6 +170,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 		factory: (controller, containerEl) =>
 			new CalendarBasesView(controller, containerEl, {
 				app: deps.app,
+				peekFrontmatter: deps.peekFrontmatter,
 				getPropertyKeys: deps.getPropertyKeys,
 				getStatuses: deps.getStatuses,
 				getWeekStart: deps.getWeekStart,

@@ -324,12 +324,14 @@ use-cases (never imported directly by `domain`).
 - **Clock** — the only source of "now" the core is allowed to use, so tests can inject a fixed
   time. Methods: `now(): TaskDate` (current local wall-clock instant, same string shape as
   frontmatter dates).
-- **TaskStore** — all task persistence, always addressed by path: there is deliberately no
-  `list()`, because Bases already selects the notes a view shows (see "why views never filter"),
-  so the plugin never enumerates the vault for task data. Methods: `read(path)`, `readBody(path)`,
-  `rawFrontmatter(path)`, `exists(path)`, `updateProperties(path, patch)` (goes through
-  `processFrontMatter`), `create(draft)` (fails idempotently if the target path already exists).
-  All return `Result<_, TaskStoreError>`.
+- **TaskStore** — all task persistence. Methods: `list(): Task[]` (or an async iterable — see
+  `docs/DOMAIN-MODEL.md`/TBD (M1) for exact signature), `read(path: TaskPath): Task | undefined`,
+  `write(path: TaskPath, patch: Partial<TaskDraft>): Promise<Result<void, Error>>` (goes through
+  `processFrontMatter`), `create(draft: TaskDraft): Promise<Result<TaskPath, Error>>` (fails
+  idempotently if the target path already exists), `peekFrontmatter(path: TaskPath): Record<string,
+  FrontmatterValue> | undefined` (synchronous, no I/O — metadata cache, else a recent write of the
+  store's own, else `undefined`; what Bases views and menus read to avoid the metadata-cache gap
+  right after a write).
 - **Notifier** — user-visible feedback without coupling `app` to Obsidian's `Notice`. Method:
   `notify(message: string): void`.
 - **CalendarRenderer** — abstracts the calendar widget library (`src/ports/calendar-renderer.ts`,

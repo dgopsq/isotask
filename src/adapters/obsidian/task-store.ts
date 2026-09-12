@@ -1,14 +1,17 @@
-import type { App, EventRef, TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
 import { getFrontMatterInfo, normalizePath, Notice, parseYaml } from "obsidian";
 
+import type { RecentWrite } from "@/adapters/obsidian/task-store-helpers";
 import {
 	applyFrontmatterPatch,
 	extractBody,
-	frontmatterReflectsPatch,
+	lookupFrontmatter,
+	rememberWrite,
 	setAllFrontmatterValues,
+	shouldDropOverlayEntry,
 } from "@/adapters/obsidian/task-store-helpers";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
-import { parseTask } from "@/domain/frontmatter";
+import { isTaskNote, parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
@@ -26,13 +29,8 @@ function describeError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-interface FrontmatterAttempt {
-	readonly frontmatter: Record<string, unknown> | undefined;
-	readonly cacheDefined: boolean;
-	readonly cacheFmDefined: boolean;
-	readonly contentLength: number | undefined;
-	readonly fmInfoExists: boolean | undefined;
-}
+/** How long a just-written note's frontmatter is served from `recentWrites` before falling back to the cache/file — long enough to bridge an iCloud sync stall. */
+const RECENT_WRITE_TTL_MS = 15_000;
 
 /**
  * `TaskStore` over Vault + MetadataCache + `fileManager.processFrontMatter`
@@ -41,119 +39,60 @@ interface FrontmatterAttempt {
  */
 export class VaultTaskStore implements TaskStore {
 	private readonly deps: VaultTaskStoreDeps;
+	/** Overlay of this store's own recent writes, keyed by path — masks the metadata-cache gap right after a write on iOS/iCloud. See `peekFrontmatter`/`frontmatterOf`. */
+	private readonly recentWrites = new Map<string, RecentWrite>();
 
 	constructor(deps: VaultTaskStoreDeps) {
 		this.deps = deps;
 	}
 
-	private wait(ms: number): Promise<void> {
-		return new Promise((resolve) => {
-			window.setTimeout(resolve, ms);
-		});
+	/** Frontmatter as currently known without I/O: an unexpired recent write, else the metadata cache, else `undefined`. */
+	peekFrontmatter(path: TaskPath): Readonly<Record<string, FrontmatterValue>> | undefined {
+		const file = this.deps.app.vault.getFileByPath(normalizePath(path));
+		if (file === null) {
+			return undefined;
+		}
+		const cacheFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+		return lookupFrontmatter(cacheFm, this.recentWrites, file.path, Date.now(), RECENT_WRITE_TTL_MS) as
+			| Readonly<Record<string, FrontmatterValue>>
+			| undefined;
 	}
 
-	private async attemptFrontmatterLookup(file: TFile): Promise<FrontmatterAttempt> {
-		const cache = this.deps.app.metadataCache.getFileCache(file);
-		const cacheFm = cache?.frontmatter;
-		if (cacheFm !== undefined) {
-			return {
-				frontmatter: cacheFm,
-				cacheDefined: cache !== null,
-				cacheFmDefined: true,
-				contentLength: undefined,
-				fmInfoExists: undefined,
-			};
+	/** Narrows the overlay's masking window: once the cache re-indexes a path at all, trust it over a same-path overlay entry rather than waiting out the full TTL. */
+	onCacheChanged(path: string): void {
+		const file = this.deps.app.vault.getFileByPath(normalizePath(path));
+		if (file === null) {
+			return;
+		}
+		const cacheFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+		if (shouldDropOverlayEntry(cacheFm)) {
+			this.recentWrites.delete(file.path);
+		}
+	}
+
+	private async frontmatterOf(file: TFile): Promise<Record<string, unknown> | undefined> {
+		const cacheFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+		const known = lookupFrontmatter(cacheFm, this.recentWrites, file.path, Date.now(), RECENT_WRITE_TTL_MS);
+		if (known !== undefined) {
+			return known;
 		}
 
 		const content = await this.deps.app.vault.cachedRead(file);
 		const info = getFrontMatterInfo(content);
-		const base = { cacheDefined: cache !== null, cacheFmDefined: false, contentLength: content.length, fmInfoExists: info.exists };
-		if (!info.exists) {
-			return { frontmatter: undefined, ...base };
-		}
-
-		try {
-			const parsed: unknown = parseYaml(info.frontmatter);
-			const frontmatter = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
-			return { frontmatter, ...base };
-		} catch {
-			return { frontmatter: undefined, ...base };
-		}
-	}
-
-	/** Cache (and even the freshly-read file) can lag right after a write, especially over iCloud sync; retry a few times before giving up. */
-	private async frontmatterOf(file: TFile): Promise<Record<string, unknown> | undefined> {
-		const maxRetries = 3;
-		let currentFile = file;
-		let lastAttempt: FrontmatterAttempt | undefined;
-		let sameFileAsPrevious = true;
-
-		for (let attempt = 0; attempt <= maxRetries; attempt++) {
-			const result = await this.attemptFrontmatterLookup(currentFile);
-			lastAttempt = result;
-			if (result.frontmatter !== undefined) {
-				return result.frontmatter;
-			}
-
-			if (attempt === maxRetries) {
-				break;
-			}
-
-			await this.wait(200);
-			const refreshed = this.deps.app.vault.getFileByPath(currentFile.path);
-			sameFileAsPrevious = refreshed === currentFile;
-			if (refreshed !== null) {
-				currentFile = refreshed;
+		if (info.exists) {
+			try {
+				const parsed: unknown = parseYaml(info.frontmatter);
+				if (typeof parsed === "object" && parsed !== null) {
+					return parsed as Record<string, unknown>;
+				}
+			} catch {
+				// falls through to the diagnostic notice below
 			}
 		}
 
 		// TEMP: removed before merge.
-		const contentLen = lastAttempt?.contentLength === undefined ? "n/a" : String(lastAttempt.contentLength);
-		const fmInfoExists = lastAttempt?.fmInfoExists === undefined ? "n/a" : String(lastAttempt.fmInfoExists);
-		new Notice(
-			`isotask diag: path=${file.path} cacheFm=${lastAttempt?.cacheFmDefined ? "yes" : "no"} cache=${lastAttempt?.cacheDefined ? "yes" : "no"} contentLen=${contentLen} fmInfoExists=${fmInfoExists} attempts=${String(maxRetries + 1)} sameFile=${sameFileAsPrevious ? "yes" : "no"}`,
-			10000,
-		);
+		new Notice(`isotask diag: path=${file.path} cacheFm=no overlay=no fmInfoExists=${String(info.exists)}`, 10000);
 		return undefined;
-	}
-
-	/**
-	 * Resolves once the metadata cache reflects a just-written patch, or after `timeoutMs` —
-	 * timing out isn't an error, callers proceed regardless (iCloud can stall the "changed" event).
-	 */
-	private async awaitCacheSettled(file: TFile, patch: FrontmatterPatch, timeoutMs = 2000): Promise<void> {
-		const cachedFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
-		if (frontmatterReflectsPatch(cachedFm, patch)) {
-			return;
-		}
-
-		return new Promise((resolve) => {
-			let settled = false;
-			let ref: EventRef | undefined;
-			let timer: number | undefined;
-
-			const cleanup = (): void => {
-				if (settled) {
-					return;
-				}
-				settled = true;
-				if (ref !== undefined) {
-					this.deps.app.metadataCache.offref(ref);
-				}
-				if (timer !== undefined) {
-					window.clearTimeout(timer);
-				}
-				resolve();
-			};
-
-			// Compare by path, not reference: iCloud can hand back a new TFile instance for the same file.
-			ref = this.deps.app.metadataCache.on("changed", (changedFile) => {
-				if (changedFile.path === file.path) {
-					cleanup();
-				}
-			});
-			timer = window.setTimeout(cleanup, timeoutMs);
-		});
 	}
 
 	async read(path: TaskPath): Promise<Result<Task, TaskStoreError>> {
@@ -167,6 +106,29 @@ export class VaultTaskStore implements TaskStore {
 		return result.ok ? ok(result.value) : err({ kind: "invalid-task", path, errors: result.error });
 	}
 
+	async list(): Promise<readonly Task[]> {
+		const keys = this.deps.getPropertyKeys();
+		const statuses = this.deps.getStatuses();
+		const tasks: Task[] = [];
+
+		for (const file of this.deps.app.vault.getMarkdownFiles()) {
+			const cacheFm = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+			const raw = lookupFrontmatter(cacheFm, this.recentWrites, file.path, Date.now(), RECENT_WRITE_TTL_MS);
+			if (raw === undefined || !isTaskNote(raw, keys)) {
+				continue;
+			}
+			const result = parseTask(file.path as TaskPath, file.basename, raw, keys, statuses);
+			if (result.ok) {
+				tasks.push(result.value);
+			}
+			// Notes that match the marker but fail to parse are skipped here;
+			// `adapters/obsidian/bases-entries.ts` is where they're surfaced as
+			// "invalid" rows for the feed view.
+		}
+
+		return tasks;
+	}
+
 	async updateProperties(path: TaskPath, patch: FrontmatterPatch): Promise<Result<void, TaskStoreError>> {
 		const file = this.deps.app.vault.getFileByPath(normalizePath(path));
 		if (file === null) {
@@ -176,8 +138,8 @@ export class VaultTaskStore implements TaskStore {
 		try {
 			await this.deps.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 				applyFrontmatterPatch(frontmatter, patch);
+				rememberWrite(this.recentWrites, file.path, frontmatter, Date.now(), RECENT_WRITE_TTL_MS);
 			});
-			await this.awaitCacheSettled(file, patch);
 			return ok(undefined);
 		} catch (error) {
 			return err({ kind: "io-error", path, message: describeError(error) });
@@ -201,8 +163,8 @@ export class VaultTaskStore implements TaskStore {
 			const file = await this.deps.app.vault.create(path, "");
 			await this.deps.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 				setAllFrontmatterValues(frontmatter, draft.frontmatter);
+				rememberWrite(this.recentWrites, file.path, frontmatter, Date.now(), RECENT_WRITE_TTL_MS);
 			});
-			await this.awaitCacheSettled(file, draft.frontmatter);
 			if (draft.body.length > 0) {
 				await this.deps.app.vault.process(file, (data) => data + draft.body);
 			}

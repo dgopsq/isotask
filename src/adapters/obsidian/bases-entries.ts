@@ -1,4 +1,4 @@
-import type { App, BasesEntry } from "obsidian";
+import type { BasesEntry } from "obsidian";
 
 import { parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
@@ -25,20 +25,20 @@ export interface BasesEntriesResult {
 
 /**
  * Maps the entries a Bases view was handed into parsed tasks (each paired
- * with the `BasesEntry` it came from), using
- * `app.metadataCache.getFileCache(file)?.frontmatter` (never re-reading the
- * file body) as the source of raw frontmatter for `domain/frontmatter.ts`.
- * Entries whose note isn't a task at all (marker mismatch) are silently
- * skipped; entries that look like a task but fail to parse are reported as
- * `invalid` per `docs/DOMAIN-MODEL.md`'s parse-error policy. Entries whose
- * `metadataCache` entry isn't indexed yet are reported as `uncached` instead
- * of being parsed against an empty frontmatter and misread as a mismatch.
+ * with the `BasesEntry` it came from), using `peekFrontmatter` (metadata
+ * cache, else the store's own recent write — see `ports/task-store.ts`) as
+ * the source of raw frontmatter for `domain/frontmatter.ts`. Entries whose
+ * note isn't a task at all (marker mismatch) are silently skipped; entries
+ * that look like a task but fail to parse are reported as `invalid` per
+ * `docs/DOMAIN-MODEL.md`'s parse-error policy. Entries `peekFrontmatter`
+ * has nothing for yet are reported as `uncached` instead of being parsed
+ * against an empty frontmatter and misread as a mismatch.
  *
  * `BasesEntry.getValue()` was considered as an alternative source (it can't
  * be stale the way `metadataCache` momentarily can be, right after a vault
  * loads) but its `Value` wrapper only exposes `toString()`/`isTruthy()` —
  * no accessor round-trips a property back to the string/number/boolean/array
- * shapes `parseTask` needs — so `metadataCache` stays the source of truth;
+ * shapes `parseTask` needs — so `peekFrontmatter` stays the source of truth;
  * the views self-heal the rare staleness window instead (see
  * `docs/ARCHITECTURE.md`). The entry is still handed back alongside the
  * parsed task, display-only, so the feed view can render Bases toolbar
@@ -46,7 +46,7 @@ export interface BasesEntriesResult {
  * (`feed-row.ts#feedRowColumns`'s `generic` column).
  */
 export function tasksFromBasesEntries(
-	app: App,
+	peekFrontmatter: (path: TaskPath) => Readonly<Record<string, unknown>> | undefined,
 	entries: readonly BasesEntry[],
 	keys: PropertyKeys,
 	statuses: readonly StatusConfig[],
@@ -58,15 +58,12 @@ export function tasksFromBasesEntries(
 	for (const entry of entries) {
 		const file = entry.file;
 		const path = file.path as TaskPath;
-		const cache = app.metadataCache.getFileCache(file);
-		// Covers both "not indexed yet" (no cache entry at all) and "cache
-		// entry exists but frontmatter hasn't landed" (seen on iOS: a
-		// just-written note's cache can arrive before its frontmatter does).
-		if (cache?.frontmatter === undefined) {
+		const frontmatter = peekFrontmatter(path);
+		if (frontmatter === undefined) {
 			uncached.push(path);
 			continue;
 		}
-		const result = parseTask(path, file.basename, cache.frontmatter, keys, statuses);
+		const result = parseTask(path, file.basename, frontmatter, keys, statuses);
 
 		if (result.ok) {
 			tasks.push({ task: result.value, entry });

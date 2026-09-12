@@ -101,6 +101,7 @@ function newMenu(): Menu {
 
 export interface FeedBasesViewDeps {
 	readonly app: App;
+	readonly peekFrontmatter: (path: TaskPath) => Readonly<Record<string, unknown>> | undefined;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
@@ -328,7 +329,7 @@ export class FeedBasesView extends BasesView {
 				mountText(`g:${groupKey}`, "h3", cssClass("feed__group"), groupLabel);
 			}
 
-			const { tasks, invalid, uncached } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
+			const { tasks, invalid, uncached } = tasksFromBasesEntries(this.deps.peekFrontmatter, group.entries, keys, statuses);
 			uncachedPaths.push(...uncached);
 			const entryByPath = new Map(tasks.map((row) => [row.task.path, row.entry] as const));
 			const buckets = groupIntoBuckets(

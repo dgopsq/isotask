@@ -35,6 +35,7 @@ interface BasesViewAction {
 
 export interface CalendarBasesViewDeps {
 	readonly app: App;
+	readonly peekFrontmatter: (path: TaskPath) => Readonly<Record<string, unknown>> | undefined;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getWeekStart: () => Weekday;
@@ -228,7 +229,7 @@ export class CalendarBasesView extends BasesView {
 		// front.
 		this.lastProjectPaths = new Set<string>();
 		for (const group of this.data.groupedData) {
-			const { tasks, invalid, uncached } = tasksFromBasesEntries(this.deps.app, group.entries, keys, statuses);
+			const { tasks, invalid, uncached } = tasksFromBasesEntries(this.deps.peekFrontmatter, group.entries, keys, statuses);
 			invalidCount += invalid.length;
 			uncachedPaths.push(...uncached);
 			for (const { task } of tasks) {

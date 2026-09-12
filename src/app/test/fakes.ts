@@ -103,6 +103,8 @@ export class FakeTaskStore implements TaskStore {
 		}
 		return ok(note.frontmatter);
 	};
+
+	peekFrontmatter = (path: TaskPath): Readonly<Record<string, FrontmatterValue>> | undefined => this.notes.get(path)?.frontmatter;
 }
 
 /** Fixed-time `Clock` fake, mutable via `set` for tests that need `now`/`today` to change mid-test. */

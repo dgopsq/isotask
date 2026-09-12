@@ -19,6 +19,7 @@ import { buildTaskEditMenu } from "@/ui/task-edit-menu";
 
 export interface RegisterTaskMenusDeps {
 	readonly app: App;
+	readonly peekFrontmatter: (path: TaskPath) => Readonly<Record<string, unknown>> | undefined;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
@@ -32,8 +33,8 @@ export interface RegisterTaskMenusDeps {
 }
 
 /**
- * Parses `file` via `domain/frontmatter.ts#parseTask`, reading the metadata
- * cache directly — same synchronous approach as
+ * Parses `file` via `domain/frontmatter.ts#parseTask`, reading `peekFrontmatter`
+ * (synchronous, no I/O) — same synchronous approach as
  * `commands/register-commands.ts#activeTaskFile`, since a
  * `file-menu`/`editor-menu` handler must add its items before returning.
  * Keeps the full `Result`, unlike `parseTaskFile` below, so a caller can
@@ -44,7 +45,7 @@ export interface RegisterTaskMenusDeps {
  */
 export function parseTaskFileDetailed(deps: RegisterTaskMenusDeps, file: TFile): Result<Task, readonly TaskParseError[]> {
 	const keys = deps.getPropertyKeys();
-	const raw = deps.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+	const raw = deps.peekFrontmatter(file.path as TaskPath) ?? {};
 	return parseTask(file.path as TaskPath, file.basename, raw, keys, deps.getStatuses());
 }
 

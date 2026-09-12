@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
 	applyFrontmatterPatch,
 	extractBody,
-	frontmatterReflectsPatch,
+	lookupFrontmatter,
+	recentWrite,
+	rememberWrite,
 	setAllFrontmatterValues,
+	shouldDropOverlayEntry,
 } from "@/adapters/obsidian/task-store-helpers";
+import type { RecentWrite } from "@/adapters/obsidian/task-store-helpers";
 
 describe("applyFrontmatterPatch", () => {
 	it("sets keys present in the patch", () => {
@@ -47,21 +51,60 @@ describe("setAllFrontmatterValues", () => {
 	});
 });
 
-describe("frontmatterReflectsPatch", () => {
-	it("is true when the cache already has every patched primitive value", () => {
-		expect(frontmatterReflectsPatch({ status: "done", priority: "high" }, { status: "done" })).toBe(true);
+describe("rememberWrite / recentWrite", () => {
+	it("returns the overlaid frontmatter when the write is within the TTL", () => {
+		const writes = new Map<string, RecentWrite>();
+		rememberWrite(writes, "Tasks/A.md", { status: "done" }, 1000, 15_000);
+		expect(recentWrite(writes, "Tasks/A.md", 1000 + 5000, 15_000)).toEqual({ status: "done" });
 	});
 
-	it("is false when the cache is missing a patched key", () => {
-		expect(frontmatterReflectsPatch({ status: "todo" }, { status: "done" })).toBe(false);
+	it("returns undefined once the write is older than the TTL", () => {
+		const writes = new Map<string, RecentWrite>();
+		rememberWrite(writes, "Tasks/A.md", { status: "done" }, 1000, 15_000);
+		expect(recentWrite(writes, "Tasks/A.md", 1000 + 15_001, 15_000)).toBeUndefined();
 	});
 
-	it("is true for a null patch value when the key is already absent", () => {
-		expect(frontmatterReflectsPatch({ status: "todo" }, { due: null })).toBe(true);
+	it("returns undefined for a path that was never written", () => {
+		const writes = new Map<string, RecentWrite>();
+		expect(recentWrite(writes, "Tasks/Other.md", 1000, 15_000)).toBeUndefined();
 	});
 
-	it("is false for a null patch value when the key is still present", () => {
-		expect(frontmatterReflectsPatch({ status: "todo", due: "2026-08-29" }, { due: null })).toBe(false);
+	it("prunes expired entries on write", () => {
+		const writes = new Map<string, RecentWrite>();
+		rememberWrite(writes, "Tasks/A.md", { status: "done" }, 1000, 15_000);
+		rememberWrite(writes, "Tasks/B.md", { status: "todo" }, 1000 + 15_001, 15_000);
+		expect(writes.has("Tasks/A.md")).toBe(false);
+		expect(writes.has("Tasks/B.md")).toBe(true);
+	});
+});
+
+describe("lookupFrontmatter", () => {
+	it("prefers an unexpired recent write over a defined-but-stale cache value", () => {
+		const writes = new Map<string, RecentWrite>();
+		rememberWrite(writes, "Tasks/A.md", { status: "done" }, 1000, 15_000);
+		const cacheFrontmatter = { status: "todo" };
+		expect(lookupFrontmatter(cacheFrontmatter, writes, "Tasks/A.md", 1000 + 5000, 15_000)).toEqual({
+			status: "done",
+		});
+	});
+
+	it("falls back to the cache value once the recent write has expired", () => {
+		const writes = new Map<string, RecentWrite>();
+		rememberWrite(writes, "Tasks/A.md", { status: "done" }, 1000, 15_000);
+		const cacheFrontmatter = { status: "todo" };
+		expect(lookupFrontmatter(cacheFrontmatter, writes, "Tasks/A.md", 1000 + 15_001, 15_000)).toEqual(
+			cacheFrontmatter,
+		);
+	});
+});
+
+describe("shouldDropOverlayEntry", () => {
+	it("drops the overlay once the cache has frontmatter again", () => {
+		expect(shouldDropOverlayEntry({ status: "done" })).toBe(true);
+	});
+
+	it("keeps the overlay while the cache still has none", () => {
+		expect(shouldDropOverlayEntry(undefined)).toBe(false);
 	});
 });
 

@@ -29,4 +29,6 @@ export interface TaskStore {
 	readonly readBody: (path: TaskPath) => Promise<Result<string, TaskStoreError>>;
 	/** The note's frontmatter exactly as stored, for callers (e.g. transitions) that need to copy properties verbatim. */
 	readonly rawFrontmatter: (path: TaskPath) => Promise<Result<Readonly<Record<string, FrontmatterValue>>, TaskStoreError>>;
+	/** Frontmatter as currently known without I/O: the store's own unexpired write, else the metadata cache, else `undefined`. */
+	readonly peekFrontmatter: (path: TaskPath) => Readonly<Record<string, FrontmatterValue>> | undefined;
 }

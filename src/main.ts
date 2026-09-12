@@ -50,6 +50,8 @@ export default class IsotaskPlugin extends Plugin {
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 		});
+		const peekFrontmatter = store.peekFrontmatter.bind(store);
+		this.registerEvent(this.app.metadataCache.on("changed", (file) => { store.onCacheChanged(file.path); }));
 		const clock = createObsidianClock();
 		const notifier = createObsidianNotifier();
 		const calendarRenderer = new EventCalendarRenderer();
@@ -82,6 +84,7 @@ export default class IsotaskPlugin extends Plugin {
 
 		registerViews(this, {
 			app: this.app,
+			peekFrontmatter,
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 			getWeekStart: () => this.pluginSettings.weekStart,
@@ -126,6 +129,7 @@ export default class IsotaskPlugin extends Plugin {
 
 		const taskMenuDeps = {
 			app: this.app,
+			peekFrontmatter,
 			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 			setStatus,
