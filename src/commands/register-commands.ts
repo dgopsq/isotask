@@ -1,7 +1,5 @@
 import type { App, Plugin, TFile } from "obsidian";
-import { normalizePath, Notice } from "obsidian";
-
-import { describeHapticsSupport } from "@/adapters/obsidian/haptics";
+import { normalizePath } from "obsidian";
 
 import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
@@ -24,7 +22,6 @@ import { err } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
 import { VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
-import type { Haptics } from "@/ports/haptics";
 import type { Notifier } from "@/ports/notifier";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
@@ -38,7 +35,6 @@ export interface RegisterCommandsDeps {
 	readonly app: App;
 	readonly store: TaskStore;
 	readonly notifier: Notifier;
-	readonly haptics: Haptics;
 	readonly getPropertyKeys: () => PropertyKeys;
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getTaskFolder: () => string;
@@ -397,16 +393,6 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		name: "Redo last calendar reschedule",
 		callback: () => {
 			void runHistoryStep(deps.redoReschedule, "Nothing to redo.");
-		},
-	});
-
-	// TEMP: removed before merge.
-	plugin.addCommand({
-		id: "probe-haptics",
-		name: "Probe haptic support (temporary)",
-		callback: () => {
-			new Notice(describeHapticsSupport(), 8000);
-			deps.haptics.trigger("light");
 		},
 	});
 }

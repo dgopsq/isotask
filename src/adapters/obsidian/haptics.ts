@@ -54,25 +54,6 @@ function resolveHapticsPlugin(global: unknown): CapacitorHapticsPlugin | undefin
 	return undefined;
 }
 
-/** One-line support summary for the temporary `probe-haptics` command. */
-export function describeHapticsSupport(
-	platform: { readonly isIosApp: boolean } = Platform,
-	global: unknown = window,
-): string {
-	const capacitor = isCapacitorGlobal(global) ? (global as Record<string, unknown>)["Capacitor"] : undefined;
-	const hasCapacitor = isCapacitorGlobal(capacitor);
-	const hasPluginsHaptics = hasCapacitor ? isCapacitorHapticsPlugin(capacitor.Plugins?.["Haptics"]) : false;
-	const isPluginAvailable = hasCapacitor ? capacitor.isPluginAvailable?.("Haptics") === true : false;
-	const registerWorks = hasCapacitor && isPluginAvailable && capacitor.registerPlugin !== undefined;
-	return (
-		`iOS app: ${platform.isIosApp ? "yes" : "no"}; ` +
-		`Capacitor global: ${hasCapacitor ? "yes" : "no"}; ` +
-		`Plugins.Haptics: ${hasPluginsHaptics ? "yes" : "no"}; ` +
-		`isPluginAvailable: ${isPluginAvailable ? "yes" : "no"}; ` +
-		`registerPlugin: ${registerWorks ? "ok" : "no"}`
-	);
-}
-
 /**
  * iOS-only: WKWebView has no `navigator.vibrate`; the only path is Capacitor's Haptics plugin via `window.Capacitor`.
  */
