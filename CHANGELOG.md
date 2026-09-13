@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/dgopsq/isotask/compare/0.2.0...0.3.0) (2026-09-13)
+
+
+### Features
+
+* agent instructions API and copy command ([#27](https://github.com/dgopsq/isotask/issues/27)) ([bb59170](https://github.com/dgopsq/isotask/commit/bb591705c727ee080455c8f63705bff193887400))
+* reconcile completed with status on external frontmatter edits ([#26](https://github.com/dgopsq/isotask/issues/26)) ([f0478b0](https://github.com/dgopsq/isotask/commit/f0478b0e80b3ac26e9cbced73f093d126f7ba5a2))
+
+
+### Maintenance
+
+* sync versions.json for 0.2.0 ([c814a29](https://github.com/dgopsq/isotask/commit/c814a2958ff6ffe439c7f76f32fc36fd7dabc550))
+
 ## [0.2.0](https://github.com/dgopsq/isotask/compare/0.1.2...0.2.0) (2026-09-13)
 
 
