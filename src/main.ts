@@ -6,12 +6,15 @@ import "@/styles/isotask.css";
 import { EventCalendarRenderer } from "@/adapters/calendar/event-calendar/event-calendar-renderer";
 import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
 import { makeNavigationMemory } from "@/adapters/navigation/navigation-memory";
+import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { createObsidianHaptics } from "@/adapters/obsidian/haptics";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
 import { VaultTaskStore } from "@/adapters/obsidian/task-store";
 import { registerTaskViewActions } from "@/adapters/obsidian/view-actions";
+import type { IsotaskApi } from "@/app/agent-instructions";
+import { renderAgentInstructions } from "@/app/agent-instructions";
 import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import type { AppDeps } from "@/app/deps";
@@ -28,21 +31,25 @@ import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
 import { parseSettings } from "@/domain/settings";
 import type { IsotaskSettings } from "@/domain/settings";
-import { VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
+import { AGENT_GUIDE_URL, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { IsotaskSettingTab } from "@/settings/settings-tab";
 import { registerViews } from "@/views/bases/register";
 import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
 import { TASK_PANEL_ICON, TaskPanelView } from "@/views/task-panel/task-panel-view";
 
 /**
- * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads
- * settings, builds the adapters and `app` use-cases, registers the Bases
- * views, commands, the "Isotask" file/editor-menu section and the settings
- * tab. Everything registered through `register*`/`add*` is torn down
- * automatically on unload — there is nothing to clean up manually here.
+ * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads settings,
+ * builds the adapters and `app` use-cases, and registers the Bases views,
+ * commands, menus, settings tab, and the public `api` field.
  */
 export default class IsotaskPlugin extends Plugin {
 	private pluginSettings: IsotaskSettings = parseSettings(undefined);
+
+	/** `app.plugins.plugins.isotask.api` — reads `pluginSettings` live via closure, so it always reflects the current settings. */
+	readonly api: IsotaskApi = {
+		version: 1,
+		agentInstructions: () => renderAgentInstructions(this.pluginSettings, AGENT_GUIDE_URL),
+	};
 
 	override async onload(): Promise<void> {
 		await this.loadSettings();
@@ -119,6 +126,7 @@ export default class IsotaskPlugin extends Plugin {
 			getStatuses: () => this.pluginSettings.statuses,
 			getTaskFolder: () => this.pluginSettings.taskFolder,
 			getTasksBasePath: () => this.pluginSettings.tasksBasePath,
+			getAgentInstructions: () => this.api.agentInstructions(),
 			createTask,
 			convertNote,
 			setStatus,
@@ -179,6 +187,7 @@ export default class IsotaskPlugin extends Plugin {
 			new IsotaskSettingTab(this.app, this, {
 				getSettings: () => this.pluginSettings,
 				setSettings: (settings) => this.saveSettings(settings),
+				copyAgentInstructions: () => copyToClipboard(this.api.agentInstructions(), notifier, "Agent instructions copied to clipboard."),
 			}),
 		);
 	}

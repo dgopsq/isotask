@@ -5,6 +5,7 @@ import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
 import type { AppError } from "@/app/errors";
 import type { makeToggleDone } from "@/app/toggle-done";
+import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { describeAppError, storeError } from "@/app/errors";
 import { renderTasksBase } from "@/app/generate-base";
 import type { DateField, makeSetDate } from "@/app/set-date";
@@ -39,6 +40,7 @@ export interface RegisterCommandsDeps {
 	readonly getStatuses: () => readonly StatusConfig[];
 	readonly getTaskFolder: () => string;
 	readonly getTasksBasePath: () => string;
+	readonly getAgentInstructions: () => string;
 	readonly createTask: ReturnType<typeof makeCreateTask>;
 	readonly convertNote: ReturnType<typeof makeConvertNote>;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
@@ -369,6 +371,14 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		name: "Open tasks base",
 		callback: () => {
 			void openTasksBase();
+		},
+	});
+
+	plugin.addCommand({
+		id: "copy-agent-instructions",
+		name: "Copy agent instructions",
+		callback: () => {
+			void copyToClipboard(deps.getAgentInstructions(), deps.notifier, "Agent instructions copied to clipboard.");
 		},
 	});
 

@@ -4,6 +4,7 @@ import { Platform, PluginSettingTab } from "obsidian";
 import type { IsotaskSettings } from "@/adapters/obsidian/settings";
 import type { Weekday } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
+import { AGENT_GUIDE_URL, PLUGIN_ID } from "@/plugin-id";
 
 const WEEKDAY_LABELS: Readonly<Record<Weekday, string>> = {
 	0: "Monday",
@@ -95,6 +96,7 @@ function isScalarSetting(key: string): key is ScalarSettingKey {
 export interface SettingsTabDeps {
 	readonly getSettings: () => IsotaskSettings;
 	readonly setSettings: (settings: IsotaskSettings) => Promise<void>;
+	readonly copyAgentInstructions: () => Promise<void>;
 }
 
 /**
@@ -163,6 +165,25 @@ export class IsotaskSettingTab extends PluginSettingTab {
 					desc: control.desc,
 					control: { type: "text" as const, key: control.key },
 				})),
+			},
+			{
+				type: "group",
+				heading: "AI agents",
+				items: [
+					{
+						name: "Copy agent instructions",
+						desc: `Text an AI agent needs to create and manage task notes in this vault. From the Obsidian CLI: obsidian eval code="app.plugins.plugins.${PLUGIN_ID}.api.agentInstructions()". Guide: ${AGENT_GUIDE_URL}`,
+						// SettingControl has no "button" variant; "render" drops to imperative
+						// Setting/addButton for just this row, rest of the tab stays declarative.
+						render: (setting) => {
+							setting.addButton((button) =>
+								button.setButtonText("Copy").onClick(() => {
+									void this.deps.copyAgentInstructions();
+								}),
+							);
+						},
+					},
+				],
 			},
 		];
 	}

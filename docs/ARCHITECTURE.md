@@ -394,6 +394,16 @@ torn down automatically by the `Plugin` base class when the plugin unloads — t
 `onunload()` cleanup to write as long as every side-effecting registration goes through one of
 those methods.
 
+### Agent instructions API
+
+`IsotaskPlugin` also exposes a public `readonly api: IsotaskApi` field (`{ version: 1,
+agentInstructions: () => string }`), reachable at runtime as
+`app.plugins.plugins.isotask.api`. It's for AI agents/scripts that only see the vault and need
+to know this vault's configured frontmatter schema — the same text backs the "Copy agent
+instructions" command and settings-tab button. The generator, `renderAgentInstructions` in
+`src/app/agent-instructions.ts`, is a pure function of `IsotaskSettings`, so it always reflects
+the vault's actual property keys, statuses, and paths rather than the plugin's defaults.
+
 ## Why views never filter
 
 Bases already owns which notes appear, their order, grouping, and property visibility — that is
