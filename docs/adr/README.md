@@ -39,3 +39,4 @@ new ADR that supersedes it and update the `Status` line and the index below.
 | [0015](0015-project-color-drives-card-dot.md) | Project color drives the card dot/bar | Accepted, 2026-08-31 |
 | [0016](0016-auto-animate-feed-motion.md) | Feed interaction motion via @formkit/auto-animate and keyed row reconciliation | Accepted, 2026-09-01 |
 | [0017](0017-two-status-kinds-open-done.md) | Two status kinds: open and done | Accepted, 2026-09-02 |
+| [0018](0018-reconcile-completed-with-status.md) | Reconcile `completed` with `status` on any metadata change | Accepted, 2026-09-13 |

@@ -57,7 +57,10 @@ migrate away from: the notes are still just notes.
 Isotask never reads note bodies and never sends anything off-device. It lists vault files
 only where a picker needs them: the project note picker (markdown notes), the tag picker
 (tags from the metadata cache) and the folder picker (folder paths). Task data is read from
-the metadata cache of the notes your Bases views already select.
+the metadata cache of the notes your Bases views already select. It also writes `completed`
+(and spawns a recurrence occurrence) whenever a task note's status changes while Obsidian is
+running, whichever surface changed it — the plugin's own controls, the Properties view, or
+anything else that edits frontmatter.
 
 ## Install
 

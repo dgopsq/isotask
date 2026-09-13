@@ -130,6 +130,19 @@ describe("applyStatusChange — patch", () => {
 		const result = applyStatusChange(inputFor(t, TODO));
 		expect(result.patch).toEqual({ status: "todo", completed: null });
 	});
+
+	it("force: same-status done transition still writes completed (external edit reconciliation)", () => {
+		const t = task({ title: "Buy milk", status: "done" as StatusId });
+		const result = applyStatusChange(inputFor(t, DONE, { force: true }));
+		expect(result.patch).toEqual({ status: "done", completed: NOW });
+	});
+
+	it("without force, same-status done transition is still a no-op", () => {
+		const t = task({ title: "Buy milk", status: "done" as StatusId });
+		const result = applyStatusChange(inputFor(t, DONE));
+		expect(result.patch).toEqual({});
+		expect(isNone(result.spawn)).toBe(true);
+	});
 });
 
 describe("applyStatusChange — spawn", () => {
@@ -258,6 +271,17 @@ describe("applyStatusChange — spawn", () => {
 		expect(frontmatter["created"]).toBe(NOW);
 		expect("completed" in frontmatter).toBe(false);
 		expect(frontmatter["project"]).toBe("[[Groceries]]");
+	});
+
+	it("force: already-done recurring task still spawns the next occurrence", () => {
+		const t = task({
+			title: "Buy milk 2026-09-02",
+			status: "done" as StatusId,
+			due: date("2026-09-02"),
+			repeat: rule("FREQ=WEEKLY"),
+		});
+		const result = applyStatusChange(inputFor(t, DONE, { basename: "Buy milk 2026-09-02", force: true }));
+		expect(isSome(result.spawn)).toBe(true);
 	});
 
 	it("idempotent: applying the same input twice yields identical results", () => {

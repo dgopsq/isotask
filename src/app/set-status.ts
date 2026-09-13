@@ -2,55 +2,47 @@ import type { AppDeps } from "@/app/deps";
 import { storeError, unknownStatusError } from "@/app/errors";
 import type { AppError } from "@/app/errors";
 import { joinTaskPath, splitTaskPath } from "@/app/paths";
+import type { FrontmatterValue } from "@/domain/frontmatter";
 import type { Option, Result } from "@/domain/result";
 import { err, none, ok, some } from "@/domain/result";
+import type { StatusConfig } from "@/domain/status";
 import { findStatus } from "@/domain/status";
 import { applyStatusChange } from "@/domain/transitions";
-import type { StatusId, TaskPath } from "@/domain/task";
+import type { StatusId, Task, TaskPath } from "@/domain/task";
 
 export interface SetStatusOutcome {
 	/** The spawned next occurrence's path, if a `done`-kind status transition triggered recurrence spawning. */
 	readonly spawned: Option<TaskPath>;
 }
 
-/**
- * Sets a task's status: reads the task and its raw frontmatter, computes the
- * patch (and optional spawn plan) via `domain/transitions.ts`, writes the
- * patch, then — if the transition spawned a next occurrence — creates it
- * unless a note already exists at the spawn path (idempotent, per
- * `docs/DOMAIN-MODEL.md#recurrence-semantics`).
- */
-export function makeSetStatus(deps: AppDeps) {
-	return async (path: TaskPath, statusId: StatusId): Promise<Result<SetStatusOutcome, AppError>> => {
-		const taskResult = await deps.store.read(path);
-		if (!taskResult.ok) {
-			return err(storeError(taskResult.error));
-		}
-		const rawResult = await deps.store.rawFrontmatter(path);
-		if (!rawResult.ok) {
-			return err(storeError(rawResult.error));
-		}
+export interface WriteStatusTransitionInput {
+	readonly path: TaskPath;
+	readonly task: Task;
+	readonly raw: Readonly<Record<string, FrontmatterValue>>;
+	readonly to: StatusConfig;
+	readonly force?: boolean;
+}
 
+/** Writes a status-transition patch and spawn, if any, skipping the spawn if its path exists.
+ * Shared by `makeSetStatus` and `app/reconcile-completion.ts` so that check exists once. */
+export function makeWriteStatusTransition(deps: AppDeps) {
+	return async (input: WriteStatusTransitionInput): Promise<Result<SetStatusOutcome, AppError>> => {
 		const settings = deps.settings();
-		const toStatus = findStatus(settings.statuses, statusId);
-		if (!toStatus.some) {
-			return err(unknownStatusError(statusId));
-		}
-
-		const { folder, basename } = splitTaskPath(path);
+		const { folder, basename } = splitTaskPath(input.path);
 
 		const { patch, spawn } = applyStatusChange({
-			task: taskResult.value,
-			raw: rawResult.value,
+			task: input.task,
+			raw: input.raw,
 			basename,
-			to: toStatus.value,
+			to: input.to,
 			statuses: settings.statuses,
 			keys: settings.propertyKeys,
 			now: deps.clock.now(),
 			spawnTemplate: settings.spawnFilenameTemplate,
+			force: input.force,
 		});
 
-		const updateResult = await deps.store.updateProperties(path, patch);
+		const updateResult = await deps.store.updateProperties(input.path, patch);
 		if (!updateResult.ok) {
 			return err(storeError(updateResult.error));
 		}
@@ -66,7 +58,7 @@ export function makeSetStatus(deps: AppDeps) {
 			return ok({ spawned: none() });
 		}
 
-		const bodyResult = await deps.store.readBody(path);
+		const bodyResult = await deps.store.readBody(input.path);
 		if (!bodyResult.ok) {
 			return err(storeError(bodyResult.error));
 		}
@@ -83,6 +75,28 @@ export function makeSetStatus(deps: AppDeps) {
 
 		deps.notifier.info(`Created next occurrence: ${createResult.value}`);
 		return ok({ spawned: some(createResult.value) });
+	};
+}
+
+export function makeSetStatus(deps: AppDeps) {
+	const writeStatusTransition = makeWriteStatusTransition(deps);
+
+	return async (path: TaskPath, statusId: StatusId): Promise<Result<SetStatusOutcome, AppError>> => {
+		const taskResult = await deps.store.read(path);
+		if (!taskResult.ok) {
+			return err(storeError(taskResult.error));
+		}
+		const rawResult = await deps.store.rawFrontmatter(path);
+		if (!rawResult.ok) {
+			return err(storeError(rawResult.error));
+		}
+
+		const toStatus = findStatus(deps.settings().statuses, statusId);
+		if (!toStatus.some) {
+			return err(unknownStatusError(statusId));
+		}
+
+		return writeStatusTransition({ path, task: taskResult.value, raw: rawResult.value, to: toStatus.value });
 	};
 }
 
