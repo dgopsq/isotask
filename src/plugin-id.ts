@@ -23,3 +23,6 @@ export const CSS_PREFIX: string = PLUGIN_ID;
 export function cssClass(name: string): string {
 	return `${CSS_PREFIX}-${name}`;
 }
+
+/** Linked from the agent instructions text and the settings tab; kept alongside the other identity constants since it's also imported from any layer. */
+export const AGENT_GUIDE_URL = "https://github.com/dgopsq/isotask/blob/main/docs/AGENT-GUIDE.md";

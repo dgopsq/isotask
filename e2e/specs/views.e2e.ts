@@ -3853,4 +3853,17 @@ describe("Actions", function () {
 			expect(contentAfter).toEqual(contentBefore);
 		});
 	});
+
+	describe("Copy agent instructions", function () {
+		it("copies text containing the task marker line to the clipboard", async function () {
+			await browser.executeObsidianCommand("isotask:copy-agent-instructions");
+
+			// Fire-and-forget clipboard write (`copyToClipboard`), same rationale
+			// as every other command test in this file: poll instead of reading once.
+			await browser.waitUntil(async () => (await browser.execute(() => navigator.clipboard.readText())).includes("type: task"), {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "clipboard never contained the agent instructions marker line",
+			});
+		});
+	});
 });
