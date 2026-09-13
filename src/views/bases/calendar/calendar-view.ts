@@ -267,6 +267,7 @@ export class CalendarBasesView extends BasesView {
 				firstDay: effective.firstDay,
 				compact: effective.compact,
 				...(restore !== undefined ? { date: restore.date } : {}),
+				...(restore?.scrollTop !== undefined ? { scrollTop: restore.scrollTop } : {}),
 				// Unconditional: every other calendar view option changes what
 				// is *shown*, whereas a read-only toggle would change what is
 				// *permitted*, and a user who doesn't want to drag simply
@@ -379,7 +380,7 @@ export class CalendarBasesView extends BasesView {
 			this.deps.navigationMemory.set(navigationMemoryKey(this.type, basesViewName(this.config)), {
 				view: handle.getView(),
 				date: handle.getDate(),
-				scrollTop: undefined,
+				scrollTop: handle.getScrollTop(),
 				savedAt: this.deps.clock.now(),
 			});
 		}

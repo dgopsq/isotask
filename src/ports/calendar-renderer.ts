@@ -54,6 +54,8 @@ export interface CalendarOptions {
 	readonly compact?: boolean;
 	/** Initial navigated-to date, restored from session navigation memory — omitted mounts on today, Event Calendar's own default. */
 	readonly date?: IsoDate;
+	/** Initial time-grid scroll position, restored from session navigation memory — omitted leaves Event Calendar's own scroll-to-current-time default. */
+	readonly scrollTop?: number;
 	readonly callbacks: CalendarCallbacks;
 }
 
@@ -102,6 +104,8 @@ export interface CalendarHandle {
 	readonly setCompact: (compact: boolean) => void;
 	/** The date Event Calendar is currently showing (`calendar.getOption("date")`) — read at `onunload` to save navigation memory. */
 	readonly getDate: () => IsoDate;
+	/** The time-grid scroller's `scrollTop`, or `undefined` when no time-grid scroller is mounted (e.g. month view). */
+	readonly getScrollTop: () => number | undefined;
 	readonly goTo: (date: IsoDate) => void;
 	readonly next: () => void;
 	readonly prev: () => void;

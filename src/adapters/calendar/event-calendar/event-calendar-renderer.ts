@@ -36,6 +36,18 @@ function applyHexDotColor(el: HTMLElement, event: CalendarEvent | undefined): vo
 }
 
 /**
+ * The time grid's own scroll container (`.ec-main`, vendored `overflow:
+ * auto`) — nested under `.ec-time-grid`, which only day/week views render,
+ * so this is `undefined` in month view. Confirmed live: Event Calendar
+ * scrolls this element to `scrollTime` (default 06:00) on mount via its own
+ * `tick().then(...)`, which is why callers restoring a saved position always
+ * do so from a `requestAnimationFrame` — scheduled after that microtask.
+ */
+function findTimeGridScroller(container: HTMLElement): HTMLElement | undefined {
+	return container.querySelector<HTMLElement>(".ec-time-grid .ec-main") ?? undefined;
+}
+
+/**
  * The sole `@event-calendar/*` import site in the codebase (ESLint-enforced,
  * `eslint.config.js`). Wraps `@event-calendar/core` behind the
  * `CalendarRenderer` port (ADR 0006) so the rest of the plugin never sees
@@ -411,6 +423,31 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			buildOptions(compact, options.date === undefined ? undefined : toJsDate(options.date)),
 		);
 
+		/** Reads the time-grid scroller's current position, or `undefined` when none is mounted (month view). */
+		function currentScrollTop(): number | undefined {
+			return findTimeGridScroller(container)?.scrollTop;
+		}
+
+		/**
+		 * Restores a saved scroll position after Event Calendar's own mount-time
+		 * auto-scroll (`scrollToTime`, scheduled via `tick().then(...)`, a
+		 * microtask) has already run — `requestAnimationFrame` runs after all
+		 * pending microtasks, so this reliably wins the race.
+		 */
+		function applyScrollTop(scrollTop: number | undefined): void {
+			if (scrollTop === undefined) {
+				return;
+			}
+			window.requestAnimationFrame(() => {
+				const scroller = findTimeGridScroller(container);
+				if (scroller !== undefined) {
+					scroller.scrollTop = scrollTop;
+				}
+			});
+		}
+
+		applyScrollTop(options.scrollTop);
+
 		// Serializes `setCompact`'s destroy/recreate cycles. `onResize` can
 		// fire many times in a row for a single drag gesture (confirmed live:
 		// ~9 calls for one sidebar collapse animation), so a pane dragged back
@@ -484,6 +521,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// the last one this handle happened to push.
 			getView: () => fromEventCalendarView(calendar.getOption("view")),
 			getDate: () => fromEventCalendarDate(calendar.getOption("date")),
+			getScrollTop: () => currentScrollTop(),
 			setFirstDay: (firstDay) => {
 				currentFirstDay = firstDay;
 				calendar.setOption("firstDay", toEventCalendarFirstDay(firstDay));
@@ -502,6 +540,10 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					// defaults the new instance's `date` back to today, discarding
 					// wherever the user had navigated to.
 					const preservedDate = calendar.getOption("date");
+					// Same reasoning as `preservedDate` — a remount would otherwise
+					// reset the time grid to Event Calendar's own scroll-to-current-
+					// time default, discarding wherever the user had scrolled to.
+					const preservedScrollTop = currentScrollTop();
 					await unmountCurrent();
 					// `destroy()` may have landed during that await — recreating
 					// now would mount into a container that is being torn down.
@@ -517,6 +559,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					mountedElements.clear();
 					calendar = createCalendar(container, [DayGrid, TimeGrid, Interaction], buildOptions(target, preservedDate));
 					calendarLive = true;
+					applyScrollTop(preservedScrollTop);
 				});
 			},
 			goTo: (date) => {

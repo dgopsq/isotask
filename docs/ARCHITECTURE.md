@@ -238,6 +238,20 @@ user's navigated-to date survives the swap. The same probe found the resulting 3
 computation (never a CSS media query, which would key off the *viewport*, not the pane) so the
 header's smaller typography/padding can't drift from the JS's own breakpoint.
 
+**Navigation memory across the click-a-task/go-back round trip.** Clicking a calendar event opens
+its note in the same leaf; going back re-creates the `CalendarBasesView` from scratch, which would
+otherwise reset it to the Bases-configured view/today/scroll-to-current-time. `onunload` saves the
+mounted `CalendarHandle`'s view, date, and time-grid scroll position (`getView`/`getDate`/
+`getScrollTop`) into a session-only `NavigationMemory` (`adapters/navigation/navigation-memory.ts`,
+a plain `Map`, never persisted — mirrors `RescheduleHistory`), keyed by
+`domain/calendar-navigation.ts#navigationMemoryKey(this.type, this.config.name)` so more than one
+calendar view in a `.base` file remembers independently. The next mount restores it only if
+`shouldRestoreNavigation` says it's fresh enough (`NAVIGATION_MEMORY_MAX_AGE_MS`, 12 hours) — past
+that, a reopened calendar starts from the Bases config again rather than resurrecting a
+long-abandoned position. `applied` is still set from `effective` (the Bases-config-derived value),
+never from the restored state, so a later `onDataUpdated` never fights the restore back to the
+config's own `initialView`.
+
 ## Data flow: complete-task path
 
 ```
