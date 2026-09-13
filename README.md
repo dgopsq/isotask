@@ -1,6 +1,7 @@
 # Isotask
 
-[Install](#install) · [Quick start](#quick-start) · [Docs](#docs) · [Development](#development)
+[Install](#install) · [Quick start](#quick-start) · [Agent guide](docs/AGENT-GUIDE.md) ·
+[Docs](#docs) · [Development](#development)
 
 [![CI](https://github.com/dgopsq/isotask/actions/workflows/ci.yml/badge.svg)](https://github.com/dgopsq/isotask/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/dgopsq/isotask)](https://github.com/dgopsq/isotask/releases)
@@ -51,6 +52,15 @@ migrate away from: the notes are still just notes.
 - **Week starts on**: which day the feed's this week / next week buckets split on.
 - **Property keys**: every frontmatter key above, plus the marker key/value that identifies a note
   as a task, individually renameable.
+
+## Using isotask with AI agents
+
+Point an agent that writes notes into your vault at
+[`docs/AGENT-GUIDE.md`](https://github.com/dgopsq/isotask/blob/main/docs/AGENT-GUIDE.md) — it
+covers the frontmatter schema and recipes an agent needs, with no plugin source access required.
+For the vault's actual property keys, statuses, and task folder, run
+`app.plugins.plugins.isotask.api.agentInstructions()` (Obsidian CLI `eval`) or the **Copy agent
+instructions** command, and hand the agent the result.
 
 ## What the plugin reads
 
@@ -103,6 +113,8 @@ repeat: FREQ=WEEKLY;BYDAY=MO
 
 ## Docs
 
+- [Agent guide](docs/AGENT-GUIDE.md): frontmatter schema and recipes for an AI agent writing tasks
+  into your vault.
 - [Architecture](docs/ARCHITECTURE.md): layers, data flow, ports, and the composition root.
 - [Domain model](docs/DOMAIN-MODEL.md): frontmatter schema, statuses, recurrence, feed buckets.
 - [Conventions](docs/CONVENTIONS.md): TypeScript, DOM, Obsidian API, and testing rules.
@@ -123,7 +135,8 @@ pnpm wt feat/<name> # new worktree branched off main, deps installed
 For a fast e2e debug loop, filter to one spec and one test name:
 `E2E_GREP="<pattern>" pnpm test:e2e --spec <substring>`.
 
-> Working with an AI agent? Start from `AGENTS.md`.
+> Contributing to isotask with an AI agent? Start from `AGENTS.md`. Writing tasks into a vault?
+> See [Using isotask with AI agents](#using-isotask-with-ai-agents) above.
 
 ## License
 

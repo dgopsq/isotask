@@ -1,5 +1,8 @@
 # Agent instructions
 
+This file is for agents contributing to the isotask codebase. An agent writing tasks *into* a
+vault that uses isotask should read `docs/AGENT-GUIDE.md` instead.
+
 ## What this is
 
 Isotask is an Obsidian plugin: one markdown note = one task, all task data lives in frontmatter
