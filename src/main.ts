@@ -115,7 +115,7 @@ export default class IsotaskPlugin extends Plugin {
 			app: this.app,
 			store,
 			notifier,
-						getPropertyKeys: () => this.pluginSettings.propertyKeys,
+			getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 			getTaskFolder: () => this.pluginSettings.taskFolder,
 			getTasksBasePath: () => this.pluginSettings.tasksBasePath,
