@@ -38,12 +38,9 @@ import { revealTaskPanel } from "@/views/task-panel/reveal-task-panel";
 import { TASK_PANEL_ICON, TaskPanelView } from "@/views/task-panel/task-panel-view";
 
 /**
- * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads
- * settings, builds the adapters and `app` use-cases, registers the Bases
- * views, commands, the "Isotask" file/editor-menu section, the settings
- * tab, and the public `api` field. Everything registered through
- * `register*`/`add*` is torn down automatically on unload — there is
- * nothing to clean up manually here.
+ * Composition root (`docs/ARCHITECTURE.md#composition-root`). Loads settings,
+ * builds the adapters and `app` use-cases, and registers the Bases views,
+ * commands, menus, settings tab, and the public `api` field.
  */
 export default class IsotaskPlugin extends Plugin {
 	private pluginSettings: IsotaskSettings = parseSettings(undefined);

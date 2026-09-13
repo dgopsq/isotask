@@ -8,7 +8,7 @@ export interface IsotaskApi {
 }
 
 function statusLine(id: string, kind: string, label: string): string {
-	return `- \`${id}\` = ${kind} "${label}"`;
+	return `  - \`${id}\` = ${kind} "${label}"`;
 }
 
 /** Renders from the CONFIGURED settings, never the hardcoded defaults, so this always matches what the vault actually expects. */
