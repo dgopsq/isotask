@@ -1,6 +1,6 @@
 {
 	"name": "isotask",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"private": true,
 	"type": "module",
 	"description": "Notes as tasks: due dates, recurrence, priorities, and feed and calendar views built on Bases. Agent-friendly.",
