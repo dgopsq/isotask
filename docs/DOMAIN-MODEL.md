@@ -80,9 +80,11 @@ command that sets the first configured `done`-kind status without going through 
   normal done transition applied (completed = now, recurrence spawn included); an `open`-kind
   status with a stale `completed` gets it cleared. This is what makes editing `status` directly in
   the Properties view, an external editor, or a script behave the same as using the plugin's own
-  done/reopen toggle. It only fires while Obsidian is running — there is no vault scan on startup
-  (see "What the plugin reads" in the README), so an edit made while Obsidian is closed reconciles
-  the next time that note's metadata is (re)cached, not immediately.
+  done/reopen toggle. It only reconciles live edits: the watcher ignores every `metadataCache`
+  `changed` event until a quiet period after startup indexing's `resolved` events settle, so
+  startup indexing never rewrites a pre-existing done task's `completed`. An edit made while
+  Obsidian is closed is therefore not reconciled at the next startup — only a change made while
+  Obsidian is running, after that quiet period, triggers it.
 
 ## Priority
 
@@ -188,7 +190,8 @@ new name/path.
 5. Entering a `done`-kind status by editing `status` directly in frontmatter (bypassing the
    plugin's own toggle) spawns the next occurrence too — `adapters/obsidian/completion-watcher.ts`
    reconciles `completed` with `status` on any metadata change and, for that case, reuses this same
-   transition (ADR 0018). Only while Obsidian is running; no vault scan on startup.
+   transition (ADR 0018). Only a live edit triggers this; one made while Obsidian was closed does
+   not reconcile at the next startup.
 6. UI: a recurrence picker offers presets — daily, weekdays, weekly on `<day>`, every N weeks,
    monthly on day N, yearly — plus a raw RRULE text field for anything else. Natural-language
    recurrence input is a later idea (see `docs/ROADMAP.md`), not in scope for v1.

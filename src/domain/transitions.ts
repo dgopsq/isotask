@@ -42,8 +42,9 @@ export interface StatusChangeInput {
 	readonly keys: PropertyKeys;
 	readonly now: IsoDateTime;
 	readonly spawnTemplate: string;
-	/** Skips the same-status short-circuit — needed to re-apply a `done` transition (completed + spawn) to a task already at `to`. */
-	readonly force?: boolean;
+	/** Skips the same-status short-circuit — needed to re-apply a `done` transition (completed + spawn) to a task already at `to`.
+	 * `| undefined` lets a caller forward its own optional `force` without a conditional spread (`exactOptionalPropertyTypes`). */
+	readonly force?: boolean | undefined;
 }
 
 /** The anchor rrule evaluates against: `due` if present, else `scheduled` (see `docs/DOMAIN-MODEL.md#recurrence-semantics`). */

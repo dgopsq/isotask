@@ -44,12 +44,16 @@ same path before the call resolves, and by then `completed` already matches `sta
 re-entrant event is a safe no-op even without the guard, which exists to avoid two concurrent reads
 of the same note racing each other's write.
 
-This only reacts while Obsidian is running: there is deliberately no vault scan on plugin load, per
-the plugin's existing narrow-enumeration policy (`README.md`'s "What the plugin reads", commit
-62dcd8f). A note edited while Obsidian is closed (synced in externally, edited via CLI with the
-vault unopened) only reconciles once it's next opened and the file's metadata is (re)cached — which
-happens for every note Obsidian indexes on startup, not only ones a Bases view queries, but the
-watcher itself is still a live-event listener, not a scan the plugin runs itself.
+The watcher ignores every `changed` event until 1s after the last `metadataCache` `resolved` event
+it has seen (`MetadataCache` has no synchronous "already resolved" check). `resolved` fires in
+waves while a vault is still being indexed — a brand new file's own indexing can land in a later
+wave than the session's very first `resolved` — so gating on a quiet period rather than that first
+firing is what actually prevents a pre-existing done task (hand-marked before this release, no
+`completed` yet) from getting `completed` rewritten, and, if recurring, spawning a next occurrence,
+on every launch; a single-flip boolean was tried first and, verified empirically, let exactly that
+slip through for a freshly-created fixture note in e2e testing.
+**Consequence: an edit made while Obsidian is closed is never caught up when it's next opened.**
+Only a live edit, made once the quiet period has elapsed, ever triggers reconciliation.
 
 ## Consequences
 
@@ -62,10 +66,14 @@ Positive:
   completed-patch behavior can't drift between the two.
 
 Negative:
-- Reconciliation is event-driven only; a change made while Obsidian isn't running takes effect on
-  the next metadata cache update for that note, not immediately when the file changes on disk.
+- Reconciliation only covers live edits (after the startup-resolution quiet period); an edit made
+  while Obsidian is closed is not reconciled at the next startup, only on its own next live change.
 - Every task note's every metadata change now runs one extra read + drift check, even when nothing
   is actually inconsistent — cheap (in-memory cache reads, no vault enumeration) but non-zero.
+- `completionDrift` only detects "done vs. open"; a hand-edit from one `done`-kind status straight
+  to another `done`-kind status doesn't re-spawn the way the UI toggle's actual status change would.
+  With today's two default statuses (one `open`, one `done`) this can't occur — it would need a
+  third, `done`-kind status configured, which nothing in the UI currently offers (ADR 0017).
 
 ## Alternatives considered
 
@@ -77,3 +85,6 @@ Negative:
   `applyStatusChange`.** Rejected: recurrence spawning and its idempotency check are fiddly enough
   (see ADR 0005) that two copies would inevitably drift; a `force` flag is a smaller surface than a
   second implementation.
+- **A boolean flipped by the session's first `resolved` event.** Rejected: verified empirically to
+  be insufficient — a brand new file's indexing can land in a later `resolved` wave than the first,
+  so this let a pre-existing done task through anyway; the quiet-period debounce above closes that.

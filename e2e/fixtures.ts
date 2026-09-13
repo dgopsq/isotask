@@ -64,6 +64,8 @@ export interface Fixtures {
 	readonly tasks: readonly FixtureTask[];
 	readonly invalid: FixtureInvalidTask;
 	readonly recurring: FixtureRecurringTask;
+	/** Already `status: done`, no `completed` — as if hand-marked done pre-boot; the startup-gating e2e test (ADR 0018) asserts the watcher never touches it. */
+	readonly preDoneRecurring: FixtureRecurringTask;
 	/**
 	 * `scheduled` date on the "Today task" fixture (below `tasks`, alongside
 	 * its `due: today`) — used by `e2e/specs/views.e2e.ts`'s "Calendar view"
@@ -266,7 +268,15 @@ export function buildFixtures(now: Date = new Date()): Fixtures {
 		body: "Generated e2e fixture: recurring weekly task.",
 	};
 
-	return { today, tasks, invalid, recurring, todayTaskScheduled };
+	const preDoneRecurring: FixtureRecurringTask = {
+		filename: "Pre-done recurring task.md",
+		title: "Pre-done recurring task",
+		due: today,
+		frontmatter: { type: "task", status: "done", due: today, repeat: "FREQ=WEEKLY" },
+		body: "Generated e2e fixture: already done, no completed, pre-existing at boot.",
+	};
+
+	return { today, tasks, invalid, recurring, preDoneRecurring, todayTaskScheduled };
 }
 
 /**

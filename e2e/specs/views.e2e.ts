@@ -3713,6 +3713,19 @@ describe("Actions", function () {
 
 			await waitForFrontmatter(originalPath, "completed", (v) => v === undefined, `${originalPath} completed was never cleared`);
 		});
+
+		it("never reconciles a task already done before Obsidian booted (startup-indexing gate)", async function () {
+			const preDonePath = `Tasks/${fixtures.preDoneRecurring.filename}`;
+			const spawnDue = format(addDays(parseISO(fixtures.preDoneRecurring.due), 7), "yyyy-MM-dd");
+			const preDoneSpawnPath = `Tasks/${fixtures.preDoneRecurring.title} ${spawnDue}.md`;
+
+			const fm = await frontmatterOf(preDonePath);
+			expect(fm?.["status"]).toEqual("done");
+			expect(fm?.["completed"]).toBeUndefined();
+
+			const spawnExists = await browser.executeObsidian(({ app }, p: string) => app.vault.getFileByPath(p) !== null, preDoneSpawnPath);
+			expect(spawnExists).toBe(false);
+		});
 	});
 
 	describe("Convert note to task", function () {

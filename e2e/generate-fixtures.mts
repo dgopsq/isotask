@@ -87,6 +87,7 @@ async function main(): Promise<void> {
 	// (e.g. "Recurring task 2026-09-05.md") since only the exact fixture
 	// filenames below are kept.
 	desired.set(fixtures.recurring.filename, noteContent(fixtures.recurring.frontmatter, fixtures.recurring.body));
+	desired.set(fixtures.preDoneRecurring.filename, noteContent(fixtures.preDoneRecurring.frontmatter, fixtures.preDoneRecurring.body));
 
 	const existingFiles = await readdir(tasksDir);
 	// Stray files not in this run's desired set (e.g. leftovers from a

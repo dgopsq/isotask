@@ -125,4 +125,24 @@ describe("makeSetStatus", () => {
 		}
 		expect(notifier.infoMessages).toEqual([]);
 	});
+
+	it("same-status call is a no-op (force is never set by makeSetStatus)", async () => {
+		const { deps, store, notifier } = makeDeps();
+		store.seed(path("Tasks/Buy milk 2026-09-02.md"), {
+			type: "task",
+			status: "done",
+			due: "2026-09-02",
+			repeat: "FREQ=WEEKLY",
+			completed: "2026-08-26T10:00",
+		});
+		const setStatus = makeSetStatus(deps);
+		const result = await setStatus(path("Tasks/Buy milk 2026-09-02.md"), statusId("done"));
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.spawned.some).toBe(false);
+		}
+		expect(store.notes.get(path("Tasks/Buy milk 2026-09-02.md"))?.frontmatter["completed"]).toBe("2026-08-26T10:00");
+		expect(notifier.infoMessages).toEqual([]);
+	});
 });

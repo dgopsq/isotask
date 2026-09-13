@@ -39,7 +39,7 @@ export function makeWriteStatusTransition(deps: AppDeps) {
 			keys: settings.propertyKeys,
 			now: deps.clock.now(),
 			spawnTemplate: settings.spawnFilenameTemplate,
-			...(input.force !== undefined ? { force: input.force } : {}),
+			force: input.force,
 		});
 
 		const updateResult = await deps.store.updateProperties(input.path, patch);
