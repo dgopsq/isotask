@@ -35,14 +35,7 @@ function applyHexDotColor(el: HTMLElement, event: CalendarEvent | undefined): vo
 	}
 }
 
-/**
- * The time grid's own scroll container (`.ec-main`, vendored `overflow:
- * auto`) — nested under `.ec-time-grid`, which only day/week views render,
- * so this is `undefined` in month view. Confirmed live: Event Calendar
- * scrolls this element to `scrollTime` (default 06:00) on mount via its own
- * `tick().then(...)`, which is why callers restoring a saved position always
- * do so from a `requestAnimationFrame` — scheduled after that microtask.
- */
+/** `.ec-main` is the time grid's scroller; only day/week views render it. */
 function findTimeGridScroller(container: HTMLElement): HTMLElement | undefined {
 	return container.querySelector<HTMLElement>(".ec-time-grid .ec-main") ?? undefined;
 }
@@ -428,12 +421,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			return findTimeGridScroller(container)?.scrollTop;
 		}
 
-		/**
-		 * Restores a saved scroll position after Event Calendar's own mount-time
-		 * auto-scroll (`scrollToTime`, scheduled via `tick().then(...)`, a
-		 * microtask) has already run — `requestAnimationFrame` runs after all
-		 * pending microtasks, so this reliably wins the race.
-		 */
+		/** Event Calendar's mount-time scroll runs in a microtask; rAF is the earliest point where a restore is not overwritten. */
 		function applyScrollTop(scrollTop: number | undefined): void {
 			if (scrollTop === undefined) {
 				return;
@@ -540,9 +528,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					// defaults the new instance's `date` back to today, discarding
 					// wherever the user had navigated to.
 					const preservedDate = calendar.getOption("date");
-					// Same reasoning as `preservedDate` — a remount would otherwise
-					// reset the time grid to Event Calendar's own scroll-to-current-
-					// time default, discarding wherever the user had scrolled to.
+					// Remount would otherwise reset scroll to Event Calendar's time default.
 					const preservedScrollTop = currentScrollTop();
 					await unmountCurrent();
 					// `destroy()` may have landed during that await — recreating

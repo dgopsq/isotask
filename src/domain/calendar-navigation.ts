@@ -2,11 +2,7 @@ import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import { differenceInMinutes } from "@/domain/dates";
 
-/**
- * What the calendar view remembers across the click-a-task-note/go-back round
- * trip Obsidian does (`views/bases/calendar/calendar-view.ts`), session-only
- * (`adapters/navigation/navigation-memory.ts`).
- */
+/** Calendar view state across task-note trips, session-only. */
 export interface CalendarNavigationState {
 	readonly view: CalendarViewKind;
 	readonly date: IsoDate;

@@ -253,12 +253,7 @@ export class CalendarBasesView extends BasesView {
 			const root = this.viewContainerEl.createDiv({ cls: cssClass("calendar") });
 			this.calendarRootEl = root;
 
-			// Restores the view/date/scroll position the user last had open on
-			// this Bases view before clicking a task note away from it — see
-			// `onunload` for where this gets saved. Ignored past
-			// `NAVIGATION_MEMORY_MAX_AGE_MS` (`shouldRestoreNavigation`) so a
-			// reopen hours later starts fresh rather than resurrecting a
-			// long-abandoned position.
+			// Saved in onunload; stale entries ignored so a reopen hours later starts from the config.
 			const remembered = this.deps.navigationMemory.get(navigationMemoryKey(this.type, basesViewName(this.config)));
 			const restore = remembered !== undefined && shouldRestoreNavigation(remembered, this.deps.clock.now()) ? remembered : undefined;
 

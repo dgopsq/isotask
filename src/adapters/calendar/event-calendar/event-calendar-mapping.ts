@@ -59,12 +59,7 @@ export function fromEventCalendarView(view: string | undefined): CalendarViewKin
 	}
 }
 
-/**
- * `calendar.getOption("date")` -> `IsoDate`, backing `CalendarHandle.getDate`.
- * Typed `Date | string | undefined` because that's the SETTER's accepted
- * shape (`Calendar.Options["date"]`) even though a live instance always
- * stores a real `Date` here — the fallback exists only for the type checker.
- */
+/** Setter type is `Date | string | undefined` but live instance always holds a `Date`; fallback only satisfies the type checker. */
 export function fromEventCalendarDate(value: Date | string | undefined): IsoDate {
 	if (value instanceof Date) {
 		return fromJsDate(value);
