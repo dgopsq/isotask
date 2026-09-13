@@ -20,18 +20,11 @@ export interface WriteStatusTransitionInput {
 	readonly task: Task;
 	readonly raw: Readonly<Record<string, FrontmatterValue>>;
 	readonly to: StatusConfig;
-	/** Forwarded to `applyStatusChange` — see its own doc for why `app/reconcile-completion.ts` needs this. */
 	readonly force?: boolean;
 }
 
-/**
- * Computes the patch (and optional spawn plan) for a status transition via
- * `domain/transitions.ts`, writes the patch, then — if the transition
- * spawned a next occurrence — creates it unless a note already exists at
- * the spawn path (idempotent, per `docs/DOMAIN-MODEL.md#recurrence-semantics`).
- * Shared by `makeSetStatus` below and `app/reconcile-completion.ts`'s
- * external-edit path, so the spawn/idempotency logic exists in one place.
- */
+/** Writes a status-transition patch and spawn, if any, skipping the spawn if its path exists.
+ * Shared by `makeSetStatus` and `app/reconcile-completion.ts` so that check exists once. */
 export function makeWriteStatusTransition(deps: AppDeps) {
 	return async (input: WriteStatusTransitionInput): Promise<Result<SetStatusOutcome, AppError>> => {
 		const settings = deps.settings();
@@ -85,10 +78,6 @@ export function makeWriteStatusTransition(deps: AppDeps) {
 	};
 }
 
-/**
- * Sets a task's status: reads the task and its raw frontmatter, resolves
- * the target `StatusConfig`, then delegates to `makeWriteStatusTransition`.
- */
 export function makeSetStatus(deps: AppDeps) {
 	const writeStatusTransition = makeWriteStatusTransition(deps);
 

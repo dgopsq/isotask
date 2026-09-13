@@ -20,14 +20,7 @@ function isParseError(error: TaskStoreError): boolean {
 	return error.kind === "invalid-task";
 }
 
-/**
- * Reconciles `completed` with `status` for one task note, per
- * `docs/adr/0018-reconcile-completed-with-status.md`: called from
- * `adapters/obsidian/completion-watcher.ts` on every `metadataCache`
- * `changed` event, so an external edit (Properties view, another app, a
- * script) gets the same `completed`/spawn handling as the plugin's own
- * `app/set-status.ts`.
- */
+/** Gives an external edit to `status` the same `completed`/spawn handling as `app/set-status.ts`. */
 export function makeReconcileCompletion(deps: AppDeps) {
 	const writeStatusTransition = makeWriteStatusTransition(deps);
 
@@ -54,8 +47,7 @@ export function makeReconcileCompletion(deps: AppDeps) {
 			return ok({ kind: "reopened" });
 		}
 
-		// drift === "complete": the task is already at its (done) target status,
-		// so force the same-status short-circuit off to get the completed patch + spawn plan.
+		// Already at the done status, so force skips applyStatusChange's same-status short-circuit.
 		const toStatus = findStatus(settings.statuses, task.status);
 		if (!toStatus.some) {
 			return ok({ kind: "none" });

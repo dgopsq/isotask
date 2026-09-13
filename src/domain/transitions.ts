@@ -42,7 +42,7 @@ export interface StatusChangeInput {
 	readonly keys: PropertyKeys;
 	readonly now: IsoDateTime;
 	readonly spawnTemplate: string;
-	/** Skips the same-status no-op short-circuit — used to re-run a `done` transition (write `completed` + spawn) for a task already at `to`, e.g. an external edit that set `status` without `completed`. */
+	/** Skips the same-status short-circuit — needed to re-apply a `done` transition (completed + spawn) to a task already at `to`. */
 	readonly force?: boolean;
 }
 

@@ -7,18 +7,12 @@ import { isTaskNote } from "@/domain/frontmatter";
 import type { TaskPath } from "@/domain/task";
 
 /**
- * Reconciles `completed` with `status` on every `metadataCache` `changed`
- * event for a task note, so an edit made outside the plugin's own
- * `app/set-status.ts` (Properties view, an external editor, a script) still
- * gets `completed` written/cleared and, on completion, a recurrence spawn.
- * Only reacts while Obsidian is running — no vault scan on startup, per
- * `docs/adr/0018-reconcile-completed-with-status.md`.
+ * Reconciles `completed` with `status` on any frontmatter edit, not just the plugin's own toggle.
+ * Only reacts while Obsidian runs — deliberately no vault scan on startup.
  */
 export function registerCompletionWatcher(plugin: Plugin, deps: AppDeps): void {
 	const reconcile = makeReconcileCompletion(deps);
-	// `reconcile`'s own frontmatter write re-fires `changed` for the same
-	// path before the first call resolves; without this guard that re-entrant
-	// event would race the first call's read/write against its own patch.
+	// Our own write re-fires `changed` for the same path before this resolves; guards against racing that.
 	const inFlight = new Set<TaskPath>();
 
 	plugin.registerEvent(
