@@ -42,6 +42,8 @@ export interface StatusChangeInput {
 	readonly keys: PropertyKeys;
 	readonly now: IsoDateTime;
 	readonly spawnTemplate: string;
+	/** Skips the same-status no-op short-circuit — used to re-run a `done` transition (write `completed` + spawn) for a task already at `to`, e.g. an external edit that set `status` without `completed`. */
+	readonly force?: boolean;
 }
 
 /** The anchor rrule evaluates against: `due` if present, else `scheduled` (see `docs/DOMAIN-MODEL.md#recurrence-semantics`). */
@@ -96,9 +98,9 @@ function planSpawn(input: StatusChangeInput): Option<SpawnPlan> {
  * same spawn plan; it's the caller's job not to write it twice).
  */
 export function applyStatusChange(input: StatusChangeInput): StatusChangeResult {
-	const { task, to, statuses } = input;
+	const { task, to, statuses, force = false } = input;
 
-	if (task.status === to.id) {
+	if (task.status === to.id && !force) {
 		return { patch: {}, spawn: none() };
 	}
 

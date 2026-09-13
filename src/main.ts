@@ -8,6 +8,7 @@ import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
 import { makeNavigationMemory } from "@/adapters/navigation/navigation-memory";
 import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
+import { registerCompletionWatcher } from "@/adapters/obsidian/completion-watcher";
 import { createObsidianHaptics } from "@/adapters/obsidian/haptics";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
@@ -157,6 +158,7 @@ export default class IsotaskPlugin extends Plugin {
 
 		registerTaskMenus(this, taskMenuDeps);
 		registerTaskViewActions(this, taskMenuDeps);
+		registerCompletionWatcher(this, appDeps);
 
 		this.registerView(VIEW_TYPE_TASK_PANEL, (leaf) => new TaskPanelView(leaf, { ...taskMenuDeps, convertNote }));
 

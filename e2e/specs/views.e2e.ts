@@ -3645,6 +3645,76 @@ describe("Actions", function () {
 		});
 	});
 
+	/**
+	 * `adapters/obsidian/completion-watcher.ts` (ADR 0018): edits made
+	 * directly in frontmatter — never through any plugin command or UI
+	 * control — must still get `completed` reconciled with `status`. Uses
+	 * `processFrontMatter` from the test itself, exactly what a Properties
+	 * view edit or an external editor/CLI would do.
+	 */
+	describe("External frontmatter edit reconciliation", function () {
+		const originalPath = `Tasks/${fixtures.recurring.filename}`;
+		const spawnDue = format(addDays(parseISO(fixtures.recurring.due), 7), "yyyy-MM-dd");
+		const spawnPath = `Tasks/${fixtures.recurring.title} ${spawnDue}.md`;
+
+		before(async function () {
+			await openFile(originalPath);
+		});
+
+		afterEach(async function () {
+			await restoreFixtureNote(originalPath, fixtures.recurring.frontmatter, fixtures.recurring.body);
+			await waitForFrontmatter(originalPath, "status", (v) => v === "todo", `${originalPath} status never restored to its fixture value`);
+			await deleteNoteIfExists(spawnPath);
+		});
+
+		it("sets completed and spawns the next occurrence when status is set to done directly in frontmatter", async function () {
+			await browser.executeObsidian(async ({ app }, p: string) => {
+				const file = app.vault.getFileByPath(p);
+				if (file === null) {
+					throw new Error(`${p} not found`);
+				}
+				await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+					fm["status"] = "done";
+				});
+			}, originalPath);
+
+			await waitForFrontmatter(originalPath, "completed", (v) => typeof v === "string", `${originalPath} completed was never reconciled`);
+
+			await waitForFrontmatter(spawnPath, "status", (v) => v === "todo", `${spawnPath} was never spawned via reconciliation`);
+			const spawnFm = await frontmatterOf(spawnPath);
+			expect(spawnFm?.["due"]).toEqual(spawnDue);
+			expect(spawnFm?.["completed"]).toBeUndefined();
+		});
+
+		it("clears completed when status is set back to open directly in frontmatter", async function () {
+			// Sets status and completed together, in one write, so the note is
+			// already consistent — no reconciliation (and no spawn) should fire yet.
+			await browser.executeObsidian(async ({ app }, p: string) => {
+				const file = app.vault.getFileByPath(p);
+				if (file === null) {
+					throw new Error(`${p} not found`);
+				}
+				await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+					fm["status"] = "done";
+					fm["completed"] = "2026-01-01T00:00";
+				});
+			}, originalPath);
+			await waitForFrontmatter(originalPath, "status", (v) => v === "done", `${originalPath} status was never set to done`);
+
+			await browser.executeObsidian(async ({ app }, p: string) => {
+				const file = app.vault.getFileByPath(p);
+				if (file === null) {
+					throw new Error(`${p} not found`);
+				}
+				await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+					fm["status"] = "todo";
+				});
+			}, originalPath);
+
+			await waitForFrontmatter(originalPath, "completed", (v) => v === undefined, `${originalPath} completed was never cleared`);
+		});
+	});
+
 	describe("Convert note to task", function () {
 		const path = "Plain.md";
 

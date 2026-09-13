@@ -74,6 +74,15 @@ command that sets the first configured `done`-kind status without going through 
   never writes this default back to the note; the next write through any `app/*` use-case
   persists it. Only when no `open`-kind status is configured at all does this still fail, with
   `no-open-status`.
+- `completed` is derived from `status`, not just set by the plugin's own toggle: on every
+  `metadataCache` change to a task note, `adapters/obsidian/completion-watcher.ts` reconciles the
+  two (`domain/completion-drift.ts`, ADR 0018) — a `done`-kind status with no `completed` gets the
+  normal done transition applied (completed = now, recurrence spawn included); an `open`-kind
+  status with a stale `completed` gets it cleared. This is what makes editing `status` directly in
+  the Properties view, an external editor, or a script behave the same as using the plugin's own
+  done/reopen toggle. It only fires while Obsidian is running — there is no vault scan on startup
+  (see "What the plugin reads" in the README), so an edit made while Obsidian is closed reconciles
+  the next time that note's metadata is (re)cached, not immediately.
 
 ## Priority
 
@@ -176,7 +185,11 @@ new name/path.
 4. **Idempotency**: if the spawn target path already exists, the plugin does not spawn a
    duplicate — it shows a `Notice` instead. This makes re-triggering completion (e.g. a duplicate
    event, or the user toggling status back and forth) safe.
-5. UI: a recurrence picker offers presets — daily, weekdays, weekly on `<day>`, every N weeks,
+5. Entering a `done`-kind status by editing `status` directly in frontmatter (bypassing the
+   plugin's own toggle) spawns the next occurrence too — `adapters/obsidian/completion-watcher.ts`
+   reconciles `completed` with `status` on any metadata change and, for that case, reuses this same
+   transition (ADR 0018). Only while Obsidian is running; no vault scan on startup.
+6. UI: a recurrence picker offers presets — daily, weekdays, weekly on `<day>`, every N weeks,
    monthly on day N, yearly — plus a raw RRULE text field for anything else. Natural-language
    recurrence input is a later idea (see `docs/ROADMAP.md`), not in scope for v1.
 
