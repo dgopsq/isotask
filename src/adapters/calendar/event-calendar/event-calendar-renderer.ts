@@ -2,6 +2,7 @@ import { createCalendar, DayGrid, destroyCalendar, Interaction, TimeGrid } from 
 import type { Calendar } from "@event-calendar/core";
 
 import {
+	fromEventCalendarDate,
 	fromEventCalendarDrop,
 	fromEventCalendarView,
 	hexDotColorOf,
@@ -12,7 +13,7 @@ import {
 import { eventContent } from "@/adapters/calendar/event-calendar/event-content";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { Weekday } from "@/domain/dates";
-import { fromJsDate, fromJsDateTime } from "@/domain/dates";
+import { fromJsDate, fromJsDateTime, toJsDate } from "@/domain/dates";
 import { cssClass } from "@/plugin-id";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer, CalendarViewKind } from "@/ports/calendar-renderer";
 
@@ -32,6 +33,11 @@ function applyHexDotColor(el: HTMLElement, event: CalendarEvent | undefined): vo
 	} else {
 		el.setCssProps({ "--isotask-dot-color": hex });
 	}
+}
+
+/** `.ec-main` is the time grid's scroller; only day/week views render it. */
+function findTimeGridScroller(container: HTMLElement): HTMLElement | undefined {
+	return container.querySelector<HTMLElement>(".ec-time-grid .ec-main") ?? undefined;
 }
 
 /**
@@ -404,7 +410,31 @@ export class EventCalendarRenderer implements CalendarRenderer {
 		// dynamic/conditional on which callbacks `options.callbacks` wires) —
 		// this file is the composition point for the calendar library, not a
 		// place worth adding lazy-loading complexity for a plugin this small.
-		let calendar = createCalendar(container, [DayGrid, TimeGrid, Interaction], buildOptions(compact));
+		let calendar = createCalendar(
+			container,
+			[DayGrid, TimeGrid, Interaction],
+			buildOptions(compact, options.date === undefined ? undefined : toJsDate(options.date)),
+		);
+
+		/** Reads the time-grid scroller's current position, or `undefined` when none is mounted (month view). */
+		function currentScrollTop(): number | undefined {
+			return findTimeGridScroller(container)?.scrollTop;
+		}
+
+		/** Event Calendar's mount-time scroll runs in a microtask; rAF is the earliest point where a restore is not overwritten. */
+		function applyScrollTop(scrollTop: number | undefined): void {
+			if (scrollTop === undefined) {
+				return;
+			}
+			window.requestAnimationFrame(() => {
+				const scroller = findTimeGridScroller(container);
+				if (scroller !== undefined) {
+					scroller.scrollTop = scrollTop;
+				}
+			});
+		}
+
+		applyScrollTop(options.scrollTop);
 
 		// Serializes `setCompact`'s destroy/recreate cycles. `onResize` can
 		// fire many times in a row for a single drag gesture (confirmed live:
@@ -478,6 +508,8 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// month's `onSlotClick`) needs the view actually on screen, not
 			// the last one this handle happened to push.
 			getView: () => fromEventCalendarView(calendar.getOption("view")),
+			getDate: () => fromEventCalendarDate(calendar.getOption("date")),
+			getScrollTop: () => currentScrollTop(),
 			setFirstDay: (firstDay) => {
 				currentFirstDay = firstDay;
 				calendar.setOption("firstDay", toEventCalendarFirstDay(firstDay));
@@ -496,6 +528,8 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					// defaults the new instance's `date` back to today, discarding
 					// wherever the user had navigated to.
 					const preservedDate = calendar.getOption("date");
+					// Remount would otherwise reset scroll to Event Calendar's time default.
+					const preservedScrollTop = currentScrollTop();
 					await unmountCurrent();
 					// `destroy()` may have landed during that await — recreating
 					// now would mount into a container that is being torn down.
@@ -511,6 +545,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 					mountedElements.clear();
 					calendar = createCalendar(container, [DayGrid, TimeGrid, Interaction], buildOptions(target, preservedDate));
 					calendarLive = true;
+					applyScrollTop(preservedScrollTop);
 				});
 			},
 			goTo: (date) => {

@@ -2169,6 +2169,55 @@ describe("Views", function () {
 			await reopenCalendarView();
 		});
 
+		/**
+		 * M-later "calendar navigation memory": navigating with Event Calendar's OWN header buttons must survive click-a-task/go-back round trips.
+		 */
+		it("remembers the sub-view and navigated date across the click-a-task/back round trip", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-timeGridDay`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-day-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-next`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-next`).click();
+
+			const titleBefore = await browser.$(`.${cssClass("calendar")} .ec-title`).getText();
+
+			// Opening the note directly (rather than clicking a rendered event)
+			// exercises the same leaf-replacing navigation a real click does,
+			// without depending on an event existing on whatever date "Next,
+			// Next" landed on.
+			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks/Today task.md", "", false));
+			await browser.waitUntil(async () => (await activeFilePath()) === "Tasks/Today task.md", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "opening the task note never made it the active file",
+			});
+
+			await reopenCalendarView();
+
+			await browser.$(`.${cssClass("calendar")} .ec-day-view`).waitForExist({
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "the calendar reopened in a view other than the remembered Day",
+			});
+			const dayButton = (await readToolbarButtons()).find((b) => b.text.trim() === "Day");
+			expect(dayButton?.isActive).toBe(true);
+			const titleAfter = await browser.$(`.${cssClass("calendar")} .ec-title`).getText();
+			expect(titleAfter).toEqual(titleBefore);
+
+			// Cleanup: reset navigation to month/today so later tests' fixtures (anchored to today) exist.
+			// Do a round trip to flush the session-only navigation memory back to default.
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-today`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-dayGridMonth`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks/Today task.md", "", false));
+			await browser.waitUntil(async () => (await activeFilePath()) === "Tasks/Today task.md", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "opening the task note never made it the active file (cleanup round trip)",
+			});
+			await reopenCalendarView();
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+		});
+
 		it("clicking an empty day-grid cell opens the create-task modal pre-filled with that date", async function () {
 			await setCalendarInitialView("month");
 			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
