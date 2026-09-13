@@ -2,6 +2,7 @@ import { createCalendar, DayGrid, destroyCalendar, Interaction, TimeGrid } from 
 import type { Calendar } from "@event-calendar/core";
 
 import {
+	fromEventCalendarDate,
 	fromEventCalendarDrop,
 	fromEventCalendarView,
 	hexDotColorOf,
@@ -12,7 +13,7 @@ import {
 import { eventContent } from "@/adapters/calendar/event-calendar/event-content";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import type { Weekday } from "@/domain/dates";
-import { fromJsDate, fromJsDateTime } from "@/domain/dates";
+import { fromJsDate, fromJsDateTime, toJsDate } from "@/domain/dates";
 import { cssClass } from "@/plugin-id";
 import type { CalendarHandle, CalendarOptions, CalendarRenderer, CalendarViewKind } from "@/ports/calendar-renderer";
 
@@ -404,7 +405,11 @@ export class EventCalendarRenderer implements CalendarRenderer {
 		// dynamic/conditional on which callbacks `options.callbacks` wires) —
 		// this file is the composition point for the calendar library, not a
 		// place worth adding lazy-loading complexity for a plugin this small.
-		let calendar = createCalendar(container, [DayGrid, TimeGrid, Interaction], buildOptions(compact));
+		let calendar = createCalendar(
+			container,
+			[DayGrid, TimeGrid, Interaction],
+			buildOptions(compact, options.date === undefined ? undefined : toJsDate(options.date)),
+		);
 
 		// Serializes `setCompact`'s destroy/recreate cycles. `onResize` can
 		// fire many times in a row for a single drag gesture (confirmed live:
@@ -478,6 +483,7 @@ export class EventCalendarRenderer implements CalendarRenderer {
 			// month's `onSlotClick`) needs the view actually on screen, not
 			// the last one this handle happened to push.
 			getView: () => fromEventCalendarView(calendar.getOption("view")),
+			getDate: () => fromEventCalendarDate(calendar.getOption("date")),
 			setFirstDay: (firstDay) => {
 				currentFirstDay = firstDay;
 				calendar.setOption("firstDay", toEventCalendarFirstDay(firstDay));

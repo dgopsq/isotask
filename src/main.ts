@@ -5,6 +5,7 @@ import "@/styles/isotask.css";
 
 import { EventCalendarRenderer } from "@/adapters/calendar/event-calendar/event-calendar-renderer";
 import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
+import { makeNavigationMemory } from "@/adapters/navigation/navigation-memory";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { createObsidianHaptics } from "@/adapters/obsidian/haptics";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
@@ -59,6 +60,9 @@ export default class IsotaskPlugin extends Plugin {
 		// `adapters/history/reschedule-history.ts`), so it's built fresh here
 		// rather than restored from `loadData`.
 		const rescheduleHistory = makeRescheduleHistory();
+		// Session-only, same reasoning as `rescheduleHistory` above: a reload
+		// should start the calendar fresh rather than resurrect a stale view/date.
+		const navigationMemory = makeNavigationMemory();
 
 		const appDeps: AppDeps = {
 			store,
@@ -94,6 +98,8 @@ export default class IsotaskPlugin extends Plugin {
 			history: rescheduleHistory,
 			undoReschedule,
 			redoReschedule,
+			navigationMemory,
+			clock,
 			setStatus,
 			setPriority,
 			setDate,

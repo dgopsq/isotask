@@ -18,7 +18,9 @@ import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { CalendarRenderer } from "@/ports/calendar-renderer";
+import type { Clock } from "@/ports/clock";
 import type { Haptics } from "@/ports/haptics";
+import type { NavigationMemory } from "@/ports/navigation-memory";
 import type { Notifier } from "@/ports/notifier";
 import type { RescheduleHistory } from "@/ports/reschedule-history";
 import { CalendarBasesView } from "@/views/bases/calendar/calendar-view";
@@ -127,6 +129,8 @@ export interface RegisterViewsDeps {
 	readonly history: RescheduleHistory;
 	readonly undoReschedule: UndoReschedule;
 	readonly redoReschedule: RedoReschedule;
+	readonly navigationMemory: NavigationMemory;
+	readonly clock: Clock;
 	readonly setStatus: ReturnType<typeof makeSetStatus>;
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDate: ReturnType<typeof makeSetDate>;
@@ -182,6 +186,8 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				history: deps.history,
 				undoReschedule: deps.undoReschedule,
 				redoReschedule: deps.redoReschedule,
+				navigationMemory: deps.navigationMemory,
+				clock: deps.clock,
 			}),
 		options: () => calendarViewOptions(deps.getWeekStart),
 	});

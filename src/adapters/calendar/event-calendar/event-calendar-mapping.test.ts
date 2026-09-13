@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	fromEventCalendarDate,
 	fromEventCalendarDrop,
 	fromEventCalendarView,
 	hexDotColorOf,
@@ -68,6 +69,16 @@ describe("fromEventCalendarView", () => {
 		for (const kind of kinds) {
 			expect(fromEventCalendarView(toEventCalendarView(kind))).toBe(kind);
 		}
+	});
+});
+
+describe("fromEventCalendarDate", () => {
+	it("reads year/month/day off a real Date", () => {
+		expect(fromEventCalendarDate(new Date(2026, 8, 13))).toBe("2026-09-13");
+	});
+
+	it("falls back to today (not a throw) when given something other than a Date", () => {
+		expect(fromEventCalendarDate(undefined)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 	});
 });
 

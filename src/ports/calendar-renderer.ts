@@ -52,6 +52,8 @@ export interface CalendarOptions {
 	 * after mount.
 	 */
 	readonly compact?: boolean;
+	/** Initial navigated-to date, restored from session navigation memory — omitted mounts on today, Event Calendar's own default. */
+	readonly date?: IsoDate;
 	readonly callbacks: CalendarCallbacks;
 }
 
@@ -98,6 +100,8 @@ export interface CalendarHandle {
 	 * doesn't lose their navigated position.
 	 */
 	readonly setCompact: (compact: boolean) => void;
+	/** The date Event Calendar is currently showing (`calendar.getOption("date")`) — read at `onunload` to save navigation memory. */
+	readonly getDate: () => IsoDate;
 	readonly goTo: (date: IsoDate) => void;
 	readonly next: () => void;
 	readonly prev: () => void;

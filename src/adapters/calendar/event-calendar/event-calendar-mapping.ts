@@ -3,7 +3,7 @@ import type { Calendar } from "@event-calendar/core";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
-import type { TaskDate, Weekday } from "@/domain/dates";
+import type { IsoDate, TaskDate, Weekday } from "@/domain/dates";
 import { formatTime, fromJsDate, fromJsDateTime, isDateTime, toJsDate, toSundayFirstWeekday, withDatePart } from "@/domain/dates";
 import { dotColorClasses } from "@/domain/project-color";
 import type { Priority } from "@/domain/task";
@@ -57,6 +57,19 @@ export function fromEventCalendarView(view: string | undefined): CalendarViewKin
 		default:
 			return DEFAULT_CALENDAR_VIEW_OPTIONS.initialView;
 	}
+}
+
+/**
+ * `calendar.getOption("date")` -> `IsoDate`, backing `CalendarHandle.getDate`.
+ * Typed `Date | string | undefined` because that's the SETTER's accepted
+ * shape (`Calendar.Options["date"]`) even though a live instance always
+ * stores a real `Date` here — the fallback exists only for the type checker.
+ */
+export function fromEventCalendarDate(value: Date | string | undefined): IsoDate {
+	if (value instanceof Date) {
+		return fromJsDate(value);
+	}
+	return fromJsDate(value === undefined ? new Date() : new Date(value));
 }
 
 /**

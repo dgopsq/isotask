@@ -2169,6 +2169,71 @@ describe("Views", function () {
 			await reopenCalendarView();
 		});
 
+		/**
+		 * M-later "calendar navigation memory": navigating with Event Calendar's
+		 * OWN header buttons (not the Bases `initialView` config) must survive
+		 * the click-a-task/go-back round trip, which re-creates
+		 * `CalendarBasesView` from scratch and would otherwise reset it to the
+		 * Bases-configured view and today (`views/bases/calendar/calendar-view.ts`,
+		 * `domain/calendar-navigation.ts`). Switches to Day and navigates forward
+		 * twice via `.ec-button`s specifically — `setCalendarInitialView` only
+		 * changes the Bases config, which is not what this feature covers.
+		 */
+		it("remembers the sub-view and navigated date across the click-a-task/back round trip", async function () {
+			await setCalendarInitialView("month");
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-timeGridDay`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-day-view`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-next`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-next`).click();
+
+			const titleBefore = await browser.$(`.${cssClass("calendar")} .ec-title`).getText();
+
+			// Opening the note directly (rather than clicking a rendered event)
+			// exercises the same leaf-replacing navigation a real click does,
+			// without depending on an event existing on whatever date "Next,
+			// Next" landed on.
+			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks/Today task.md", "", false));
+			await browser.waitUntil(async () => (await activeFilePath()) === "Tasks/Today task.md", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "opening the task note never made it the active file",
+			});
+
+			await reopenCalendarView();
+
+			await browser.$(`.${cssClass("calendar")} .ec-day-view`).waitForExist({
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "the calendar reopened in a view other than the remembered Day",
+			});
+			const dayButton = (await readToolbarButtons()).find((b) => b.text.trim() === "Day");
+			expect(dayButton?.isActive).toBe(true);
+			const titleAfter = await browser.$(`.${cssClass("calendar")} .ec-title`).getText();
+			expect(titleAfter).toEqual(titleBefore);
+
+			// Cleanup: the navigated-to date, not just the view, persists on
+			// the live widget across a plain `setView` (by design — that's
+			// what lets a config-driven view change never lose the user's
+			// place) — so every later test in this shared Obsidian window
+			// would otherwise keep landing on the date "Next, Next" left it
+			// on, where fixtures anchored to today don't exist. Click back to
+			// Today and Month, then do one more round trip so the saved
+			// navigation memory (session-only but persists across this spec
+			// file's window) is flushed back to a plain (month, today) state
+			// too — `setCalendarInitialView` alone is a no-op in Bases when
+			// the value doesn't change, so it can't be relied on to undo this.
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-today`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-toolbar .ec-dayGridMonth`).click();
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+			await browser.executeObsidian(({ app }) => app.workspace.openLinkText("Tasks/Today task.md", "", false));
+			await browser.waitUntil(async () => (await activeFilePath()) === "Tasks/Today task.md", {
+				timeout: SELECT_TIMEOUT,
+				timeoutMsg: "opening the task note never made it the active file (cleanup round trip)",
+			});
+			await reopenCalendarView();
+			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });
+		});
+
 		it("clicking an empty day-grid cell opens the create-task modal pre-filled with that date", async function () {
 			await setCalendarInitialView("month");
 			await browser.$(`.${cssClass("calendar")} .ec-day-grid`).waitForExist({ timeout: SELECT_TIMEOUT });

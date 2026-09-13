@@ -9,6 +9,7 @@ import type { RescheduleTask } from "@/app/reschedule-task";
 import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import type { CalendarEvent } from "@/domain/calendar-events";
 import { eventsForTask, sortCalendarEvents } from "@/domain/calendar-events";
+import { navigationMemoryKey, shouldRestoreNavigation } from "@/domain/calendar-navigation";
 import type { CalendarViewKind } from "@/domain/calendar-view-options";
 import { COMPACT_CALENDAR_WIDTH, parseCalendarViewOptions } from "@/domain/calendar-view-options";
 import type { TaskDate, Weekday } from "@/domain/dates";
@@ -22,10 +23,17 @@ import type { Task } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_CALENDAR } from "@/plugin-id";
 import type { CalendarHandle, CalendarRenderer } from "@/ports/calendar-renderer";
+import type { Clock } from "@/ports/clock";
 import type { Haptics } from "@/ports/haptics";
+import type { NavigationMemory } from "@/ports/navigation-memory";
 import type { Notifier } from "@/ports/notifier";
 import type { RescheduleHistory } from "@/ports/reschedule-history";
 import { CreateTaskModal } from "@/ui/create-task-modal";
+
+/** `BasesViewConfig.name` is declared `string`, but it's Bases-plugin-supplied data, not this codebase's own — guarded rather than trusted. */
+function basesViewName(config: { readonly name: unknown }): string {
+	return typeof config.name === "string" ? config.name : "";
+}
 
 /** One entry in the results-count dropdown's undocumented `getViewActions` hook — see the doc comment on `FeedBasesView`'s copy of this interface. */
 interface BasesViewAction {
@@ -48,6 +56,8 @@ export interface CalendarBasesViewDeps {
 	readonly history: RescheduleHistory;
 	readonly undoReschedule: UndoReschedule;
 	readonly redoReschedule: RedoReschedule;
+	readonly navigationMemory: NavigationMemory;
+	readonly clock: Clock;
 }
 
 /**
@@ -242,10 +252,21 @@ export class CalendarBasesView extends BasesView {
 			this.invalidLineEl = this.viewContainerEl.createDiv({ cls: cssClass("calendar__invalid") });
 			const root = this.viewContainerEl.createDiv({ cls: cssClass("calendar") });
 			this.calendarRootEl = root;
+
+			// Restores the view/date/scroll position the user last had open on
+			// this Bases view before clicking a task note away from it — see
+			// `onunload` for where this gets saved. Ignored past
+			// `NAVIGATION_MEMORY_MAX_AGE_MS` (`shouldRestoreNavigation`) so a
+			// reopen hours later starts fresh rather than resurrecting a
+			// long-abandoned position.
+			const remembered = this.deps.navigationMemory.get(navigationMemoryKey(this.type, basesViewName(this.config)));
+			const restore = remembered !== undefined && shouldRestoreNavigation(remembered, this.deps.clock.now()) ? remembered : undefined;
+
 			handle = this.deps.renderer.mount(root, {
-				initialView: effective.view,
+				initialView: restore?.view ?? effective.view,
 				firstDay: effective.firstDay,
 				compact: effective.compact,
+				...(restore !== undefined ? { date: restore.date } : {}),
 				// Unconditional: every other calendar view option changes what
 				// is *shown*, whereas a read-only toggle would change what is
 				// *permitted*, and a user who doesn't want to drag simply
@@ -352,6 +373,15 @@ export class CalendarBasesView extends BasesView {
 		if (this.scopePushed) {
 			this.deps.app.keymap.popScope(this.scope);
 			this.scopePushed = false;
+		}
+		if (this.handle !== undefined) {
+			const handle = this.handle;
+			this.deps.navigationMemory.set(navigationMemoryKey(this.type, basesViewName(this.config)), {
+				view: handle.getView(),
+				date: handle.getDate(),
+				scrollTop: undefined,
+				savedAt: this.deps.clock.now(),
+			});
 		}
 		this.handle?.destroy();
 		this.handle = undefined;
