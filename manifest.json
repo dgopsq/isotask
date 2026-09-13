@@ -1,7 +1,7 @@
 {
 	"id": "isotask",
 	"name": "Isotask",
-	"version": "0.1.2",
+	"version": "0.2.0",
 	"minAppVersion": "1.13.0",
 	"description": "Notes as tasks: due dates, recurrence, priorities, and feed and calendar views built on Bases.",
 	"author": "Diego Pasquali",
