@@ -11,8 +11,8 @@ src/
   domain/      pure. Types, frontmatter parse/serialise, statuses, buckets, recurrence,
                transitions, settings (type + defaults + `parseSettings`). No `obsidian` import.
                100% unit-tested with vitest.
-  ports/       interfaces the core needs: Clock, TaskStore, Notifier, CalendarRenderer,
-               PathResolver.
+  ports/       interfaces the core needs: Clock, TaskStore, Notifier, Haptics,
+               CalendarRenderer, PathResolver.
   app/         use-cases, each a `make*(deps: AppDeps) => (...) => Promise<Result<...>>` factory
                over `deps.ts`'s ports: `createTask`, `setStatus` (incl. complete -> spawn),
                `toggleDone`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the
@@ -332,6 +332,11 @@ use-cases (never imported directly by `domain`).
   All return `Result<_, TaskStoreError>`.
 - **Notifier** — user-visible feedback without coupling `app` to Obsidian's `Notice`. Method:
   `notify(message: string): void`.
+- **Haptics** — touch feedback (`src/ports/haptics.ts`). One method, `trigger(kind: "light" |
+  "medium" | "success" | "error")`. The Obsidian adapter fires only on the iOS app, only when the
+  `hapticsEnabled` setting is on, and only if Capacitor's Haptics plugin is reachable on
+  `window.Capacitor`; everywhere else it is a silent no-op. Called from the shell only (feed and
+  calendar views), never from use-cases.
 - **CalendarRenderer** — abstracts the calendar widget library (`src/ports/calendar-renderer.ts`,
   finalized M3). One method, `mount(container: HTMLElement, options: CalendarOptions):
   CalendarHandle`; `CalendarOptions` carries `initialView`/`firstDay`/`editable?`/`compact?` plus an
@@ -362,7 +367,7 @@ which concrete adapter implements which port (e.g. the Event Calendar adapter is
 one line here). On `onload()` it:
 
 1. Loads and migrates settings (`src/settings`).
-2. Constructs adapters (`ObsidianTaskStore`, `ObsidianClock`, `ObsidianNotifier`,
+2. Constructs adapters (`ObsidianTaskStore`, `ObsidianClock`, `ObsidianNotifier`, `ObsidianHaptics`,
    `EventCalendarRenderer`, ...), each closed over `this.app`.
 3. Registers Bases views via `this.registerBasesView(type, { name, icon, factory, options })` for
    `isotask-feed` and `isotask-calendar`.

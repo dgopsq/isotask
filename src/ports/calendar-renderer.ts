@@ -32,6 +32,8 @@ export interface CalendarCallbacks {
 	readonly onEventMoved?: (event: CalendarEvent, start: TaskDate, end: TaskDate | undefined) => Promise<boolean>;
 	/** An empty slot was clicked, carrying the clicked date — date-only for a month cell or the all-day row, timed for a time-grid slot. */
 	readonly onSlotClick?: (date: TaskDate) => void;
+	/** A drag or resize gesture started (touch or mouse). */
+	readonly onEventGrabbed?: () => void;
 }
 
 export interface CalendarOptions {

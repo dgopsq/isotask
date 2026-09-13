@@ -37,7 +37,7 @@ migrate away from: the notes are still just notes.
 - **Projects** are a wikilink to a project note; that note's `color` property colours the task in
   the feed and on the calendar.
 - **Task panel** is a sidebar form for the active note, with a command for every field.
-- **Mobile** ready: no desktop-only APIs, long-press to drag events on the calendar.
+- **Mobile** ready: no desktop-only APIs, long-press to drag events on the calendar, haptic feedback on iOS (toggle in settings).
 - **Your property names** every frontmatter key is renameable in settings, not just the ones shown
   above.
 - **Commands** for everything above, plus convert note to task, create/open the tasks base, and

@@ -34,6 +34,7 @@ import type { Priority, StatusId, Task, TaskPath } from "@/domain/task";
 import { describeTaskParseError, priorityChipClass, priorityMarks } from "@/domain/task";
 import { refreshAfterMetadataResolved } from "@/views/bases/refresh-after-resolved";
 import { cssClass, VIEW_TYPE_FEED } from "@/plugin-id";
+import type { Haptics } from "@/ports/haptics";
 import type { Notifier } from "@/ports/notifier";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
@@ -114,6 +115,7 @@ export interface FeedBasesViewDeps {
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
+	readonly haptics: Haptics;
 }
 
 /**
@@ -848,6 +850,9 @@ export class FeedBasesView extends BasesView {
 				this.pendingToggles.delete(task.path);
 				if (!ok) {
 					revertOptimism();
+					this.deps.haptics.trigger("error");
+				} else {
+					this.deps.haptics.trigger(completing ? "success" : "light");
 				}
 			})();
 		};
@@ -922,6 +927,7 @@ export class FeedBasesView extends BasesView {
 			clearLongPress();
 			longPressTimer = window.setTimeout(() => {
 				suppressNextContextMenu = true;
+				this.deps.haptics.trigger("light");
 				openEditMenu({ clientX, clientY });
 			}, 500);
 		});

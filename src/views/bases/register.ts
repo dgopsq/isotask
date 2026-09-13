@@ -18,6 +18,7 @@ import type { PropertyKeys } from "@/domain/property-keys";
 import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { CalendarRenderer } from "@/ports/calendar-renderer";
+import type { Haptics } from "@/ports/haptics";
 import type { Notifier } from "@/ports/notifier";
 import type { RescheduleHistory } from "@/ports/reschedule-history";
 import { CalendarBasesView } from "@/views/bases/calendar/calendar-view";
@@ -134,6 +135,7 @@ export interface RegisterViewsDeps {
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
+	readonly haptics: Haptics;
 }
 
 /** Registers the feed and calendar Bases views (`VIEW_TYPE_FEED`/`VIEW_TYPE_CALENDAR`). Returns whether Bases is enabled in this vault. */
@@ -157,6 +159,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				setProject: deps.setProject,
 				setTags: deps.setTags,
 				notifier: deps.notifier,
+				haptics: deps.haptics,
 			}),
 		options: () => feedViewOptions,
 	});
@@ -175,6 +178,7 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				rescheduleTask: deps.rescheduleTask,
 				renderer: deps.renderer,
 				notifier: deps.notifier,
+				haptics: deps.haptics,
 				history: deps.history,
 				undoReschedule: deps.undoReschedule,
 				redoReschedule: deps.redoReschedule,

@@ -1,5 +1,5 @@
 import type { App, Plugin, SettingDefinitionItem } from "obsidian";
-import { PluginSettingTab } from "obsidian";
+import { Platform, PluginSettingTab } from "obsidian";
 
 import type { IsotaskSettings } from "@/adapters/obsidian/settings";
 import type { Weekday } from "@/domain/dates";
@@ -40,7 +40,7 @@ const PROPERTY_KEY_CONTROLS: readonly PropertyKeyControlDef[] = [
 	{ key: "completed", name: "Completed property key", desc: "The frontmatter key holding the date the task was completed." },
 ];
 
-type ScalarSettingKey = "taskFolder" | "tasksBasePath" | "newTaskFilenameTemplate" | "spawnFilenameTemplate" | "weekStart";
+type ScalarSettingKey = "taskFolder" | "tasksBasePath" | "newTaskFilenameTemplate" | "spawnFilenameTemplate" | "weekStart" | "hapticsEnabled";
 type SettingKey = keyof PropertyKeys | ScalarSettingKey;
 
 function isPropertyKeySetting(key: string): key is keyof PropertyKeys {
@@ -81,6 +81,10 @@ const SCALAR_SETTINGS: Readonly<
 	weekStart: {
 		get: (settings) => String(settings.weekStart),
 		set: (settings, value) => ({ ...settings, weekStart: Number(value) as Weekday }),
+	},
+	hapticsEnabled: {
+		get: (settings) => settings.hapticsEnabled,
+		set: (settings, value) => ({ ...settings, hapticsEnabled: Boolean(value) }),
 	},
 };
 
@@ -142,6 +146,12 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						name: "Week starts on",
 						desc: "Used by the feed view's this week / next week buckets.",
 						control: { type: "dropdown", key: "weekStart", options: WEEKDAY_OPTIONS },
+					},
+					{
+						name: "Haptic feedback",
+						desc: "Vibrate on drag, drop and task completion. Currently iOS only.",
+						control: { type: "toggle", key: "hapticsEnabled" },
+						visible: () => Platform.isMobileApp,
 					},
 				],
 			},

@@ -6,6 +6,7 @@ import "@/styles/isotask.css";
 import { EventCalendarRenderer } from "@/adapters/calendar/event-calendar/event-calendar-renderer";
 import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
+import { createObsidianHaptics } from "@/adapters/obsidian/haptics";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
 import { VaultTaskStore } from "@/adapters/obsidian/task-store";
@@ -52,6 +53,7 @@ export default class IsotaskPlugin extends Plugin {
 		});
 		const clock = createObsidianClock();
 		const notifier = createObsidianNotifier();
+		const haptics = createObsidianHaptics({ isEnabled: () => this.pluginSettings.hapticsEnabled });
 		const calendarRenderer = new EventCalendarRenderer();
 		// Session-only: deliberately not persisted across reloads (see
 		// `adapters/history/reschedule-history.ts`), so it's built fresh here
@@ -100,13 +102,14 @@ export default class IsotaskPlugin extends Plugin {
 			setProject,
 			setTags,
 			notifier,
+			haptics,
 		});
 
 		registerCommands(this, {
 			app: this.app,
 			store,
 			notifier,
-			getPropertyKeys: () => this.pluginSettings.propertyKeys,
+						getPropertyKeys: () => this.pluginSettings.propertyKeys,
 			getStatuses: () => this.pluginSettings.statuses,
 			getTaskFolder: () => this.pluginSettings.taskFolder,
 			getTasksBasePath: () => this.pluginSettings.tasksBasePath,

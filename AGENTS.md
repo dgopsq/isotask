@@ -50,7 +50,7 @@ no query language.
 ```
 src/
   domain/      pure types, frontmatter parse/serialise, statuses, buckets, recurrence, transitions
-  ports/       interfaces: Clock, TaskStore, Notifier, CalendarRenderer, PathResolver
+  ports/       interfaces: Clock, TaskStore, Notifier, Haptics, CalendarRenderer, PathResolver
   app/         use-cases: createTask, setStatus, rescheduleTask, convertNoteToTask, generateBaseFile
   adapters/
     obsidian/  TaskStore, Clock, Notifier, settings persistence — implement the ports
