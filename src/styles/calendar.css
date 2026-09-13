@@ -915,19 +915,17 @@
  * settle un-press/drop keeps: releasing removes the `:active` match, so the
  * base rule's own (slower) transition governs the way back down instead.
  */
-/* Pointer only: iOS sets :active at touchstart, long before the drag starts, giving a double lift. */
-@media (hover: hover) {
-	.isotask-calendar:not(.isotask-calendar--resizing) .ec-event:active:not(.ec-ghost) {
-		scale: var(--isotask-lift-scale);
-		box-shadow: var(--isotask-lift-shadow);
-		transition:
-			scale var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
-			box-shadow var(--isotask-motion, 160ms) ease;
-	}
+/* Not on touch: iOS sets :active at touchstart, long before the drag starts, giving a double lift. --touch is set per pointerdown so hybrid devices (iPad + trackpad) get the right rule per gesture. */
+.isotask-calendar:not(.isotask-calendar--resizing):not(.isotask-calendar--touch) .ec-event:active:not(.ec-ghost) {
+	scale: var(--isotask-lift-scale);
+	box-shadow: var(--isotask-lift-shadow);
+	transition:
+		scale var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1),
+		box-shadow var(--isotask-motion, 160ms) ease;
+}
 
-	.isotask-calendar:not(.isotask-calendar--resizing) .ec-time-grid .ec-body .ec-event:active:not(.ec-ghost)::after {
-		box-shadow: var(--isotask-lift-shadow-value);
-	}
+.isotask-calendar:not(.isotask-calendar--resizing):not(.isotask-calendar--touch) .ec-time-grid .ec-body .ec-event:active:not(.ec-ghost)::after {
+	box-shadow: var(--isotask-lift-shadow-value);
 }
 
 /*
@@ -1029,14 +1027,12 @@
 }
 
 /* Touch lifts at drag start; an animation, not a transition, since the preview is a freshly inserted element. */
-@media (hover: none) {
-	.isotask-calendar .ec.ec-dragging .ec-event.ec-preview {
-		animation: isotask-lift var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
+.isotask-calendar.isotask-calendar--touch .ec.ec-dragging .ec-event.ec-preview {
+	animation: isotask-lift var(--isotask-motion, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
-	.isotask-calendar .ec.ec-dragging.ec-time-grid .ec-body .ec-event.ec-preview::after {
-		animation: isotask-lift-shadow var(--isotask-motion, 160ms) ease;
-	}
+.isotask-calendar.isotask-calendar--touch .ec.ec-dragging.ec-time-grid .ec-body .ec-event.ec-preview::after {
+	animation: isotask-lift-shadow var(--isotask-motion, 160ms) ease;
 }
 
 @keyframes isotask-lift {

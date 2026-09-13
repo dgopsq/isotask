@@ -4,5 +4,3 @@ export type HapticKind = "light" | "medium" | "success" | "error";
 export interface Haptics {
 	readonly trigger: (kind: HapticKind) => void;
 }
-
-export const NOOP_HAPTICS: Haptics = { trigger: () => undefined };

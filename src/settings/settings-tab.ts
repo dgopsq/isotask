@@ -149,9 +149,9 @@ export class IsotaskSettingTab extends PluginSettingTab {
 					},
 					{
 						name: "Haptic feedback",
-						desc: "Vibrate on drag, drop and task completion. Currently iOS only.",
+						desc: "Vibrate on drag, drop and task completion.",
 						control: { type: "toggle", key: "hapticsEnabled" },
-						visible: () => Platform.isMobileApp,
+						visible: () => Platform.isIosApp,
 					},
 				],
 			},

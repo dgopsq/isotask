@@ -1,5 +1,5 @@
 import type { App, QueryController } from "obsidian";
-import { BasesView, Platform, Scope, TFile } from "obsidian";
+import { BasesView, Scope, TFile } from "obsidian";
 
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
 import { projectFilePath, projectRawColor } from "@/adapters/obsidian/project-color-lookup";
@@ -103,6 +103,8 @@ export class CalendarBasesView extends BasesView {
 	/** Whether `scope` is currently pushed onto `app.keymap`'s scope stack — see the `focusin`/`focusout` handlers below. */
 	private scopePushed = false;
 	private readonly scope: Scope;
+	/** Pointer type of the last `pointerdown` on this view, e.g. `"touch"` — never cleared, so it reflects whatever gesture last drove the calendar. */
+	private lastPointerType = "";
 	/**
 	 * Vault-relative paths of every project note the last render's events
 	 * resolved a dot color against — rebuilt from scratch at the top of
@@ -166,10 +168,13 @@ export class CalendarBasesView extends BasesView {
 		// Event Calendar classes the root only after the drag threshold, and rewrites `.ec-event`'s class
 		// wholesale once a resize starts, so the press-lift exclusion goes on our own root at pointerdown.
 		const resizingCls = cssClass("calendar--resizing");
+		const touchCls = cssClass("calendar--touch");
 		this.registerDomEvent(
 			this.viewContainerEl,
 			"pointerdown",
 			(evt) => {
+				this.calendarRootEl?.toggleClass(touchCls, evt.pointerType === "touch");
+				this.lastPointerType = evt.pointerType;
 				if (evt.target instanceof Element && evt.target.closest(".ec-resizer") !== null) {
 					this.calendarRootEl?.addClass(resizingCls);
 				}
@@ -284,8 +289,8 @@ export class CalendarBasesView extends BasesView {
 							// popped our scope and left Cmd+Z dead at exactly the
 							// moment an undo became available. Take focus back so
 							// the keystroke is armed for the gesture just made.
-							// Not on mobile: no keyboard to arm, and a focused container keeps the next touch drag from moving on iOS.
-							if (!Platform.isMobileApp) {
+							// Not after a touch drag: a focused container keeps the next touch drag from moving on iOS. A tablet with a keyboard still gets Cmd+Z armed.
+							if (this.lastPointerType !== "touch") {
 								this.viewContainerEl.focus();
 							}
 							this.deps.haptics.trigger("medium");
