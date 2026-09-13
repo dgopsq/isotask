@@ -1729,6 +1729,16 @@
 	padding: var(--size-2-2) var(--size-2-2);
 }
 
+/* Phones: the icon-only arrows are too narrow to tap; height is already fine. */
+.is-mobile .isotask-calendar .ec-button[aria-label="Previous"],
+.is-mobile .isotask-calendar .ec-button[aria-label="Next"] {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: var(--input-height);
+	padding-inline: var(--size-4-3);
+}
+
 /*
  * Block (vertical) padding is deliberately ZERO here, not the `--size-4-1`
  * the wide-pane version of this rule uses — measured live: the plain
