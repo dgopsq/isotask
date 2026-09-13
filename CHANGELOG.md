@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/dgopsq/isotask/compare/0.1.2...0.2.0) (2026-09-13)
+
+
+### Features
+
+* **calendar:** remember navigation across note open/back, wider mobile arrows ([#24](https://github.com/dgopsq/isotask/issues/24)) ([6dbe11c](https://github.com/dgopsq/isotask/commit/6dbe11c54332103bd84c295c539d1a379f34b65a))
+* haptic feedback on iOS for feed and calendar gestures ([#22](https://github.com/dgopsq/isotask/issues/22)) ([d145378](https://github.com/dgopsq/isotask/commit/d145378c44ad153c17c76f8dd464a13e61437a04))
+
+
+### Bug fixes
+
+* attest release assets and narrow vault enumeration ([#19](https://github.com/dgopsq/isotask/issues/19)) ([62dcd8f](https://github.com/dgopsq/isotask/commit/62dcd8f9003b47358514acb8170c47d65c4ac478))
+* **calendar:** key touch lift and undo focus off pointer type, iOS-only haptics toggle ([#23](https://github.com/dgopsq/isotask/issues/23)) ([3aa9221](https://github.com/dgopsq/isotask/commit/3aa9221be030c8248947022f581a81f56f0d9f35))
+
+
+### Maintenance
+
+* sync versions.json for 0.1.2 ([7aadd80](https://github.com/dgopsq/isotask/commit/7aadd80d9f940bb904b04af5b822d53a2d3faa1f))
+
 ## [0.1.2](https://github.com/dgopsq/isotask/compare/0.1.1...0.1.2) (2026-09-11)
 
 
