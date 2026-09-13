@@ -1,6 +1,5 @@
 export type { Clock } from "@/ports/clock";
 export type { Haptics, HapticKind } from "@/ports/haptics";
-export { NOOP_HAPTICS } from "@/ports/haptics";
 export type {
 	CalendarCallbacks,
 	CalendarEvent,
