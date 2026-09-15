@@ -1,7 +1,6 @@
 filters:
   and:
     - type == "task"
-    - status != "done"
 views:
   - type: isotask-feed
     name: Feed
@@ -17,6 +16,9 @@ views:
   - type: isotask-calendar
     name: Calendar
     newItemFolder: Tasks
+    filters:
+      and:
+        - status != "done"
   - type: table
     name: All tasks
     order:

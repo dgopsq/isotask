@@ -623,6 +623,10 @@ describe("Views", function () {
 				list.push(task.title);
 				byBucket.set(task.bucket, list);
 			}
+			// `preDoneRecurring` is done-kind, due today, but isn't in `fixtures.tasks`
+			// (it's a separate fixture) — it lands in "completed" now that the file
+			// filter no longer hides done tasks from the Feed.
+			byBucket.set("completed", [fixtures.preDoneRecurring.title]);
 			// The "errors" bucket has no date to compute from `bucketFor`, so it's
 			// never in `byBucket` above — it's sized off the single `fixtures.invalid`
 			// note instead (`domain/buckets.ts#visibleBuckets`), which is always
@@ -636,6 +640,20 @@ describe("Views", function () {
 
 			expect(structure.map((entry) => entry.bucketLabel)).toEqual(expected.map((entry) => entry.bucketLabel));
 			expect(structure.at(-1)?.bucketLabel).toEqual("Errors");
+		});
+
+		it('renders the pre-done recurring task under "Completed", last before any "Errors" header', function () {
+			const completedIndex = structure.findIndex((entry) => entry.bucketLabel === "Completed");
+			expect(completedIndex).toBeGreaterThanOrEqual(0);
+			expect(structure[completedIndex]?.titles).toContain(fixtures.preDoneRecurring.title);
+
+			const errorsIndex = structure.findIndex((entry) => entry.bucketLabel === "Errors");
+			if (errorsIndex >= 0) {
+				expect(completedIndex).toBeLessThan(errorsIndex);
+			}
+			expect(structure.slice(completedIndex).some((entry) => entry.bucketLabel !== "Completed" && entry.bucketLabel !== "Errors")).toBe(
+				false,
+			);
 		});
 
 		it("places each generated task under its expected bucket", function () {
@@ -1053,15 +1071,12 @@ describe("Views", function () {
 		});
 
 		/**
-		 * `e2e/vault/Tasks.base`'s Feed view filters `status != "done"` — a
-		 * task marked done via the status control doesn't move to the bottom
-		 * of its bucket, it disappears from the feed entirely (`completedAt
-		 * Bottom` never gets a chance to apply since the row is filtered out
-		 * upstream of the view). So (a) asserts disappearance rather than
-		 * bucket position, and (b) reopens the note through the
-		 * `isotask:toggle-done` command (rather than a second click on a
-		 * control that no longer exists in the DOM) before asserting the row
-		 * comes back.
+		 * A task marked done via the status control moves into the
+		 * "Completed" bucket (`domain/buckets.ts`), so the assertion tracks
+		 * the row's bucket rather than its disappearance. Reopens the note
+		 * through the `isotask:toggle-done` command (rather than a second
+		 * click on the status control, which has moved to a different DOM
+		 * position by then) before asserting the row is back under "Today".
 		 *
 		 * Uses "Deadline call" (`fixtures.tasks[9]`, due today at 14:30) —
 		 * read only by the calendar suite's chip-ordering assertions
@@ -1101,6 +1116,30 @@ describe("Views", function () {
 					cssClass("feed__row"),
 					cssClass("feed__title"),
 					cssClass("feed__status"),
+					title,
+				);
+			}
+
+			/** Which bucket header a row currently renders under, by walking back through its preceding siblings — mirrors the invalid-row lookup above. */
+			async function feedRowBucketLabel(title: string): Promise<string | null> {
+				return browser.execute(
+					(rowCls, titleCls, bucketCls, wantedTitle) => {
+						for (const row of Array.from(document.querySelectorAll(`.${rowCls}`))) {
+							const titleEl = row.querySelector(`.${titleCls}`);
+							if (titleEl?.textContent !== wantedTitle) {
+								continue;
+							}
+							for (let sibling = row.previousElementSibling; sibling !== null; sibling = sibling.previousElementSibling) {
+								if (sibling.classList.contains(bucketCls)) {
+									return sibling.textContent;
+								}
+							}
+						}
+						return null;
+					},
+					cssClass("feed__row"),
+					cssClass("feed__title"),
+					cssClass("feed__bucket"),
 					title,
 				);
 			}
@@ -1154,7 +1193,7 @@ describe("Views", function () {
 				await reopenFeedView();
 			});
 
-			it("marks the task done and removes its row from the feed", async function () {
+			it("marks the task done and moves its row to the Completed bucket", async function () {
 				const ariaLabelBefore = await feedRowStatusAriaLabel(task.title);
 				expect(ariaLabelBefore).toEqual("To do");
 				expect(await feedRowStatusAriaChecked(task.title)).toEqual("false");
@@ -1177,17 +1216,16 @@ describe("Views", function () {
 				expect(fm?.["status"]).toEqual("done");
 				expect(typeof fm?.["completed"]).toEqual("string");
 
-				// The base's Feed view filters `status != "done"` — a done task
-				// is filtered out entirely rather than sinking to the bottom of
-				// its bucket, so the row disappearing is the observable effect.
-				await browser.waitUntil(async () => !(await feedRowExists(task.title)), {
+				// A completed task moves into the "Completed" bucket instead of
+				// being filtered out (domain/buckets.ts's `completedAtBottom`).
+				await browser.waitUntil(async () => (await feedRowBucketLabel(task.title)) === "Completed", {
 					timeout: SELECT_TIMEOUT,
-					timeoutMsg: `${task.title}'s row never disappeared from the feed after being marked done`,
+					timeoutMsg: `${task.title}'s row never moved to the Completed bucket after being marked done`,
 				});
-				expect(await feedRowExists(task.title)).toBe(false);
+				expect(await feedRowExists(task.title)).toBe(true);
 			});
 
-			it("reopens the task via the toggle-done command and its row reappears", async function () {
+			it("reopens the task via the toggle-done command and its row moves back to Today", async function () {
 				await openFile(path);
 				await browser.executeObsidianCommand("isotask:toggle-done");
 
@@ -1197,9 +1235,9 @@ describe("Views", function () {
 				expect(fm?.["completed"]).toBeUndefined();
 
 				await reopenFeedView();
-				await browser.waitUntil(async () => await feedRowExists(task.title), {
+				await browser.waitUntil(async () => (await feedRowBucketLabel(task.title)) === "Today", {
 					timeout: SELECT_TIMEOUT,
-					timeoutMsg: `${task.title}'s row never reappeared in the feed after being reopened`,
+					timeoutMsg: `${task.title}'s row never moved back to Today after being reopened`,
 				});
 				expect(await feedRowExists(task.title)).toBe(true);
 
