@@ -65,9 +65,11 @@ command that sets the first configured `done`-kind status without going through 
   `done`-kind status toggles to the first configured `open` status (reopen); any other status
   (open, or unconfigured) toggles to the first configured `done` status (mark as done). The
   "Toggle done" command does the same for the active note.
-- Bases filters operate on the raw `status` value, not `kind`. The generated `Tasks.base` filters
-  out every `done`-kind status (with the two defaults, just `status != "done"`) and is regenerated
-  from settings when the status list changes.
+- Bases filters operate on the raw `status` value, not `kind`. The generated `Tasks.base` no longer
+  excludes `done`-kind statuses at the file level — it only checks the marker (`type == "task"`).
+  The Calendar view includes per-view filters to exclude done tasks; the Feed and "All tasks" table
+  include them. Existing `.base` files keep their old file-level `status != "done"` filters and must
+  be regenerated or edited by hand to remove them.
 - A missing or empty `status` parses as the first configured `open`-kind status rather than
   failing (ADR 0012) — this is what makes a note created by the Bases toolbar's `+ New` button
   (see "New (Bases toolbar)" below) parse as a normal open task instead of an invalid row. Parsing
@@ -205,10 +207,12 @@ configured week-start setting (Monday default).
 Buckets, in order: **Overdue** (date source < today) · **Today** (date source == today) ·
 **This week** (rest of the current week, i.e. after today through the last day of the current
 week) · **Next week** (the following full week) · **Later** (after next week) · **No date**
-(date source absent) · **Errors** (entries that failed to parse at all — see below).
+(date source absent) · **Completed** (terminal-kind tasks when `completedAtBottom` is on) · **Errors**
+(entries that failed to parse at all — see below).
 
-Terminal-kind tasks are not excluded from bucketing by the buckets function itself — whether they
-are visible at all is decided by the Bases filter on the underlying `.base` view.
+When the feed view option `completedAtBottom` is on (default), every task whose status kind is `done`
+is routed to the `Completed` bucket regardless of its date. When it is off, tasks bucket by date
+as before and there is no terminal/non-terminal split.
 
 ### Errors bucket
 
@@ -222,27 +226,26 @@ date to bucket by). The feed view sizes it instead from
 separately alongside the parsed `tasks` for the same set of entries.
 
 Ordering and visibility are otherwise identical to every other bucket, via
-`domain/buckets.ts#visibleBuckets`: `Errors` renders after `No date` (nothing sits after it — there
-is no separate "completed" bucket; `completedAtBottom` only reorders rows within each of the other
-buckets, see below) and, like any other bucket, is skipped entirely when it has nothing in it and
-`showEmptyBuckets` is off. Each row keeps the note's path (its title never parsed) and its
-error(s), joined; fixing the note is out of scope here — a task linter/fix flow is a later plan.
+`domain/buckets.ts#visibleBuckets`: `Errors` renders last (after `Completed` when it exists, or
+after `No date` when `completedAtBottom` is off) and, like any other bucket, is skipped entirely
+when it has nothing in it and `showEmptyBuckets` is off. Each row keeps the note's path (its title
+never parsed) and its error(s), joined; fixing the note is out of scope here — a task linter/fix
+flow is a later plan.
 
-Within a bucket, rows sort: (when `completedAtBottom` is on) terminal-kind tasks
-(`domain/status.ts#isTerminal`) last, then — on each side of that split — one of two orders,
-chosen by the feed view per `this.config.getSort()` (`buckets.ts`'s `BucketOptions.order`):
+Within a bucket (or the `Completed` bucket when `completedAtBottom` is on), rows sort via one of
+two orders, chosen per `this.config.getSort()` (`buckets.ts`'s `BucketOptions.order`):
 
-- **No sort configured in the Bases toolbar** (`getSort()` returns `[]`): the *smart* order — date
-  (date source) ascending -> priority descending -> title ascending.
+- **No sort configured in the Bases toolbar** (`getSort()` returns `[]`): the *smart* order.
+  For date buckets: date (date source) ascending -> priority descending -> title ascending.
+  For the `Completed` bucket: `completed` date descending (newest first) -> tasks without a
+  `completed` date last -> title ascending.
 - **A sort is configured in the Bases toolbar**: Bases has already sorted `group.entries`
   accordingly, and the feed keeps that order as-is within each bucket (`order: "preserve"` — the
-  within-bucket comparator applies only the `completedAtBottom` split and otherwise returns `0`,
-  relying on `Array.prototype.sort`'s stability to leave Bases' order untouched).
+  within-bucket comparator returns `0`, relying on `Array.prototype.sort`'s stability to leave
+  Bases' order untouched).
 
-Either way, `completedAtBottom` only reorders which tasks come first; it never replaces the
-chosen order, only splits it into a non-terminal group and a terminal group, each independently
-keeping that order. The calendar view ignores the toolbar sort entirely — its events are placed
-by time, not list position (see "Calendar event derivation" below).
+The calendar view ignores the toolbar sort entirely — its events are placed by time, not list
+position (see "Calendar event derivation" below).
 
 ### Feed view options
 
@@ -254,7 +257,7 @@ own view options panel):
 |----------------------|----------|---------|--------|
 | `dateSource`         | dropdown | `due`   | which date anchors bucketing *and* the row's date chip (`due`/`scheduled`/`earliest`) |
 | `showEmptyBuckets`   | toggle   | `false` | render every bucket header, even with zero tasks (empty ones get a muted "No tasks" placeholder), instead of skipping them |
-| `completedAtBottom`  | toggle   | `true`  | sort terminal-kind tasks after non-terminal ones within each bucket (see above) |
+| `completedAtBottom`  | toggle   | `true`  | group completed tasks at bottom in a separate `Completed` bucket (smart order: newest `completed` date first) |
 
 A malformed or hand-edited `.base` file falls back to each option's default independently
 (`v.fallback` per field) rather than breaking the view.
