@@ -49,7 +49,7 @@ const feedViewOptions: BasesAllOptions[] = [
 	{
 		key: "completedAtBottom",
 		type: "toggle",
-		displayName: "Completed tasks at bottom",
+		displayName: "Group completed tasks at bottom",
 		default: DEFAULT_FEED_VIEW_OPTIONS.completedAtBottom,
 	},
 ];
