@@ -14,9 +14,10 @@ import type { StatusId } from "@/domain/task";
  * verified there to actually load in Obsidian (see AGENTS.md).
  */
 const EXPECTED_DEFAULT_BASE =
-	'filters:\n  and:\n    - type == "task"\n    - status != "done"\nviews:\n' +
+	'filters:\n  and:\n    - type == "task"\nviews:\n' +
 	"  - type: isotask-feed\n    name: Feed\n    newItemFolder: Tasks\n    order:\n      - file.name\n      - status\n      - due\n      - scheduled\n      - priority\n      - project\n      - tags\n" +
-	"  - type: isotask-calendar\n    name: Calendar\n    newItemFolder: Tasks\n  - type: table\n" +
+	'  - type: isotask-calendar\n    name: Calendar\n    newItemFolder: Tasks\n    filters:\n      and:\n        - status != "done"\n' +
+	"  - type: table\n" +
 	"    name: All tasks\n    order:\n      - file.name\n      - status\n      - priority\n      - due\n      - scheduled\n";
 
 const viewTypes = { feed: "isotask-feed", calendar: "isotask-calendar" };
@@ -27,16 +28,36 @@ describe("renderTasksBase", () => {
 		expect(actual).toBe(EXPECTED_DEFAULT_BASE);
 	});
 
-	it("emits one exclusion filter per done-kind status, in configured order", () => {
+	it("emits one exclusion filter per done-kind status, in configured order, under the Calendar view only", () => {
 		const statuses: readonly StatusConfig[] = [
 			{ id: "todo" as StatusId, label: "To do", kind: "open" },
 			{ id: "waiting" as StatusId, label: "Waiting", kind: "open" },
 			{ id: "archived" as StatusId, label: "Archived", kind: "done" },
 		];
 		const result = renderTasksBase(DEFAULT_PROPERTY_KEYS, statuses, viewTypes, "Tasks");
-		expect(result).toContain('    - status != "archived"');
+		expect(result).toContain('        - status != "archived"');
 		expect(result).not.toContain('status != "todo"');
 		expect(result).not.toContain('status != "waiting"');
+	});
+
+	it("the file-level filter block contains only the marker filter", () => {
+		const result = renderTasksBase(DEFAULT_PROPERTY_KEYS, DEFAULT_STATUSES, viewTypes, "Tasks");
+		const fileLevelBlock = result.slice(0, result.indexOf("views:"));
+		expect(fileLevelBlock).toBe('filters:\n  and:\n    - type == "task"\n');
+	});
+
+	it("the exclusion filter appears once, indented 8 spaces under the Calendar view", () => {
+		const result = renderTasksBase(DEFAULT_PROPERTY_KEYS, DEFAULT_STATUSES, viewTypes, "Tasks");
+		expect(result.match(/status != "done"/g)).toHaveLength(1);
+		expect(result).toContain('        - status != "done"');
+	});
+
+	it("the Feed and table sections carry no status != filter", () => {
+		const result = renderTasksBase(DEFAULT_PROPERTY_KEYS, DEFAULT_STATUSES, viewTypes, "Tasks");
+		const feedSection = result.slice(result.indexOf("isotask-feed"), result.indexOf("isotask-calendar"));
+		const tableSection = result.slice(result.indexOf("type: table"));
+		expect(feedSection).not.toContain("status !=");
+		expect(tableSection).not.toContain("status !=");
 	});
 
 	it("uses the configured property keys throughout", () => {
