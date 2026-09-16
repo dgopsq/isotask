@@ -8,17 +8,19 @@ import type { Task } from "@/domain/task";
 import { priorityRank } from "@/domain/task";
 
 /**
- * The six date-anchored buckets, plus the synthetic `"errors"` bucket: tasks
- * that fail to parse at all (`domain/task.ts#TaskParseError`) have no anchor
- * date to bucket by, so they can never come out of `bucketFor`/
- * `groupIntoBuckets` — the feed view assigns them to `"errors"` itself, from
- * the invalid-entry count `adapters/obsidian/bases-entries.ts` reports
- * alongside its parsed tasks. `"errors"` sits last in `BUCKET_ORDER` (after
- * `"no-date"`), so it always renders as the feed's final section.
+ * The six date-anchored buckets, the synthetic `"completed"` bucket (terminal-
+ * kind tasks, when `completedAtBottom` is on — see `groupIntoBuckets`), and
+ * the synthetic `"errors"` bucket: tasks that fail to parse at all
+ * (`domain/task.ts#TaskParseError`) have no anchor date to bucket by, so they
+ * can never come out of `bucketFor`/`groupIntoBuckets` — the feed view assigns
+ * them to `"errors"` itself, from the invalid-entry count
+ * `adapters/obsidian/bases-entries.ts` reports alongside its parsed tasks.
+ * `"errors"` sits last in `BUCKET_ORDER`, so it always renders as the feed's
+ * final section.
  */
-export type Bucket = "overdue" | "today" | "this-week" | "next-week" | "later" | "no-date" | "errors";
+export type Bucket = "overdue" | "today" | "this-week" | "next-week" | "later" | "no-date" | "completed" | "errors";
 
-export const BUCKET_ORDER: readonly Bucket[] = ["overdue", "today", "this-week", "next-week", "later", "no-date", "errors"];
+export const BUCKET_ORDER: readonly Bucket[] = ["overdue", "today", "this-week", "next-week", "later", "no-date", "completed", "errors"];
 
 export type DateSource = "due" | "scheduled" | "earliest";
 
@@ -74,14 +76,14 @@ export interface BucketOptions {
 	readonly source: DateSource;
 	/** Configured statuses, used to detect terminal-kind tasks for `completedAtBottom`. */
 	readonly statuses?: readonly StatusConfig[];
-	/** When true, terminal-kind tasks (see `domain/status.ts#isTerminal`) sort after all others within each bucket. Defaults to false. */
+	/** When true (and `statuses` is set), every terminal-kind task (see `domain/status.ts#isTerminal`) routes into the `"completed"` bucket instead of its date bucket. Defaults to false. */
 	readonly completedAtBottom?: boolean;
 	/**
-	 * Within-bucket ordering, after the terminal/non-terminal split above.
-	 * `"smart"` (default) sorts by date (per `source`) ascending -> priority
-	 * descending -> title ascending. `"preserve"` applies no further
-	 * comparison, keeping whatever order the tasks arrived in — used when
-	 * the caller's incoming order is already meaningful (e.g. the Bases
+	 * Within-bucket ordering. `"smart"` (default) sorts by date (per
+	 * `source`) ascending -> priority descending -> title ascending, except
+	 * in `"completed"` (see `groupIntoBuckets`). `"preserve"` applies no
+	 * further comparison, keeping whatever order the tasks arrived in — used
+	 * when the caller's incoming order is already meaningful (e.g. the Bases
 	 * toolbar's user-configured sort), since `Array.prototype.sort` is
 	 * stable and a comparator returning `0` never reorders equal elements.
 	 */
@@ -107,12 +109,6 @@ function isTaskTerminal(task: Task, statuses: readonly StatusConfig[]): boolean 
 }
 
 function compareWithinBucket(a: Task, b: Task, options: BucketOptions): number {
-	if (options.completedAtBottom === true && options.statuses !== undefined) {
-		const terminalCompare = Number(isTaskTerminal(a, options.statuses)) - Number(isTaskTerminal(b, options.statuses));
-		if (terminalCompare !== 0) {
-			return terminalCompare;
-		}
-	}
 	if (options.order === "preserve") {
 		return 0;
 	}
@@ -127,19 +123,44 @@ function compareWithinBucket(a: Task, b: Task, options: BucketOptions): number {
 	return a.title.localeCompare(b.title);
 }
 
+/** Newest `completed` first; tasks without one sort last — a spawned-next-occurrence task has none yet. */
+function compareCompletedBucket(a: Task, b: Task, options: BucketOptions): number {
+	if (options.order === "preserve") {
+		return 0;
+	}
+	const aCompleted = fromNullable(a.completed);
+	const bCompleted = fromNullable(b.completed);
+	if (aCompleted.some && bCompleted.some) {
+		const completedCompare = compareTaskDate(bCompleted.value, aCompleted.value);
+		if (completedCompare !== 0) {
+			return completedCompare;
+		}
+	} else if (aCompleted.some !== bCompleted.some) {
+		return aCompleted.some ? -1 : 1;
+	}
+	return a.title.localeCompare(b.title);
+}
+
 /**
- * Groups tasks into buckets by the configured date source, sorted within
- * each bucket: (when `completedAtBottom` is set) terminal-kind tasks last,
- * then — per `options.order` — either `"smart"` (date ascending -> priority
- * descending -> title ascending on each side, the default) or `"preserve"`
- * (keep the incoming order, e.g. a Bases toolbar sort, on each side).
- * Terminal-kind tasks are not excluded here — visibility is Bases' filter's
- * job (see `docs/ARCHITECTURE.md#why-views-never-filter`).
+ * Groups tasks into buckets by the configured date source. When
+ * `completedAtBottom` is on and `statuses` is configured, every terminal-kind
+ * task routes into `"completed"` instead of its date bucket, sorted by
+ * `completed` descending (undated-completed last, then title); every other
+ * bucket sorts per `options.order` — `"smart"` (date ascending -> priority
+ * descending -> title ascending, the default) or `"preserve"` (keep the
+ * incoming order, e.g. a Bases toolbar sort). Terminal-kind tasks are not
+ * excluded here — visibility is Bases' filter's job (see
+ * `docs/ARCHITECTURE.md#why-views-never-filter`).
  */
 export function groupIntoBuckets(tasks: readonly Task[], options: BucketOptions): ReadonlyMap<Bucket, readonly Task[]> {
 	const buckets = new Map<Bucket, Task[]>(BUCKET_ORDER.map((bucket) => [bucket, []]));
+	const statuses = options.statuses;
 
 	for (const task of tasks) {
+		if (options.completedAtBottom === true && statuses !== undefined && isTaskTerminal(task, statuses)) {
+			buckets.get("completed")?.push(task);
+			continue;
+		}
 		const anchor = taskAnchorDate(task, options.source);
 		const bucket: Bucket = anchor.some ? bucketFor(anchor.value, options.today, options.firstDay) : "no-date";
 		buckets.get(bucket)?.push(task);
@@ -148,9 +169,10 @@ export function groupIntoBuckets(tasks: readonly Task[], options: BucketOptions)
 	const result = new Map<Bucket, readonly Task[]>();
 	for (const bucket of BUCKET_ORDER) {
 		const list = buckets.get(bucket) ?? [];
+		const comparator = bucket === "completed" ? compareCompletedBucket : compareWithinBucket;
 		result.set(
 			bucket,
-			[...list].sort((a, b) => compareWithinBucket(a, b, options)),
+			[...list].sort((a, b) => comparator(a, b, options)),
 		);
 	}
 	return result;

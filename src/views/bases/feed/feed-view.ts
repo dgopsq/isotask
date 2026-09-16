@@ -80,6 +80,7 @@ const BUCKET_LABELS: Readonly<Record<Bucket, string>> = {
 	"next-week": "Next week",
 	later: "Later",
 	"no-date": "No date",
+	completed: "Completed",
 	errors: "Errors",
 };
 

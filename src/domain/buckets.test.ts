@@ -82,6 +82,12 @@ describe("taskAnchorDate", () => {
 	});
 });
 
+describe("BUCKET_ORDER", () => {
+	it('places "completed" right before "errors"', () => {
+		expect(BUCKET_ORDER.indexOf("completed")).toBe(BUCKET_ORDER.indexOf("errors") - 1);
+	});
+});
+
 describe("groupIntoBuckets", () => {
 	it("buckets no-date tasks separately and always returns every bucket key", () => {
 		const tasks = [task({ title: "No date" })];
@@ -138,8 +144,15 @@ describe("visibleBuckets", () => {
 			task({ title: "Next week", due: date("2026-09-07") }),
 			task({ title: "Later", due: date("2026-12-25") }),
 			task({ title: "No date" }),
+			task({ title: "Completed", due: date("2026-09-02"), status: "done" as Task["status"] }),
 		];
-		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due" });
+		const grouped = groupIntoBuckets(tasks, {
+			today: TODAY,
+			firstDay: 0,
+			source: "due",
+			statuses: DEFAULT_STATUSES,
+			completedAtBottom: true,
+		});
 		expect(visibleBuckets(grouped, 2, false)).toEqual(BUCKET_ORDER);
 	});
 });
@@ -152,7 +165,7 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 		task({ title: "C todo early", due: date("2026-09-03"), status: "todo" as Task["status"] }),
 	];
 
-	it("when true (with statuses configured), terminal tasks sort after non-terminal ones, each side keeping date/priority/title order", () => {
+	it("when true (with statuses configured), terminal tasks route to the completed bucket instead of their date bucket", () => {
 		const grouped = groupIntoBuckets(tasks, {
 			today: TODAY,
 			firstDay: 0,
@@ -161,10 +174,11 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 			completedAtBottom: true,
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "A todo late", "Z done early"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "A todo late"]);
+		expect((grouped.get("completed") ?? []).map((t) => t.title)).toEqual(["Z done early"]);
 	});
 
-	it("when false, terminal-ness is ignored and the existing date order applies", () => {
+	it("when false, terminal-ness is ignored and tasks stay in their date bucket", () => {
 		const grouped = groupIntoBuckets(tasks, {
 			today: TODAY,
 			firstDay: 0,
@@ -174,6 +188,7 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
 		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "Z done early", "A todo late"]);
+		expect(grouped.get("completed")).toEqual([]);
 	});
 
 	it("when omitted, behaves the same as false (default off)", () => {
@@ -186,6 +201,53 @@ describe("groupIntoBuckets — completedAtBottom", () => {
 		const grouped = groupIntoBuckets(tasks, { today: TODAY, firstDay: 0, source: "due", completedAtBottom: true });
 		const thisWeek = grouped.get("this-week") ?? [];
 		expect(thisWeek.map((t) => t.title)).toEqual(["B open mid", "C todo early", "Z done early", "A todo late"]);
+	});
+
+	it("a terminal task past due lands in completed, not overdue, when the option is on", () => {
+		const pastDue = [task({ title: "Old done", due: date("2026-08-01"), status: "done" as Task["status"] })];
+		const grouped = groupIntoBuckets(pastDue, {
+			today: TODAY,
+			firstDay: 0,
+			source: "due",
+			statuses: DEFAULT_STATUSES,
+			completedAtBottom: true,
+		});
+		expect(grouped.get("overdue")).toEqual([]);
+		expect((grouped.get("completed") ?? []).map((t) => t.title)).toEqual(["Old done"]);
+	});
+
+	it("the same past-due terminal task lands in overdue when the option is off", () => {
+		const pastDue = [task({ title: "Old done", due: date("2026-08-01"), status: "done" as Task["status"] })];
+		const grouped = groupIntoBuckets(pastDue, {
+			today: TODAY,
+			firstDay: 0,
+			source: "due",
+			statuses: DEFAULT_STATUSES,
+			completedAtBottom: false,
+		});
+		expect((grouped.get("overdue") ?? []).map((t) => t.title)).toEqual(["Old done"]);
+		expect(grouped.get("completed")).toEqual([]);
+	});
+});
+
+describe("groupIntoBuckets — completed bucket ordering", () => {
+	it("sorts by completed descending, tasks without completed last, ties by title", () => {
+		const tasks = [
+			task({ title: "B no completed", status: "done" as Task["status"] }),
+			task({ title: "A older", status: "done" as Task["status"], completed: date("2026-09-01") }),
+			task({ title: "D newer", status: "done" as Task["status"], completed: date("2026-09-05") }),
+			task({ title: "C tie later title", status: "done" as Task["status"], completed: date("2026-09-01") }),
+			task({ title: "A no completed", status: "done" as Task["status"] }),
+		];
+		const grouped = groupIntoBuckets(tasks, {
+			today: TODAY,
+			firstDay: 0,
+			source: "due",
+			statuses: DEFAULT_STATUSES,
+			completedAtBottom: true,
+		});
+		const completed = grouped.get("completed") ?? [];
+		expect(completed.map((t) => t.title)).toEqual(["D newer", "A older", "C tie later title", "A no completed", "B no completed"]);
 	});
 });
 
@@ -201,7 +263,7 @@ describe("groupIntoBuckets — order", () => {
 		expect(thisWeek.map((t) => t.title)).toEqual(["Z late normal", "A early high", "M mid normal"]);
 	});
 
-	it('"preserve" + completedAtBottom still moves terminal tasks last, keeping relative order on each side', () => {
+	it('"preserve" + completedAtBottom still routes terminal tasks to the completed bucket, keeping relative order among the rest', () => {
 		const tasks = [
 			task({ title: "Z done early", due: date("2026-09-03"), status: "done" as Task["status"] }),
 			task({ title: "A todo late", due: date("2026-09-04"), status: "todo" as Task["status"] }),
@@ -217,7 +279,8 @@ describe("groupIntoBuckets — order", () => {
 			order: "preserve",
 		});
 		const thisWeek = grouped.get("this-week") ?? [];
-		expect(thisWeek.map((t) => t.title)).toEqual(["A todo late", "B open mid", "C todo early", "Z done early"]);
+		expect(thisWeek.map((t) => t.title)).toEqual(["A todo late", "B open mid", "C todo early"]);
+		expect((grouped.get("completed") ?? []).map((t) => t.title)).toEqual(["Z done early"]);
 	});
 
 	it('omitting `order` (or passing "smart") is unchanged from the pre-existing date/priority/title behavior', () => {
