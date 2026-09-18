@@ -125,6 +125,32 @@ describe("parseRemind", () => {
 	it("rejects a boolean token", () => {
 		expect(isErr(parseRemind(true))).toBe(true);
 	});
+
+	it("rejects an offset amount too large to be a safe integer", () => {
+		expect(parseRemind("99999999999999999999m")).toEqual({
+			ok: false,
+			error: { kind: "invalid-remind", value: "99999999999999999999m" },
+		});
+	});
+
+	it("rejects an offset exceeding 1 year (525600 minutes)", () => {
+		expect(isErr(parseRemind("2w"))).toBe(false); // sanity: well within bounds
+		expect(isErr(parseRemind("366d"))).toBe(true);
+		expect(isErr(parseRemind(525_601))).toBe(true);
+	});
+
+	it("accepts exactly 1 year (525600 minutes) at the boundary", () => {
+		expect(parseRemind("365d")).toEqual({ ok: true, value: [{ kind: "offset", minutes: 525_600 }] });
+		expect(parseRemind(525_600)).toEqual({ ok: true, value: [{ kind: "offset", minutes: 525_600 }] });
+	});
+
+	it("365d round-trips through formatReminderSpec", () => {
+		const parsed = parseRemind("365d");
+		if (!parsed.ok) {
+			throw new Error("unreachable: 365d should parse");
+		}
+		expect(parsed.value.map(formatReminderSpec)).toEqual(["365d"]);
+	});
 });
 
 describe("formatReminderSpec", () => {

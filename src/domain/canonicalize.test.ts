@@ -270,6 +270,23 @@ describe("canonicalizeFrontmatter", () => {
 			const second = canonicalizeFrontmatter(first.frontmatter, keys, statuses);
 			expect(second.fixes).toEqual([]);
 		});
+
+		it("dedupes tokens that canonicalize to the same value, keeping first-seen order", () => {
+			const result = canonicalizeFrontmatter({ remind: ["1h", "60m"] }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["1h"]);
+			expect(result.fixes).toEqual([{ key: "remind", from: ["1h", "60m"], to: ["1h"], reason: "remind-normalized" }]);
+		});
+
+		it("dedupes exact duplicate tokens", () => {
+			const result = canonicalizeFrontmatter({ remind: ["15m", "15m"] }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["15m"]);
+		});
+
+		it("is idempotent after deduping", () => {
+			const first = canonicalizeFrontmatter({ remind: ["1h", "60m"] }, keys, statuses);
+			const second = canonicalizeFrontmatter(first.frontmatter, keys, statuses);
+			expect(second.fixes).toEqual([]);
+		});
 	});
 
 	describe("untouched keys and idempotence", () => {

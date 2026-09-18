@@ -3,6 +3,7 @@ import { shiftBy, toDateOnly, toFloatingDate } from "@/domain/dates";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
 import { nextOccurrence } from "@/domain/recurrence";
+import { formatReminderSpec, parseRemind } from "@/domain/reminders";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
@@ -52,6 +53,18 @@ function anchorOf(task: Task): TaskDate | undefined {
 	return task.due ?? task.scheduled;
 }
 
+/** Absolute `remind` entries are one-off and tied to a date, not the series — dropped on spawn; offsets/`none` carry over. */
+function carryRemind(raw: Readonly<Record<string, FrontmatterValue>>, keys: PropertyKeys): Readonly<Record<string, FrontmatterValue>> {
+	const value = raw[keys.remind];
+	if (value === undefined) {
+		return raw;
+	}
+	const parsed = parseRemind(value);
+	const kept = parsed.ok ? parsed.value.filter((spec) => spec.kind !== "absolute") : [];
+	const withoutRemind = Object.fromEntries(Object.entries(raw).filter(([key]) => key !== keys.remind));
+	return kept.length > 0 ? { ...withoutRemind, [keys.remind]: kept.map(formatReminderSpec) } : withoutRemind;
+}
+
 function planSpawn(input: StatusChangeInput): Option<SpawnPlan> {
 	const { task, raw, basename, statuses, keys, now, spawnTemplate } = input;
 
@@ -74,7 +87,10 @@ function planSpawn(input: StatusChangeInput): Option<SpawnPlan> {
 	const nextDue: Option<TaskDate> = task.due !== undefined ? some(shiftBy(task.due, deltaMs)) : none();
 	const nextScheduled: Option<TaskDate> = task.scheduled !== undefined ? some(shiftBy(task.scheduled, deltaMs)) : none();
 
-	const carried = Object.fromEntries(Object.entries(raw).filter(([key]) => key !== keys.completed));
+	const carried = carryRemind(
+		Object.fromEntries(Object.entries(raw).filter(([key]) => key !== keys.completed)),
+		keys,
+	);
 	const frontmatter: Readonly<Record<string, FrontmatterValue>> = {
 		...carried,
 		[keys.status]: openStatus.value.id,

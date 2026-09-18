@@ -28,6 +28,13 @@ const UNIT_MINUTES: Readonly<Record<string, number>> = {
 
 const OFFSET_RE = /^(\d+)\s?(min|m|h|d|w)$/;
 
+/** 1 year in minutes — a reminder further out than that is almost certainly a typo, not an intended offset. */
+const MAX_OFFSET_MINUTES = 525_600;
+
+function isValidOffsetMinutes(minutes: number): boolean {
+	return Number.isSafeInteger(minutes) && minutes >= 0 && minutes <= MAX_OFFSET_MINUTES;
+}
+
 function describeToken(raw: FrontmatterValue): string {
 	if (typeof raw === "string") {
 		return raw;
@@ -40,7 +47,7 @@ function describeToken(raw: FrontmatterValue): string {
 
 function parseToken(raw: FrontmatterValue): Result<ReminderSpec, ReminderParseError> {
 	if (typeof raw === "number") {
-		if (!Number.isInteger(raw) || raw < 0) {
+		if (!isValidOffsetMinutes(raw)) {
 			return err({ kind: "invalid-remind", value: describeToken(raw) });
 		}
 		return ok({ kind: "offset", minutes: raw });
@@ -62,8 +69,11 @@ function parseToken(raw: FrontmatterValue): Result<ReminderSpec, ReminderParseEr
 		const unitText: string | undefined = offsetMatch[2];
 		const amount = amountText === undefined ? 0 : Number(amountText);
 		const unitMinutes = unitText === undefined ? undefined : UNIT_MINUTES[unitText];
-		if (amount > 0 && unitMinutes !== undefined) {
-			return ok({ kind: "offset", minutes: amount * unitMinutes });
+		if (amount > 0 && Number.isSafeInteger(amount) && unitMinutes !== undefined) {
+			const minutes = amount * unitMinutes;
+			if (isValidOffsetMinutes(minutes)) {
+				return ok({ kind: "offset", minutes });
+			}
 		}
 	}
 

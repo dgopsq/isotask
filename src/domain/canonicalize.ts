@@ -114,12 +114,26 @@ function canonicalizeTagsValue(raw: string): FieldFix<readonly string[]> {
  * since the stored shape must always be a list (`frontmatter.ts#taskToPatch`). A value
  * `parseRemind` rejects is left untouched, same as an unrecognized status/priority.
  */
+/** First-seen order: `["1h", "60m"]` both canonicalize to `"1h"`, and the second is a duplicate, not a second reminder. */
+function dedupeTokens(tokens: readonly string[]): readonly string[] {
+	const seen = new Set<string>();
+	const deduped: string[] = [];
+	for (const token of tokens) {
+		if (seen.has(token)) {
+			continue;
+		}
+		seen.add(token);
+		deduped.push(token);
+	}
+	return deduped;
+}
+
 function canonicalizeRemindValue(raw: unknown): FieldFix<readonly string[]> | undefined {
 	const parsed = parseRemind(raw as FrontmatterValue);
 	if (!parsed.ok) {
 		return undefined;
 	}
-	const canonical = parsed.value.map(formatReminderSpec);
+	const canonical = dedupeTokens(parsed.value.map(formatReminderSpec));
 	const rawList = Array.isArray(raw) ? raw : undefined;
 	if (rawList?.length === canonical.length && rawList.every((token, i) => token === canonical[i])) {
 		return undefined;
