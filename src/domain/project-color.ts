@@ -1,3 +1,4 @@
+import { djb2a } from "@/domain/hash";
 import { cssClass } from "@/plugin-id";
 
 /**
@@ -66,23 +67,18 @@ export function parseProjectColor(raw: unknown): ProjectColor | undefined {
 /**
  * Stable, deterministic hash of a project name onto one of the 8 palette
  * entries — gives every project a consistent color even when its note sets
- * no `color` (or an invalid one). Plain djb2a: `hash = (hash * 33) ^ code`
- * over UTF-16 code units, seeded at 5381, folded to an unsigned 32-bit int
- * and reduced mod 8.
+ * no `color` (or an invalid one). `djb2a` (`domain/hash.ts`) folded to an
+ * unsigned 32-bit int and reduced mod 8.
  *
- * FROZEN: this algorithm is part of the plugin's user-visible behaviour —
- * it's what decides the color a project's dot renders with no explicit
- * `color` set. Changing it would silently recolor every such project in
- * every vault. Locked in by the exact-output assertions in
- * `project-color.test.ts`; treat a change here as a user-visible,
- * changelog-worthy decision, never a casual refactor.
+ * FROZEN: this is part of the plugin's user-visible behaviour — it's what
+ * decides the color a project's dot renders with no explicit `color` set.
+ * Changing it would silently recolor every such project in every vault.
+ * Locked in by the exact-output assertions in `project-color.test.ts`; treat
+ * a change here as a user-visible, changelog-worthy decision, never a
+ * casual refactor.
  */
 export function hashPaletteColor(projectName: string): PaletteName {
-	let hash = 5381;
-	for (let i = 0; i < projectName.length; i += 1) {
-		hash = (hash * 33) ^ projectName.charCodeAt(i);
-	}
-	const index = (hash >>> 0) % PALETTE.length;
+	const index = (djb2a(projectName) >>> 0) % PALETTE.length;
 	return PALETTE[index] ?? PALETTE[0];
 }
 
