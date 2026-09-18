@@ -16,6 +16,7 @@ export interface PropertyKeys {
 	readonly tags: string;
 	readonly created: string;
 	readonly completed: string;
+	readonly remind: string;
 }
 
 export const DEFAULT_PROPERTY_KEYS: PropertyKeys = {
@@ -31,4 +32,5 @@ export const DEFAULT_PROPERTY_KEYS: PropertyKeys = {
 	tags: "tags",
 	created: "created",
 	completed: "completed",
+	remind: "remind",
 };

@@ -45,6 +45,8 @@ ${statusLines}
 - \`${keys.tags}\`: a list of tags.
 - \`${keys.created}\`: datetime; set this yourself to now when creating a task.
 - \`${keys.completed}\`: datetime; never set this yourself, the plugin fills it in.
+- \`${keys.remind}\`: reminder(s) before \`${keys.due}\`/\`${keys.scheduled}\` — \`none\`, \`0\`, an
+  offset (\`15m\`, \`2h\`, \`1d\`, \`1w\`), or a full datetime; absent uses the vault's default.
 
 ## Example
 

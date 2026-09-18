@@ -1,5 +1,6 @@
 import { fromJsDateTime, isDateTime, parseTaskDate, toJsDate } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
+import { formatReminderSpec, parseRemind } from "@/domain/reminders";
 import type { StatusConfig } from "@/domain/status";
 import type { Priority, StatusId } from "@/domain/task";
 import { PRIORITIES } from "@/domain/task";
@@ -21,7 +22,8 @@ export type CanonicalFixReason =
 	| "priority-alias"
 	| "duration-string"
 	| "tags-scalar"
-	| "date-format";
+	| "date-format"
+	| "remind-normalized";
 
 /** One frontmatter key whose raw value differed from its canonical form. */
 export interface CanonicalFix {
@@ -104,6 +106,25 @@ function canonicalizeDurationValue(raw: string): FieldFix<number> | undefined {
 /** `tags`: a scalar string becomes a one-element list (or `[]` for an empty string), matching `frontmatter.ts`'s existing lenient parse. */
 function canonicalizeTagsValue(raw: string): FieldFix<readonly string[]> {
 	return { value: raw.length === 0 ? [] : [raw], reason: "tags-scalar" };
+}
+
+/**
+ * `remind`: any value `parseRemind` accepts is folded to a list of its tokens' canonical text
+ * (`formatReminderSpec`) — a scalar becomes a list even when its own text is already canonical,
+ * since the stored shape must always be a list (`frontmatter.ts#taskToPatch`). A value
+ * `parseRemind` rejects is left untouched, same as an unrecognized status/priority.
+ */
+function canonicalizeRemindValue(raw: unknown): FieldFix<readonly string[]> | undefined {
+	const parsed = parseRemind(raw as FrontmatterValue);
+	if (!parsed.ok) {
+		return undefined;
+	}
+	const canonical = parsed.value.map(formatReminderSpec);
+	const rawList = Array.isArray(raw) ? raw : undefined;
+	if (rawList?.length === canonical.length && rawList.every((token, i) => token === canonical[i])) {
+		return undefined;
+	}
+	return { value: canonical, reason: "remind-normalized" };
 }
 
 /** Strips seconds from an already-valid `TaskDate` string by round-tripping through a real `Date` (dates.ts helpers only keep hour:minute). */
@@ -200,6 +221,11 @@ export function canonicalizeFrontmatter(
 		if (typeof dateValue === "string") {
 			applyFix(dateKey, dateValue, canonicalizeDateValue(dateValue));
 		}
+	}
+
+	const remindValue = raw[keys.remind];
+	if (typeof remindValue === "string" || typeof remindValue === "number" || Array.isArray(remindValue)) {
+		applyFix(keys.remind, remindValue, canonicalizeRemindValue(remindValue));
 	}
 
 	return { frontmatter, fixes };

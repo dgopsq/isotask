@@ -34,6 +34,15 @@ describe("parseSettings", () => {
 		expect(result.propertyKeys.due).toBe("deadline");
 	});
 
+	it("keeps a custom remind property key and falls back an invalid one", () => {
+		expect(parseSettings({ propertyKeys: { ...DEFAULT_PROPERTY_KEYS, remind: "reminders" } }).propertyKeys.remind).toBe(
+			"reminders",
+		);
+		expect(parseSettings({ propertyKeys: { ...DEFAULT_PROPERTY_KEYS, remind: 7 } }).propertyKeys.remind).toBe(
+			DEFAULT_PROPERTY_KEYS.remind,
+		);
+	});
+
 	it("accepts a valid custom status list", () => {
 		const statuses = [
 			{ id: "backlog", label: "Backlog", kind: "open" },

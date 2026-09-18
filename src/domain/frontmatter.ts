@@ -4,6 +4,8 @@ import { canonicalizeFrontmatter } from "@/domain/canonicalize";
 import type { TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { ReminderSpec } from "@/domain/reminders";
+import { formatReminderSpec, parseRemind } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
@@ -137,6 +139,25 @@ function parseTags(value: unknown): Result<readonly string[], TaskParseError> {
 	return ok(typeof parsed.output === "string" ? (parsed.output.length === 0 ? [] : [parsed.output]) : parsed.output);
 }
 
+function isFrontmatterValue(value: unknown): value is FrontmatterValue {
+	if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+		return true;
+	}
+	return Array.isArray(value) && value.every(isFrontmatterValue);
+}
+
+/**
+ * An invalid `remind` value is a parse warning, not a hard error (same spirit as
+ * `recurrence-without-anchor`): the token is dropped and the task still parses.
+ */
+function parseOptionalRemind(value: unknown): readonly ReminderSpec[] {
+	if (!isFrontmatterValue(value)) {
+		return [];
+	}
+	const parsed = parseRemind(value);
+	return parsed.ok ? parsed.value : [];
+}
+
 /**
  * Parses raw frontmatter into a `Task`. Tolerant per `docs/DOMAIN-MODEL.md`:
  * missing `priority` defaults to `normal`, `tags` accepts a string or array,
@@ -170,6 +191,7 @@ export function parseTask(
 	const tags = parseTags(frontmatter[keys.tags]);
 	const created = parseOptionalDate(frontmatter[keys.created], keys.created);
 	const completed = parseOptionalDate(frontmatter[keys.completed], keys.completed);
+	const remind = parseOptionalRemind(frontmatter[keys.remind]);
 
 	const results: readonly Result<unknown, TaskParseError>[] = [
 		status,
@@ -214,6 +236,7 @@ export function parseTask(
 		...(project.value !== undefined ? { project: project.value } : {}),
 		...(created.value !== undefined ? { created: created.value } : {}),
 		...(completed.value !== undefined ? { completed: completed.value } : {}),
+		...(remind.length > 0 ? { remind } : {}),
 	};
 
 	return ok(task);
@@ -233,5 +256,6 @@ export function taskToPatch(task: Task, keys: PropertyKeys): FrontmatterPatch {
 		...(task.project !== undefined ? { [keys.project]: toWikilink(task.project) } : {}),
 		...(task.created !== undefined ? { [keys.created]: task.created } : {}),
 		...(task.completed !== undefined ? { [keys.completed]: task.completed } : {}),
+		...(task.remind !== undefined && task.remind.length > 0 ? { [keys.remind]: task.remind.map(formatReminderSpec) } : {}),
 	};
 }

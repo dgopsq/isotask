@@ -57,6 +57,7 @@ const PropertyKeysSchema = v.fallback(
 		tags: fallbackString(DEFAULT_PROPERTY_KEYS.tags),
 		created: fallbackString(DEFAULT_PROPERTY_KEYS.created),
 		completed: fallbackString(DEFAULT_PROPERTY_KEYS.completed),
+		remind: fallbackString(DEFAULT_PROPERTY_KEYS.remind),
 	}),
 	DEFAULT_PROPERTY_KEYS,
 );

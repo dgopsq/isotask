@@ -273,6 +273,23 @@ describe("applyStatusChange — spawn", () => {
 		expect(frontmatter["project"]).toBe("[[Groceries]]");
 	});
 
+	it("spawn frontmatter: remind is carried verbatim", () => {
+		const t = task({
+			title: "Buy milk 2026-09-02",
+			status: "todo" as StatusId,
+			due: date("2026-09-02"),
+			repeat: rule("FREQ=WEEKLY"),
+			remind: [{ kind: "offset", minutes: 15 }],
+		});
+		const result = applyStatusChange(inputFor(t, DONE, { basename: "Buy milk 2026-09-02" }));
+
+		expect(isSome(result.spawn)).toBe(true);
+		if (!result.spawn.some) {
+			throw new Error("unreachable");
+		}
+		expect(result.spawn.value.frontmatter["remind"]).toEqual(["15m"]);
+	});
+
 	it("force: already-done recurring task still spawns the next occurrence", () => {
 		const t = task({
 			title: "Buy milk 2026-09-02",
