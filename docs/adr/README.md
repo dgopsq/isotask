@@ -41,3 +41,4 @@ new ADR that supersedes it and update the `Status` line and the index below.
 | [0017](0017-two-status-kinds-open-done.md) | Two status kinds: open and done | Accepted, 2026-09-02 |
 | [0018](0018-reconcile-completed-with-status.md) | Reconcile `completed` with `status` on any metadata change | Accepted, 2026-09-13 |
 | [0019](0019-completed-feed-bucket.md) | Completed feed bucket | Accepted, 2026-09-15 |
+| [0020](0020-reminders-remind-property.md) | Reminders: the `remind` property, anchor, and ids | Accepted, 2026-09-18 |
