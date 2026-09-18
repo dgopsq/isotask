@@ -85,6 +85,7 @@ describe("describeTaskParseError", () => {
 		[{ kind: "invalid-tags", value: "5" }, 'Invalid tags "5"'],
 		[{ kind: "invalid-project", value: "5" }, 'Invalid project "5"'],
 		[{ kind: "recurrence-without-anchor" }, "Recurring task has no due or scheduled date to anchor from"],
+		[{ kind: "invalid-remind", value: "tomorrow" }, 'Invalid remind "tomorrow"'],
 	])("describes %o as %s", (error, expected) => {
 		expect(describeTaskParseError(error)).toBe(expected);
 	});

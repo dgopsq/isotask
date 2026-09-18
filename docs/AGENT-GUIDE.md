@@ -41,6 +41,7 @@ match a freshly installed, unconfigured vault.
 | `tags` | list | no | standard Obsidian tags. |
 | `created` | datetime | yes | same format as `due`. Set by the plugin on creation through its own UI — if you create a note by hand, set it yourself to the current local time. |
 | `completed` | datetime | no | set only when a status enters "done". Do not write this yourself — see Rules. |
+| `remind` | text / list | no | reminder(s) before the task's anchor (`scheduled` if set, else `due`). `none`, `0`, an offset (`15m`, `2h`, `1d`, `1w`), or a full datetime. Absent uses the vault's default (usually one reminder per dated task). |
 
 ## Canonical example note
 
@@ -76,6 +77,10 @@ plugin fills it in on its own, while Obsidian is running.
 
 **Add recurrence.** Set `repeat` to an RRULE body (no `DTSTART`), and make sure `due` or
 `scheduled` is set — that's the anchor the recurrence is computed from.
+
+**Set a reminder.** Add `remind` with one or more tokens, e.g. `remind: [1d, 15m]` to remind a
+day before and 15 minutes before the task's `scheduled` (or `due` if no `scheduled`). Use
+`remind: none` to silence the vault's default reminder for one task.
 
 **Recurring-task rule.** Completing a recurring task (setting its `status` to a done id) spawns
 the next occurrence as a new note, but only while Obsidian is running — the plugin does this, you

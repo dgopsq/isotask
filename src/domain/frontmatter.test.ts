@@ -294,6 +294,74 @@ describe("parseTask — lenient parse, canonical write", () => {
 	});
 });
 
+describe("parseTask — remind", () => {
+	it("parses a scalar remind into a one-element list", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", remind: "15m" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.remind).toEqual([{ kind: "offset", minutes: 15 }]);
+		}
+	});
+
+	it("parses a list remind", () => {
+		const result = parseTask(
+			path,
+			"Buy milk",
+			{ type: "task", status: "todo", remind: ["15m", "1d"] },
+			keys,
+			statuses,
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.remind).toEqual([
+				{ kind: "offset", minutes: 15 },
+				{ kind: "offset", minutes: 1440 },
+			]);
+		}
+	});
+
+	it("leaves remind absent when the property is absent", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.remind).toBeUndefined();
+		}
+	});
+
+	it("an invalid remind token is a warning, not a hard error: the task still parses with remind absent", () => {
+		const result = parseTask(path, "Buy milk", { type: "task", status: "todo", remind: "tomorrow" }, keys, statuses);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.remind).toBeUndefined();
+		}
+	});
+});
+
+describe("taskToPatch — remind", () => {
+	it("serializes remind as a list of canonical strings, even a single entry", () => {
+		const task: Task = {
+			path,
+			title: "Buy milk",
+			status: "todo" as Task["status"],
+			priority: "normal",
+			tags: [],
+			remind: [{ kind: "offset", minutes: 15 }],
+		};
+		expect(taskToPatch(task, keys)["remind"]).toEqual(["15m"]);
+	});
+
+	it("omits remind when absent or empty", () => {
+		const task: Task = {
+			path,
+			title: "Buy milk",
+			status: "todo" as Task["status"],
+			priority: "normal",
+			tags: [],
+		};
+		expect("remind" in taskToPatch(task, keys)).toBe(false);
+	});
+});
+
 describe("projectFromWikilink / toWikilink", () => {
 	it("extracts the target from a plain wikilink", () => {
 		expect(projectFromWikilink("[[Groceries]]")).toBe("Groceries");

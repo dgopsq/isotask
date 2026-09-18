@@ -1,5 +1,6 @@
 import type { Brand } from "@/domain/brand";
 import type { TaskDate } from "@/domain/dates";
+import type { ReminderSpec } from "@/domain/reminders";
 
 /** Vault-relative path to a task note, e.g. `Tasks/Buy milk.md`. */
 export type TaskPath = Brand<string, "TaskPath">;
@@ -90,6 +91,7 @@ export interface Task {
 	readonly tags: readonly string[];
 	readonly created?: TaskDate;
 	readonly completed?: TaskDate;
+	readonly remind?: readonly ReminderSpec[];
 }
 
 export type TaskParseError =
@@ -103,7 +105,9 @@ export type TaskParseError =
 	| { readonly kind: "invalid-tags"; readonly value: string }
 	| { readonly kind: "invalid-project"; readonly value: string }
 	/** Warning, not fatal: `repeat` set without a usable anchor (`due`/`scheduled`). */
-	| { readonly kind: "recurrence-without-anchor" };
+	| { readonly kind: "recurrence-without-anchor" }
+	/** Warning, not fatal, same as above: an unrecognized `remind` token is dropped, not fatal to the task. */
+	| { readonly kind: "invalid-remind"; readonly value: string };
 
 /**
  * Human-readable, sentence-case description of a `TaskParseError`, used by
@@ -130,6 +134,8 @@ export function describeTaskParseError(error: TaskParseError): string {
 			return `Invalid project "${error.value}"`;
 		case "recurrence-without-anchor":
 			return "Recurring task has no due or scheduled date to anchor from";
+		case "invalid-remind":
+			return `Invalid remind "${error.value}"`;
 		default: {
 			const exhaustive: never = error;
 			return exhaustive;

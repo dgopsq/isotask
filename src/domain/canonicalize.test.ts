@@ -230,6 +230,65 @@ describe("canonicalizeFrontmatter", () => {
 		});
 	});
 
+	describe("remind", () => {
+		it("folds a lenient offset token, case and whitespace", () => {
+			const result = canonicalizeFrontmatter({ remind: "15 M" }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["15m"]);
+			expect(result.fixes).toEqual([{ key: "remind", from: "15 M", to: ["15m"], reason: "remind-normalized" }]);
+		});
+
+		it("wraps an already-canonical scalar into a list", () => {
+			const result = canonicalizeFrontmatter({ remind: "0" }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["0"]);
+			expect(result.fixes).toEqual([{ key: "remind", from: "0", to: ["0"], reason: "remind-normalized" }]);
+		});
+
+		it("wraps a numeric scalar into a canonical-text list", () => {
+			const result = canonicalizeFrontmatter({ remind: 15 }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["15m"]);
+		});
+
+		it("leaves an already-canonical list untouched", () => {
+			const result = canonicalizeFrontmatter({ remind: ["15m", "1d"] }, keys, statuses);
+			expect(result.fixes).toEqual([]);
+		});
+
+		it("folds a lenient token inside an already-list value", () => {
+			const result = canonicalizeFrontmatter({ remind: ["15 M"] }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["15m"]);
+			expect(result.fixes).toEqual([{ key: "remind", from: ["15 M"], to: ["15m"], reason: "remind-normalized" }]);
+		});
+
+		it("leaves a genuinely invalid remind value unchanged", () => {
+			const result = canonicalizeFrontmatter({ remind: "tomorrow" }, keys, statuses);
+			expect(result.frontmatter["remind"]).toBe("tomorrow");
+			expect(result.fixes).toEqual([]);
+		});
+
+		it("is idempotent after folding a lenient remind value", () => {
+			const first = canonicalizeFrontmatter({ remind: "15 M" }, keys, statuses);
+			const second = canonicalizeFrontmatter(first.frontmatter, keys, statuses);
+			expect(second.fixes).toEqual([]);
+		});
+
+		it("dedupes tokens that canonicalize to the same value, keeping first-seen order", () => {
+			const result = canonicalizeFrontmatter({ remind: ["1h", "60m"] }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["1h"]);
+			expect(result.fixes).toEqual([{ key: "remind", from: ["1h", "60m"], to: ["1h"], reason: "remind-normalized" }]);
+		});
+
+		it("dedupes exact duplicate tokens", () => {
+			const result = canonicalizeFrontmatter({ remind: ["15m", "15m"] }, keys, statuses);
+			expect(result.frontmatter["remind"]).toEqual(["15m"]);
+		});
+
+		it("is idempotent after deduping", () => {
+			const first = canonicalizeFrontmatter({ remind: ["1h", "60m"] }, keys, statuses);
+			const second = canonicalizeFrontmatter(first.frontmatter, keys, statuses);
+			expect(second.fixes).toEqual([]);
+		});
+	});
+
 	describe("untouched keys and idempotence", () => {
 		it("leaves keys not covered by the rules (project, repeat, arbitrary) untouched", () => {
 			const raw = { project: "[[Groceries]]", repeat: "FREQ=WEEKLY", custom: "whatever" };

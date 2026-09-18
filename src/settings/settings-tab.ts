@@ -39,6 +39,7 @@ const PROPERTY_KEY_CONTROLS: readonly PropertyKeyControlDef[] = [
 	{ key: "tags", name: "Tags property key", desc: "The frontmatter key holding the task's tags." },
 	{ key: "created", name: "Created property key", desc: "The frontmatter key holding the date the task was created." },
 	{ key: "completed", name: "Completed property key", desc: "The frontmatter key holding the date the task was completed." },
+	{ key: "remind", name: "Remind property key", desc: "The frontmatter key holding the task's reminder schedule." },
 ];
 
 type ScalarSettingKey = "taskFolder" | "tasksBasePath" | "newTaskFilenameTemplate" | "spawnFilenameTemplate" | "weekStart" | "hapticsEnabled";

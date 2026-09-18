@@ -21,6 +21,7 @@ A note is a task iff `<markerKey> == <markerValue>` (default `type == "task"`); 
 | `tags`      | list              | no       | —              | native Obsidian tags |
 | `created`   | datetime          | yes      | now, on create | set by the plugin, never edited by the user |
 | `completed` | datetime          | no       | —              | set when status transitions into a `done`-kind status; removed on reopen |
+| `remind`    | text / list       | no       | —              | reminder tokens; see "Reminders" below |
 
 Rules:
 - `due`/`scheduled` accept `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm[:ss]`. No timezone suffixes; values
@@ -32,7 +33,7 @@ Rules:
 
 Domain types (branded, `src/domain`): `TaskPath`, `IsoDate`, `IsoDateTime`,
 `TaskDate = IsoDate | IsoDateTime`, `Minutes`, `RRuleString`, `StatusId`, `Priority`, `Task`,
-`TaskDraft` (input for creation), `ParsedFrontmatter` (raw record), `TaskParseError`.
+`TaskDraft` (input for creation), `ParsedFrontmatter` (raw record), `TaskParseError`, `ReminderId`.
 
 ## Statuses
 
@@ -197,6 +198,30 @@ new name/path.
 6. UI: a recurrence picker offers presets — daily, weekdays, weekly on `<day>`, every N weeks,
    monthly on day N, yearly — plus a raw RRULE text field for anything else. Natural-language
    recurrence input is a later idea (see `docs/ROADMAP.md`), not in scope for v1.
+
+## Reminders
+
+`domain/reminders.ts`. See ADR 0020 for why (no Obsidian notification API, ntfy push, delivery
+tiers).
+
+- **Tokens** (`remind`, scalar or list): `none`; `0` (fire at the anchor); an offset `<n>m`/
+  `<n>min`, `<n>h`, `<n>d`, `<n>w` before the anchor; a bare number, counted as minutes; or a
+  full ISO local datetime (`domain/dates.ts`'s datetime form), an absolute reminder independent
+  of any anchor. `none` anywhere in a list wins over every other entry. Canonical serialized
+  form (`formatReminderSpec`) is always a list of the largest unit that divides evenly.
+- **Anchor** (`reminderAnchor`): `scheduled` if present, else `due` — the REVERSE of recurrence's
+  anchor (`transitions.ts#anchorOf`, `due`-then-`scheduled`). Recurrence anchors on the date a
+  task is due *by*; a reminder anchors on when the user meant to *act*, which is `scheduled` when
+  set.
+- **Defaults** (`ReminderDefaults`): with no `remind` property, every dated open task reminds
+  once — at the anchor's own time if it has one, else at a configurable time-of-day (default
+  `09:00`). Opt-out (`remind: none`), not opt-in.
+- **Ids** (`reminderId`): `isotask-<hex djb2a(path|anchorKind|canonicalSpec)>` hashes the anchor's
+  *kind*, never its date — rescheduling `due`/`scheduled` keeps the same id (a later push
+  replaces rather than duplicates); re-parsing the same note twice also yields the same id.
+- **Parse-error policy**: an unrecognized `remind` token is a warning, not a hard error, same as
+  `recurrence-without-anchor` — the token is dropped, `remind` is absent, and the task still
+  parses.
 
 ## Feed buckets
 
@@ -524,6 +549,8 @@ Frontmatter parsing never throws and never crashes a view. `domain/frontmatter.t
 - A missing/empty `status` is not an error either (ADR 0012): it defaults to the first configured
   `open`-kind status. `no-open-status` (no `open`-kind status configured at all) is the only
   status-related hard error left; `unknown-status` (a present, unrecognized value) is unchanged.
+- An unrecognized `remind` token is a parse *warning* too, same treatment: the token is dropped,
+  `remind` is absent, the task still renders and behaves normally.
 
 ### Lenient parse, canonical write
 
