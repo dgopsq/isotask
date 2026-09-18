@@ -2,14 +2,27 @@ import { toJsDate } from "@/domain/dates";
 import type { PushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { NtfySettings } from "@/domain/settings";
+import { PROTOCOL_OPEN_ACTION } from "@/plugin-id";
 import type { PushPublishOptions } from "@/ports/push-channel";
 
 // No `obsidian` import on purpose: keeps request building unit-testable without mocking the plugin API.
 
-/** Strips trailing slashes and adds `https://` when no scheme is given; `http://` is kept as-is for LAN servers. */
+/** Adds `https://` before stripping trailing slashes, so a bare scheme like `"https://"` doesn't become `"https://https:"`. */
 export function normalizeServerUrl(raw: string): string {
-	const trimmed = raw.trim().replace(/\/+$/, "");
-	return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+	const trimmed = raw.trim();
+	const match = /^(https?:\/\/)?(.*)$/i.exec(trimmed);
+	const [, scheme, rest] = match ?? [undefined, undefined, trimmed];
+	return `${scheme ?? "https://"}${rest.replace(/\/+$/, "")}`;
+}
+
+/** `undefined` when `base` is a usable ntfy server URL; otherwise a user-facing reason. */
+export function serverUrlError(base: string): string | undefined {
+	try {
+		const url = new URL(base);
+		return url.host === "" ? "Invalid ntfy server URL." : undefined;
+	} catch {
+		return "Invalid ntfy server URL.";
+	}
 }
 
 function isAscii(value: string): boolean {
@@ -43,7 +56,7 @@ export function authHeaders(token: string): Record<string, string> {
 /** The deep link a fired notification opens; `protocol-handler.ts` parses it back on the receiving device. */
 export function clickUrlFor(vaultName: string, message: PushMessage): string {
 	const params = `vault=${encodeURIComponent(vaultName)}&path=${encodeURIComponent(message.path)}&rid=${encodeURIComponent(message.id)}`;
-	return `obsidian://isotask/open?${params}`;
+	return `obsidian://${PROTOCOL_OPEN_ACTION}?${params}`;
 }
 
 export interface NtfyRequest {

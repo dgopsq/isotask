@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { IsoDateTime } from "@/domain/dates";
-import { buildNtfyRequest, clickUrlFor, encodeHeaderValue, normalizeServerUrl, parseScheduledIds } from "@/adapters/obsidian/ntfy-request";
+import { buildNtfyRequest, clickUrlFor, encodeHeaderValue, normalizeServerUrl, parseScheduledIds, serverUrlError } from "@/adapters/obsidian/ntfy-request";
 import type { PushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { NtfySettings } from "@/domain/settings";
+import { PROTOCOL_OPEN_ACTION } from "@/plugin-id";
 import type { TaskPath } from "@/domain/task";
 
 function config(overrides: Partial<NtfySettings> = {}): NtfySettings {
@@ -52,6 +53,24 @@ describe("normalizeServerUrl", () => {
 
 	it("trims surrounding whitespace", () => {
 		expect(normalizeServerUrl("  ntfy.sh  ")).toBe("https://ntfy.sh");
+	});
+
+	it("keeps a bare scheme as-is instead of doubling it", () => {
+		expect(normalizeServerUrl("https://")).toBe("https://");
+	});
+});
+
+describe("serverUrlError", () => {
+	it("accepts a well-formed server URL", () => {
+		expect(serverUrlError("https://ntfy.sh")).toBeUndefined();
+	});
+
+	it("rejects a bare scheme with no host", () => {
+		expect(serverUrlError("https://")).toBe("Invalid ntfy server URL.");
+	});
+
+	it("rejects an unparsable URL", () => {
+		expect(serverUrlError("not a url")).toBe("Invalid ntfy server URL.");
 	});
 });
 
@@ -105,7 +124,7 @@ describe("clickUrlFor", () => {
 	it("encodes a path with spaces and slashes", () => {
 		const url = clickUrlFor("My Vault", message({ path: "Tasks/Buy milk & eggs.md" as TaskPath, id: "isotask-xyz" as ReminderId }));
 		expect(url).toBe(
-			`obsidian://isotask/open?vault=${encodeURIComponent("My Vault")}&path=${encodeURIComponent("Tasks/Buy milk & eggs.md")}&rid=${encodeURIComponent("isotask-xyz")}`,
+			`obsidian://${PROTOCOL_OPEN_ACTION}?vault=${encodeURIComponent("My Vault")}&path=${encodeURIComponent("Tasks/Buy milk & eggs.md")}&rid=${encodeURIComponent("isotask-xyz")}`,
 		);
 	});
 });

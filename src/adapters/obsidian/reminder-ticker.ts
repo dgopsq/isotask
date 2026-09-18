@@ -22,9 +22,10 @@ export interface ReminderTickerDeps {
 export function registerReminderTicker(plugin: Plugin, deps: ReminderTickerDeps): void {
 	let inFlight = false;
 	let lastTickFailed = false;
+	let gateOpen = false;
 
 	async function tick(): Promise<void> {
-		if (inFlight) {
+		if (!gateOpen || inFlight) {
 			return;
 		}
 		inFlight = true;
@@ -49,6 +50,7 @@ export function registerReminderTicker(plugin: Plugin, deps: ReminderTickerDeps)
 	}
 
 	registerResolvedGate(plugin, () => {
+		gateOpen = true;
 		void tick();
 	});
 	plugin.registerInterval(

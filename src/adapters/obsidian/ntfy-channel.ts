@@ -1,7 +1,7 @@
 import type { RequestUrlResponse } from "obsidian";
 import { requestUrl } from "obsidian";
 
-import { authHeaders, buildNtfyRequest, clickUrlFor, normalizeServerUrl, parseScheduledIds } from "@/adapters/obsidian/ntfy-request";
+import { authHeaders, buildNtfyRequest, clickUrlFor, normalizeServerUrl, parseScheduledIds, serverUrlError } from "@/adapters/obsidian/ntfy-request";
 import type { ReminderId } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
@@ -40,6 +40,11 @@ export function createNtfyChannel(deps: NtfyChannelDeps): PushChannel {
 			if (config.topic.trim() === "") {
 				return err({ kind: "unsupported", message: "No ntfy topic configured." });
 			}
+			const base = normalizeServerUrl(config.serverUrl);
+			const urlError = serverUrlError(base);
+			if (urlError !== undefined) {
+				return err({ kind: "unsupported", message: urlError });
+			}
 			const clickUrl = clickUrlFor(deps.getVaultName(), message);
 			const request = buildNtfyRequest(config, message, clickUrl, options);
 			try {
@@ -61,6 +66,10 @@ export function createNtfyChannel(deps: NtfyChannelDeps): PushChannel {
 				return ok([]);
 			}
 			const base = normalizeServerUrl(config.serverUrl);
+			const urlError = serverUrlError(base);
+			if (urlError !== undefined) {
+				return err({ kind: "unsupported", message: urlError });
+			}
 			const url = `${base}/${encodeURIComponent(config.topic)}/json?poll=1&sched=1`;
 			try {
 				const response = await requestUrl({ url, method: "GET", headers: authHeaders(config.token), throw: false });

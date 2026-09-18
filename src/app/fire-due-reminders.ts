@@ -8,6 +8,7 @@ import type { IsotaskSettings } from "@/domain/settings";
 import { findStatus, isTerminal } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
+import { PLUGIN_ID } from "@/plugin-id";
 import type { Clock } from "@/ports/clock";
 import type { Haptics } from "@/ports/haptics";
 import type { LocalState } from "@/ports/local-state";
@@ -35,7 +36,7 @@ export type FireOutcome =
 			readonly failed: readonly { readonly id: ReminderId; readonly error: PushError }[];
 	  };
 
-export const REMINDER_TICK_STATE_KEY = "isotask-reminder-tick";
+export const REMINDER_TICK_STATE_KEY = `${PLUGIN_ID}-reminder-tick`;
 
 interface ReminderTickState {
 	readonly lastTick?: IsoDateTime;

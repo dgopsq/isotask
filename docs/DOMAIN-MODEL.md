@@ -232,7 +232,10 @@ because a reminder keeps its id when its anchor moves but must still fire under 
 ntfy toggle (`reminders.ntfy.enabled`) is the single master switch, gating delivery on every
 platform; mobile has no background push target, so it shows a `Notice` instead of publishing. A
 failed publish holds `lastTick` back so the next tick retries it; success never re-fires (guarded
-by the ledger, not by `lastTick` alone).
+by the ledger, not by `lastTick` alone). A failed publish is retried every tick only while its fire
+time is still inside the catch-up window; once it ages out it is dropped without a further notice.
+The ledger is per device, so two devices with the same topic enabled both push the same reminder —
+run tier 1 from one desktop, or wait for tier 3.
 
 ## Feed buckets
 
