@@ -216,8 +216,9 @@ tiers).
 - **Defaults** (`ReminderDefaults`): with no `remind` property, every dated open task reminds
   once — at the anchor's own time if it has one, else at a configurable time-of-day (default
   `09:00`). Opt-out (`remind: none`), not opt-in.
-- **Ids** (`reminderId`): `isotask-<hex djb2a(path|anchorKind|canonicalSpec)>`, deterministic —
-  rescheduling the anchor changes the id, re-parsing the same note doesn't.
+- **Ids** (`reminderId`): `isotask-<hex djb2a(path|anchorKind|canonicalSpec)>` hashes the anchor's
+  *kind*, never its date — rescheduling `due`/`scheduled` keeps the same id (a later push
+  replaces rather than duplicates); re-parsing the same note twice also yields the same id.
 - **Parse-error policy**: an unrecognized `remind` token is a warning, not a hard error, same as
   `recurrence-without-anchor` — the token is dropped, `remind` is absent, and the task still
   parses.

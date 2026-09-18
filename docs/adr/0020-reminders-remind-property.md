@@ -21,7 +21,7 @@ specific server version.
   an offset `<n>m`/`<n>min`, `<n>h`, `<n>d`, `<n>w` before the anchor; or a full ISO local
   datetime (an absolute reminder, independent of the anchor). A bare number counts as minutes.
   `none` anywhere in a list wins over every other entry. Canonical serialized form is always a
-  list of the shortest unit that divides evenly (`domain/reminders.ts#formatReminderSpec`).
+  list of the largest unit that divides evenly (`domain/reminders.ts#formatReminderSpec`).
 - **Anchor**: `scheduled` if present, else `due` — the reverse of `repeat`'s anchor (ADR 0005:
   `due`-then-`scheduled`). Recurrence anchors on the date a task is *due by*; a reminder anchors
   on when the user meant to *act*, which is `scheduled` when it's set.
@@ -29,8 +29,8 @@ specific server version.
   anchor's own time if it has one, else at a configurable time-of-day (`ReminderDefaults`,
   default `09:00`). This is opt-out (`remind: none`), not opt-in, so existing vaults get
   reminders without editing every note.
-- **Ids**: `isotask-<hex djb2a(path|anchorKind|canonicalSpec)>` — deterministic, so rescheduling
-  changes the id while re-parsing the same note twice doesn't.
+- **Ids**: `isotask-<hex djb2a(path|anchorKind|canonicalSpec)>` — hashes the anchor's *kind*, not
+  its date, so rescheduling `due`/`scheduled` keeps the id (a later push replaces, not duplicates).
 - **Delivery tiers**, consumers of these ids in later PRs, named here so the id scheme is
   designed for all three up front: (1) live firing from a running desktop instance polling
   `dueReminders`; (2) opt-in schedule-ahead up to ~3 days via ntfy's `at`/`delay`, no
