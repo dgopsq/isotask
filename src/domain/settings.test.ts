@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_SETTINGS, parseSettings } from "@/domain/settings";
+import { DEFAULT_REMINDER_SETTINGS, DEFAULT_SETTINGS, parseSettings } from "@/domain/settings";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_STATUSES } from "@/domain/status";
 
@@ -127,5 +127,36 @@ describe("parseSettings", () => {
 		const result = parseSettings({ version: 2, taskFolder: "Tasks 2" });
 		expect(result.version).toBe(1);
 		expect(result.taskFolder).toBe("Tasks 2");
+	});
+
+	it("includes reminders in the defaults", () => {
+		expect(DEFAULT_SETTINGS.reminders).toEqual(DEFAULT_REMINDER_SETTINGS);
+	});
+
+	it("falls back an invalid reminders.defaultTime while keeping a valid sibling", () => {
+		const result = parseSettings({ reminders: { defaultTime: "25:99", catchUpMinutes: 15 } });
+		expect(result.reminders.defaultTime).toBe(DEFAULT_REMINDER_SETTINGS.defaultTime);
+		expect(result.reminders.catchUpMinutes).toBe(15);
+	});
+
+	it("accepts a valid reminders.defaultTime", () => {
+		const result = parseSettings({ reminders: { defaultTime: "18:30" } });
+		expect(result.reminders.defaultTime).toBe("18:30");
+	});
+
+	it("falls back reminders.ntfy.lookaheadHours when below the minimum", () => {
+		const result = parseSettings({ reminders: { ntfy: { lookaheadHours: 0 } } });
+		expect(result.reminders.ntfy.lookaheadHours).toBe(DEFAULT_REMINDER_SETTINGS.ntfy.lookaheadHours);
+	});
+
+	it("falls back the whole ntfy block when it isn't an object", () => {
+		const result = parseSettings({ reminders: { ntfy: "x" } });
+		expect(result.reminders.ntfy).toEqual(DEFAULT_REMINDER_SETTINGS.ntfy);
+	});
+
+	it("keeps the given fields of a partial reminders object", () => {
+		const result = parseSettings({ reminders: { remindByDefault: false } });
+		expect(result.reminders.remindByDefault).toBe(false);
+		expect(result.reminders.catchUpMinutes).toBe(DEFAULT_REMINDER_SETTINGS.catchUpMinutes);
 	});
 });

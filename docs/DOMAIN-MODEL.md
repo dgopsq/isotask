@@ -223,6 +223,17 @@ tiers).
   `recurrence-without-anchor` — the token is dropped, `remind` is absent, and the task still
   parses.
 
+### Delivery (tier 1)
+
+`app/fire-due-reminders.ts`. A 60 s tick asks for every reminder due in `(lastTick, now]`, capped
+at `catchUpMinutes` back from `now` so a long-closed app doesn't replay days of history. Each
+fired instance is recorded in a per-device local-storage ledger keyed by `id@at` (not just `id`),
+because a reminder keeps its id when its anchor moves but must still fire under the new time. The
+ntfy toggle (`reminders.ntfy.enabled`) is the single master switch, gating delivery on every
+platform; mobile has no background push target, so it shows a `Notice` instead of publishing. A
+failed publish holds `lastTick` back so the next tick retries it; success never re-fires (guarded
+by the ledger, not by `lastTick` alone).
+
 ## Feed buckets
 
 Buckets are computed by `domain/buckets.ts` from a configurable *date source* view option (`due`

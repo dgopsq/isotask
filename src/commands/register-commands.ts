@@ -4,6 +4,7 @@ import { normalizePath } from "obsidian";
 import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
 import type { AppError } from "@/app/errors";
+import type { FireDueReminders } from "@/app/fire-due-reminders";
 import type { makeToggleDone } from "@/app/toggle-done";
 import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { describeAppError, storeError } from "@/app/errors";
@@ -24,6 +25,7 @@ import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
 import { VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { Notifier } from "@/ports/notifier";
+import type { PushError } from "@/ports/push-channel";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
@@ -53,10 +55,16 @@ export interface RegisterCommandsDeps {
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly undoReschedule: UndoReschedule;
 	readonly redoReschedule: RedoReschedule;
+	readonly fireDueReminders: FireDueReminders;
+	readonly describePushError: (error: PushError) => string;
 }
 
 function describeError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+function reminderCount(n: number): string {
+	return `${String(n)} reminder${n === 1 ? "" : "s"}`;
 }
 
 /** The active file, only if it's a task note (per the configured marker) — `null` otherwise. Never reads the deprecated `workspace.activeLeaf`. */
@@ -403,6 +411,30 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		name: "Redo last calendar reschedule",
 		callback: () => {
 			void runHistoryStep(deps.redoReschedule, "Nothing to redo.");
+		},
+	});
+
+	plugin.addCommand({
+		id: "send-reminders-now",
+		name: "Send reminders now",
+		callback: () => {
+			void (async () => {
+				const outcome = await deps.fireDueReminders();
+				if (outcome.kind === "disabled") {
+					deps.notifier.error("Turn on Send via ntfy in the Isotask settings first.");
+					return;
+				}
+				const firstFailure = outcome.failed[0];
+				if (firstFailure !== undefined) {
+					deps.notifier.error(`${reminderCount(outcome.failed.length)} failed: ${deps.describePushError(firstFailure.error)}`);
+					return;
+				}
+				if (outcome.fired === 0) {
+					deps.notifier.info("No reminders due.");
+					return;
+				}
+				deps.notifier.info(`Sent ${reminderCount(outcome.fired)}.`);
+			})();
 		},
 	});
 }

@@ -4,7 +4,7 @@ import type { IsoDate, IsoDateTime, TaskDate } from "@/domain/dates";
 import { addMinutes, compareTaskDate, formatTime, isDateTime, toDateOnly, toJsDate } from "@/domain/dates";
 import type { ReminderAnchorKind, ReminderId, ReminderInstance, ReminderDefaults } from "@/domain/reminders";
 import { reminderAnchor, reminderTimes } from "@/domain/reminders";
-import type { Priority, Task } from "@/domain/task";
+import type { Priority, Task, TaskPath } from "@/domain/task";
 
 /** Every reminder instance due in `(from, to]` across the given tasks, sorted by fire time then path. */
 export function dueReminders(
@@ -29,6 +29,8 @@ export function dueReminders(
 
 export interface PushMessage {
 	readonly id: ReminderId;
+	/** The adapter builds the click-through URL from it; the domain never sees URLs. */
+	readonly path: TaskPath;
 	readonly at: IsoDateTime;
 	readonly title: string;
 	readonly body: string;
@@ -87,10 +89,11 @@ function reminderBody(task: Task, reminder: ReminderInstance): string {
 	return `${prefix} ${dateLabel(anchor.at, reminder.at)}${projectSuffix}`;
 }
 
-/** ntfy push payload for one reminder instance — no URL: the click-through URL is an adapter concern (wave 2). */
+/** ntfy push payload for one reminder instance. */
 export function toPushMessage(task: Task, reminder: ReminderInstance): PushMessage {
 	return {
 		id: reminder.id,
+		path: task.path,
 		at: reminder.at,
 		title: task.title,
 		body: reminderBody(task, reminder),

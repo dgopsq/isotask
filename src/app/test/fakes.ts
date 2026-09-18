@@ -103,6 +103,17 @@ export class FakeTaskStore implements TaskStore {
 		}
 		return ok(note.frontmatter);
 	};
+
+	list = async (): Promise<readonly Task[]> => {
+		const tasks: Task[] = [];
+		for (const [path, note] of this.notes) {
+			const result = parseTask(path, basenameOf(path), note.frontmatter, this.keys, this.statuses);
+			if (result.ok) {
+				tasks.push(result.value);
+			}
+		}
+		return tasks;
+	};
 }
 
 /** Fixed-time `Clock` fake, mutable via `set` for tests that need `now`/`today` to change mid-test. */

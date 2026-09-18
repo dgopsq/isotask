@@ -24,7 +24,43 @@ export interface IsotaskSettings {
 	 */
 	readonly taskPanelIntroduced: boolean;
 	readonly hapticsEnabled: boolean;
+	readonly reminders: ReminderSettings;
 }
+
+export interface NtfySettings {
+	readonly enabled: boolean;
+	readonly serverUrl: string;
+	readonly topic: string;
+	readonly token: string;
+	/** Tiers 2 and 3 (wave 2b): stored now so the shape is final, no UI yet. */
+	readonly scheduleAhead: boolean;
+	readonly lookaheadHours: number;
+	readonly serverSupportsUpdates: boolean;
+}
+
+export interface ReminderSettings {
+	readonly remindByDefault: boolean;
+	/** "HH:mm", the fire time for a date-only anchor. */
+	readonly defaultTime: string;
+	/** Reminders missed while the app was closed are replayed at most this far back. */
+	readonly catchUpMinutes: number;
+	readonly ntfy: NtfySettings;
+}
+
+export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
+	remindByDefault: true,
+	defaultTime: "09:00",
+	catchUpMinutes: 60,
+	ntfy: {
+		enabled: false,
+		serverUrl: "https://ntfy.sh",
+		topic: "",
+		token: "",
+		scheduleAhead: false,
+		lookaheadHours: 24,
+		serverSupportsUpdates: false,
+	},
+};
 
 export const DEFAULT_SETTINGS: IsotaskSettings = {
 	version: 1,
@@ -37,6 +73,7 @@ export const DEFAULT_SETTINGS: IsotaskSettings = {
 	weekStart: 0,
 	taskPanelIntroduced: false,
 	hapticsEnabled: true,
+	reminders: DEFAULT_REMINDER_SETTINGS,
 };
 
 function fallbackString(defaultValue: string) {
@@ -90,6 +127,31 @@ const StatusesSchema = v.fallback(
 	DEFAULT_STATUSES,
 );
 
+const TIME_OF_DAY_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const NtfySettingsSchema = v.fallback(
+	v.object({
+		enabled: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.ntfy.enabled),
+		serverUrl: fallbackString(DEFAULT_REMINDER_SETTINGS.ntfy.serverUrl),
+		topic: fallbackString(DEFAULT_REMINDER_SETTINGS.ntfy.topic),
+		token: fallbackString(DEFAULT_REMINDER_SETTINGS.ntfy.token),
+		scheduleAhead: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.ntfy.scheduleAhead),
+		lookaheadHours: v.fallback(v.pipe(v.number(), v.integer(), v.minValue(1)), DEFAULT_REMINDER_SETTINGS.ntfy.lookaheadHours),
+		serverSupportsUpdates: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.ntfy.serverSupportsUpdates),
+	}),
+	DEFAULT_REMINDER_SETTINGS.ntfy,
+);
+
+const ReminderSettingsSchema = v.fallback(
+	v.object({
+		remindByDefault: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.remindByDefault),
+		defaultTime: v.fallback(v.pipe(v.string(), v.regex(TIME_OF_DAY_RE)), DEFAULT_REMINDER_SETTINGS.defaultTime),
+		catchUpMinutes: v.fallback(v.pipe(v.number(), v.integer(), v.minValue(0)), DEFAULT_REMINDER_SETTINGS.catchUpMinutes),
+		ntfy: NtfySettingsSchema,
+	}),
+	DEFAULT_REMINDER_SETTINGS,
+);
+
 const WeekdaySchema = v.fallback(v.picklist([0, 1, 2, 3, 4, 5, 6]), DEFAULT_SETTINGS.weekStart);
 
 const SettingsSchema = v.object({
@@ -103,6 +165,7 @@ const SettingsSchema = v.object({
 	weekStart: WeekdaySchema,
 	taskPanelIntroduced: v.fallback(v.boolean(), DEFAULT_SETTINGS.taskPanelIntroduced),
 	hapticsEnabled: v.fallback(v.boolean(), DEFAULT_SETTINGS.hapticsEnabled),
+	reminders: ReminderSettingsSchema,
 });
 
 function toStatusConfig(status: ParsedStatusConfig): StatusConfig {

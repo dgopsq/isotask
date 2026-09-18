@@ -87,6 +87,12 @@ describe("toPushMessage", () => {
 		expect(message.title).toBe("Buy milk");
 	});
 
+	it("carries the task path", () => {
+		const t = task({ title: "Buy milk", due: date("2026-09-20T15:00") });
+		const message = toPushMessage(t, onlyReminder(t));
+		expect(message.path).toBe(t.path);
+	});
+
 	it.each([
 		["normal", 3],
 		["high", 4],
