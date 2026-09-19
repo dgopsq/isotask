@@ -11,7 +11,7 @@ firing from a running desktop instance) shipped, and it has real gaps: it only f
 desktop instance is open and polling, so mobile-only use or a closed laptop misses reminders
 entirely; it has no cancel, so a task completed after its reminder was queued still pings; and its
 per-device ledger lets two desktops on the same topic double-push. ntfy >= 2.16 adds sequence ids
-(`X-Message-ID`): a publish under a known id replaces the held message instead of duplicating it,
+(`X-Sequence-ID`): a publish under a known id replaces the held message instead of duplicating it,
 a held message can be cancelled by id, and held/recent messages can be listed back — exactly what
 a reconcile-from-any-client design needs, with no per-device ledger.
 
@@ -52,7 +52,7 @@ Negative:
 ## Alternatives considered
 
 - **Keep the tiers, auto-detect 2.16 and upgrade silently.** Rejected: a pre-2.16 server ignores
-  `X-Message-ID` without error, so only a throwaway probe detects it, and a normal reconcile can't
+  `X-Sequence-ID` without error, so only a throwaway probe detects it, and a normal reconcile can't
   run that probe every cycle without risking a duplicate on that same server.
 - **Ship tier 2 (schedule-ahead, no sequence ids) instead.** Rejected: without replace/cancel, a
   task finished or rescheduled after its reminder is queued still fires at the old time.

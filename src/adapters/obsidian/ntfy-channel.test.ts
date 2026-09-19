@@ -150,7 +150,7 @@ describe("createNtfyChannel", () => {
 	});
 
 	describe("publish", () => {
-		it("includes X-Message-ID header without Delay when no delayUntil", async () => {
+		it("includes X-Sequence-ID header without Delay when no delayUntil", async () => {
 			vi.mocked(requestUrl).mockResolvedValueOnce(response(200, ""));
 
 			const channel = createNtfyChannel({
@@ -162,7 +162,7 @@ describe("createNtfyChannel", () => {
 
 			const call = lastRequest();
 			const headers = call.headers as Record<string, string | undefined>;
-			expect(headers["X-Message-ID"]).toBe("isotask-123");
+			expect(headers["X-Sequence-ID"]).toBe("isotask-123");
 			expect(headers["Delay"]).toBeUndefined();
 		});
 

@@ -128,17 +128,17 @@ describe("buildNtfyRequest Delay header", () => {
 	});
 });
 
-describe("buildNtfyRequest X-Message-ID header", () => {
+describe("buildNtfyRequest X-Sequence-ID header", () => {
 	it("sets it to the message id when there is no delayUntil", () => {
 		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), "obsidian://x");
-		expect(request.headers["X-Message-ID"]).toBe("isotask-abc123");
+		expect(request.headers["X-Sequence-ID"]).toBe("isotask-abc123");
 	});
 
 	it("sets it to the message id when there is a delayUntil", () => {
 		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), "obsidian://x", {
 			delayUntil: "2026-09-18T10:00:00" as IsoDateTime,
 		});
-		expect(request.headers["X-Message-ID"]).toBe("isotask-abc123");
+		expect(request.headers["X-Sequence-ID"]).toBe("isotask-abc123");
 	});
 });
 

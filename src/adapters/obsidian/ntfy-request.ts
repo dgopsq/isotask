@@ -74,7 +74,7 @@ export function buildNtfyRequest(config: NtfySettings, message: PushMessage, cli
 		Priority: String(message.priority),
 		Tags: message.tags.join(","),
 		Click: clickUrl,
-		"X-Message-ID": message.id,
+		"X-Sequence-ID": message.id,
 		...authHeaders(config.token),
 	};
 	if (options?.delayUntil !== undefined) {
