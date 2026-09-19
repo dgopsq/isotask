@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/dgopsq/isotask/compare/0.3.0...0.4.0) (2026-09-19)
+
+
+### Features
+
+* **domain:** remind property and reminder fire-time rules (notifications wave 1) ([#31](https://github.com/dgopsq/isotask/issues/31)) ([13ec769](https://github.com/dgopsq/isotask/commit/13ec769aa79fef351872133476a16cbeb2936dfe))
+* **feed:** completed bucket; done filter scoped to Calendar view ([#29](https://github.com/dgopsq/isotask/issues/29)) ([bfedbfd](https://github.com/dgopsq/isotask/commit/bfedbfd7b59dede1abf42ca740984daa5d9dd6f5))
+* **reminders:** ntfy live firing, ticker, protocol handler, settings (notifications wave 2) ([#32](https://github.com/dgopsq/isotask/issues/32)) ([df0dd59](https://github.com/dgopsq/isotask/commit/df0dd5970f4328d2491f708d27ca660b1c765362))
+
+
+### Maintenance
+
+* sync versions.json for 0.3.0 ([d54efae](https://github.com/dgopsq/isotask/commit/d54efae25a2a6d96d31fbac206f17d8a4f53baf2))
+
 ## [0.3.0](https://github.com/dgopsq/isotask/compare/0.2.0...0.3.0) (2026-09-13)
 
 
