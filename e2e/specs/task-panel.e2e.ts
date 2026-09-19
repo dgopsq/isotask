@@ -312,9 +312,7 @@ describe("Task panel", function () {
 
 	it("sets a reminder preset from the modal and writes remind to frontmatter", async function () {
 		try {
-			// Reopens the panel rather than assuming an earlier test left it
-			// open — needed for this test to pass standalone (e.g. under
-			// `E2E_GREP`, which can filter out the test that first opens it).
+			// Not left to the first test: E2E_GREP can filter that one out.
 			await openTaskPanel();
 			await browser.executeObsidianCommand("isotask:set-reminder");
 			await browser.$(`.${cssClass("reminder-modal")}`).waitForExist({ timeout: SELECT_TIMEOUT });

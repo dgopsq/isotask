@@ -7,9 +7,9 @@ import { FakeClock, FakeNotifier, FakeRescheduleHistory, FakeTaskStore } from "@
 import type { IsoDate, IsoDateTime, TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
+import type { ReminderSpec } from "@/domain/reminders";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
 import type { IsotaskSettings } from "@/domain/settings";
-import type { ReminderSpec } from "@/domain/reminders";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { Minutes, RRuleString, TaskPath } from "@/domain/task";
 

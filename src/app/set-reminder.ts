@@ -10,6 +10,7 @@ import type { TaskPath } from "@/domain/task";
 /** Sets or clears (`undefined`/`[]`) a task's `remind` list; any `none` spec collapses the write to `["none"]`. */
 export function makeSetReminder(deps: AppDeps) {
 	return async (path: TaskPath, specs: readonly ReminderSpec[] | undefined): Promise<Result<void, AppError>> => {
+		// Reject a non-task note up front: a stray `remind` there is invisible until the linter runs.
 		const readResult = await deps.store.read(path);
 		if (!readResult.ok) {
 			return err(storeError(readResult.error));

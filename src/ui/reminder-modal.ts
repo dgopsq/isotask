@@ -61,13 +61,7 @@ function initialSelection(initial: readonly ReminderSpec[] | undefined, defaults
 
 type SpecsOrError = { readonly specs: readonly ReminderSpec[] } | { readonly error: string };
 
-/**
- * Presets (`domain/reminder-presets.ts#REMINDER_PRESETS`) plus a custom-offset
- * and an absolute-datetime field, with a live human-readable description.
- * "Use default" removes `remind` entirely rather than writing a spec that
- * happens to match the vault default, so the task keeps tracking it if it
- * later changes.
- */
+/** "Use default" removes `remind` instead of writing the matching spec, so the task keeps following the vault default if it changes. */
 export class ReminderModal extends Modal {
 	private readonly deps: ReminderModalDeps;
 	private readonly hasCurrentOption: boolean;
