@@ -1,5 +1,5 @@
-import { toJsDate } from "@/domain/dates";
-import type { PushMessage } from "@/domain/reminder-plan";
+import { fromJsDateTime, toJsDate } from "@/domain/dates";
+import type { KnownReminder, PushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { NtfySettings } from "@/domain/settings";
 import { PROTOCOL_OPEN_ACTION } from "@/plugin-id";
@@ -61,12 +61,12 @@ export function clickUrlFor(vaultName: string, message: PushMessage): string {
 
 export interface NtfyRequest {
 	readonly url: string;
-	readonly method: "POST";
+	readonly method: "POST" | "DELETE" | "GET";
 	readonly headers: Record<string, string>;
-	readonly body: string;
+	readonly body?: string;
 }
 
-/** Builds the `POST` publish request; `options.sequenceId` is ignored here — the channel rejects it as unsupported before this is called (tier 3, wave 2b). */
+/** Builds the `POST` publish request, always keyed by `message.id` as the sequence id (ntfy >= 2.16). */
 export function buildNtfyRequest(config: NtfySettings, message: PushMessage, clickUrl: string, options?: PushPublishOptions): NtfyRequest {
 	const base = normalizeServerUrl(config.serverUrl);
 	const headers: Record<string, string> = {
@@ -74,6 +74,7 @@ export function buildNtfyRequest(config: NtfySettings, message: PushMessage, cli
 		Priority: String(message.priority),
 		Tags: message.tags.join(","),
 		Click: clickUrl,
+		"X-Sequence-ID": message.id,
 		...authHeaders(config.token),
 	};
 	if (options?.delayUntil !== undefined) {
@@ -87,9 +88,30 @@ export function buildNtfyRequest(config: NtfySettings, message: PushMessage, cli
 	};
 }
 
-/** Reads `rid` off each ndjson line's `click` URL; an unparsable line (partial poll output, a foreign topic's message) is skipped rather than failing the whole batch. */
-export function parseScheduledIds(ndjson: string): readonly ReminderId[] {
-	const ids: ReminderId[] = [];
+/** Builds the `DELETE` request that cancels a still-held message by its sequence id. */
+export function buildCancelRequest(config: NtfySettings, id: ReminderId): NtfyRequest {
+	const base = normalizeServerUrl(config.serverUrl);
+	return {
+		url: `${base}/${encodeURIComponent(config.topic)}/${encodeURIComponent(id)}`,
+		method: "DELETE",
+		headers: authHeaders(config.token),
+	};
+}
+
+/** Builds the `GET .../json?poll=1&sched=1&since=` request; `since` is floored to whole seconds, minimum 1. */
+export function buildPollRequest(config: NtfySettings, sinceSeconds: number): NtfyRequest {
+	const base = normalizeServerUrl(config.serverUrl);
+	const since = Math.max(1, Math.floor(sinceSeconds));
+	return {
+		url: `${base}/${encodeURIComponent(config.topic)}/json?poll=1&sched=1&since=${String(since)}s`,
+		method: "GET",
+		headers: authHeaders(config.token),
+	};
+}
+
+/** Parses each ndjson line; an unparsable line (partial poll output, a foreign topic's message) is skipped rather than failing the whole batch. */
+export function parseKnownReminders(ndjson: string): readonly KnownReminder[] {
+	const reminders: KnownReminder[] = [];
 	for (const line of ndjson.split("\n")) {
 		const trimmed = line.trim();
 		if (trimmed === "") {
@@ -100,21 +122,16 @@ export function parseScheduledIds(ndjson: string): readonly ReminderId[] {
 			if (typeof parsed !== "object" || parsed === null) {
 				continue;
 			}
-			const click = (parsed as Record<string, unknown>)["click"];
-			if (typeof click !== "string") {
+			const record = parsed as Record<string, unknown>;
+			const sequenceId = record["sequence_id"];
+			const time = record["time"];
+			if (typeof sequenceId !== "string" || !sequenceId.startsWith("isotask-") || typeof time !== "number" || !Number.isFinite(time)) {
 				continue;
 			}
-			const queryIndex = click.indexOf("?");
-			if (queryIndex < 0) {
-				continue;
-			}
-			const rid = new URLSearchParams(click.slice(queryIndex + 1)).get("rid");
-			if (rid?.startsWith("isotask-") === true) {
-				ids.push(rid as ReminderId);
-			}
+			reminders.push({ id: sequenceId as ReminderId, at: fromJsDateTime(new Date(time * 1000)) });
 		} catch {
 			continue;
 		}
 	}
-	return ids;
+	return reminders;
 }

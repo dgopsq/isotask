@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 
 import type { IsoDate, IsoDateTime, TaskDate } from "@/domain/dates";
-import { addMinutes, compareTaskDate, formatTime, isDateTime, toDateOnly, toJsDate } from "@/domain/dates";
+import { addMinutes, compareTaskDate, formatTime, isDateTime, shiftBy, toDateOnly, toJsDate } from "@/domain/dates";
 import type { ReminderAnchorKind, ReminderId, ReminderInstance, ReminderDefaults } from "@/domain/reminders";
 import { reminderAnchor, reminderTimes } from "@/domain/reminders";
 import type { Priority, Task, TaskPath } from "@/domain/task";
@@ -100,4 +100,60 @@ export function toPushMessage(task: Task, reminder: ReminderInstance): PushMessa
 		priority: pushPriority(task.priority),
 		tags: ["alarm_clock"],
 	};
+}
+
+/** One message the server reports holding or having delivered: `at` is its scheduled or delivered time. */
+export interface KnownReminder {
+	readonly id: ReminderId;
+	readonly at: IsoDateTime;
+}
+
+// A full minute, not ntfy's 10 s minimum: datetimes are minute precision, so a shorter window could emit a Delay the server rejects.
+export const IMMEDIATE_WINDOW_MS = 60_000;
+
+export interface PlannedPublish {
+	readonly message: PushMessage;
+	readonly delayUntil?: IsoDateTime;
+}
+
+export interface ReminderPlan {
+	readonly publish: readonly PlannedPublish[];
+	readonly cancel: readonly ReminderId[];
+}
+
+function ours(id: ReminderId): boolean {
+	return id.startsWith("isotask-");
+}
+
+function isSatisfied(k: KnownReminder | undefined, m: PushMessage, immediate: boolean, cutoff: IsoDateTime): boolean {
+	if (k === undefined) {
+		return false;
+	}
+	if (!immediate) {
+		return compareTaskDate(k.at, m.at) === 0;
+	}
+	return compareTaskDate(k.at, addMinutes(m.at, -1)) >= 0 && compareTaskDate(k.at, cutoff) <= 0;
+}
+
+/** The immediate match is a range, not a point: the server stamps an immediate publish with the publish time, not `at`. */
+export function planReminders(desired: readonly PushMessage[], known: readonly KnownReminder[], now: IsoDateTime): ReminderPlan {
+	const cutoff = shiftBy(now, IMMEDIATE_WINDOW_MS) as IsoDateTime;
+	const ourKnown = known.filter((k) => ours(k.id));
+	const knownById = new Map(ourKnown.map((k) => [k.id, k]));
+	const desiredIds = new Set(desired.map((m) => m.id));
+
+	const publish: PlannedPublish[] = [];
+	for (const message of desired) {
+		const immediate = compareTaskDate(message.at, cutoff) <= 0;
+		if (isSatisfied(knownById.get(message.id), message, immediate, cutoff)) {
+			continue;
+		}
+		publish.push(immediate ? { message } : { message, delayUntil: message.at });
+	}
+
+	const cancel = ourKnown
+		.filter((k) => compareTaskDate(k.at, now) > 0 && !desiredIds.has(k.id))
+		.map((k) => k.id);
+
+	return { publish, cancel };
 }

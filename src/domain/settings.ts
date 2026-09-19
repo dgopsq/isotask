@@ -32,10 +32,8 @@ export interface NtfySettings {
 	readonly serverUrl: string;
 	readonly topic: string;
 	readonly token: string;
-	/** Tiers 2 and 3 (wave 2b): stored now so the shape is final, no UI yet. */
-	readonly scheduleAhead: boolean;
+	/** Hours ahead reminders are scheduled on the server; ntfy.sh caps Delay at 3 days. */
 	readonly lookaheadHours: number;
-	readonly serverSupportsUpdates: boolean;
 }
 
 export interface ReminderSettings {
@@ -56,9 +54,7 @@ export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
 		serverUrl: "https://ntfy.sh",
 		topic: "",
 		token: "",
-		scheduleAhead: false,
-		lookaheadHours: 24,
-		serverSupportsUpdates: false,
+		lookaheadHours: 72,
 	},
 };
 
@@ -135,9 +131,7 @@ const NtfySettingsSchema = v.fallback(
 		serverUrl: fallbackString(DEFAULT_REMINDER_SETTINGS.ntfy.serverUrl),
 		topic: fallbackString(DEFAULT_REMINDER_SETTINGS.ntfy.topic),
 		token: fallbackString(DEFAULT_REMINDER_SETTINGS.ntfy.token),
-		scheduleAhead: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.ntfy.scheduleAhead),
 		lookaheadHours: v.fallback(v.pipe(v.number(), v.integer(), v.minValue(1)), DEFAULT_REMINDER_SETTINGS.ntfy.lookaheadHours),
-		serverSupportsUpdates: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.ntfy.serverSupportsUpdates),
 	}),
 	DEFAULT_REMINDER_SETTINGS.ntfy,
 );

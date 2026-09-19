@@ -84,7 +84,8 @@ Download `main.js`, `manifest.json`, and `styles.css` from the
 [latest release](https://github.com/dgopsq/isotask/releases/latest) into
 `<vault>/.obsidian/plugins/isotask/`, then reload Obsidian and enable Isotask in Settings.
 
-Isotask requires Obsidian 1.13.0 or later (Bases).
+Isotask requires Obsidian 1.13.0 or later (Bases). Push reminders need an ntfy server running
+2.16 or newer (ntfy.sh qualifies).
 
 To update, repeat the manual steps above with the new release's files.
 

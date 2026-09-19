@@ -201,8 +201,8 @@ new name/path.
 
 ## Reminders
 
-`domain/reminders.ts`. See ADR 0020 for why (no Obsidian notification API, ntfy push, delivery
-tiers).
+`domain/reminders.ts`. See ADR 0020 for why (no Obsidian notification API, ntfy push) and
+ADR 0021 (ntfy >= 2.16, reconcile from every client).
 
 - **Tokens** (`remind`, scalar or list): `none`; `0` (fire at the anchor); an offset `<n>m`/
   `<n>min`, `<n>h`, `<n>d`, `<n>w` before the anchor; a bare number, counted as minutes; or a
@@ -223,19 +223,22 @@ tiers).
   `recurrence-without-anchor` — the token is dropped, `remind` is absent, and the task still
   parses.
 
-### Delivery (tier 1)
+### Delivery
 
-`app/fire-due-reminders.ts`. A 60 s tick asks for every reminder due in `(lastTick, now]`, capped
-at `catchUpMinutes` back from `now` so a long-closed app doesn't replay days of history. Each
-fired instance is recorded in a per-device local-storage ledger keyed by `id@at` (not just `id`),
-because a reminder keeps its id when its anchor moves but must still fire under the new time. The
-ntfy toggle (`reminders.ntfy.enabled`) is the single master switch, gating delivery on every
-platform; mobile has no background push target, so it shows a `Notice` instead of publishing. A
-failed publish holds `lastTick` back so the next tick retries it; success never re-fires (guarded
-by the ledger, not by `lastTick` alone). A failed publish is retried every tick only while its fire
-time is still inside the catch-up window; once it ages out it is dropped without a further notice.
-The ledger is per device, so two devices with the same topic enabled both push the same reminder —
-run tier 1 from one desktop, or wait for tier 3.
+`app/reconcile-reminders.ts`, `domain/reminder-plan.ts#planReminders` (ADR 0021). Every client
+polls the ntfy topic for known held/recently-delivered messages, builds the desired set — every
+reminder instance with fire time in `(now - catchUpMinutes, now + lookaheadHours]` over open
+tasks — and diffs it against what the server holds. The reminder id is sent as the ntfy sequence
+id: a desired reminder the server doesn't know, or knows under a different time, is published,
+immediately (no `Delay`) if its fire time is within a minute of now (the catch-up path) or delayed to
+its fire time otherwise; publishing again under the same id replaces the held message, which is
+how a moved `due`/`scheduled` reschedules its reminder without a new id. Held messages with our
+prefix that are no longer desired (task done/deleted, `remind` removed) are cancelled by id;
+messages under a foreign id are never touched. The poll response is the ledger — no per-device
+fired-reminder store — so two clients on the same topic converge instead of double-pushing.
+Lookahead (`reminders.ntfy.lookaheadHours`, default 72) is clamped to ntfy's `Delay` cap (3 days
+on `ntfy.sh`); an HTTP 400 on a delayed publish halves the effective lookahead for the session
+(floor 1 h) and notices once.
 
 ## Feed buckets
 
