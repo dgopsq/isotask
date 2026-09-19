@@ -90,9 +90,11 @@ export class ReminderModal extends Modal {
 
 	override onOpen(): void {
 		this.setTitle("Set reminder");
-		// Modal buttons aren't inside a <form>, so Enter in a text field needs
-		// its own handler to submit like the rest of the plugin's modals.
-		this.scope.register([], "Enter", () => {
+		// Only from a text field: a scope-wide Enter would also fire on a focused Cancel button.
+		this.scope.register([], "Enter", (evt) => {
+			if (!(evt.target instanceof HTMLInputElement)) {
+				return true;
+			}
 			this.save();
 			return false;
 		});
