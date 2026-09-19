@@ -133,6 +133,21 @@ async function panelRowIndex(name: string): Promise<number> {
 	);
 }
 
+/** The `.setting-item-description` text and class list of the panel's `Setting` row named `name` — e.g. asserting the "Reminder" row shows its default-value styling. */
+async function panelRowDesc(name: string): Promise<{ text: string | null; classes: string[] }> {
+	return browser.execute(
+		(panelCls, wanted) => {
+			const root = document.querySelector(`.${panelCls}`);
+			const rows = root === null ? [] : Array.from(root.querySelectorAll(".setting-item"));
+			const row = rows.find((r) => r.querySelector(".setting-item-name")?.textContent === wanted);
+			const desc = row?.querySelector(".setting-item-description") ?? null;
+			return { text: desc?.textContent ?? null, classes: desc === null ? [] : Array.from(desc.classList) };
+		},
+		cssClass("panel"),
+		name,
+	);
+}
+
 /** The `.checkbox-container` toggle control inside the panel's `Setting` row named `name` (e.g. "Done"); see `panelToggleChecked` for how its on/off state is read. */
 async function panelToggleFor(name: string): Promise<WebdriverIO.Element> {
 	const index = await panelRowIndex(name);
@@ -164,6 +179,59 @@ async function convertButtonText(): Promise<string | null> {
 		(panelCls) => document.querySelector(`.${panelCls} button`)?.textContent ?? null,
 		cssClass("panel"),
 	);
+}
+
+/** Option texts of the reminder modal's preset dropdown, in DOM order — there is exactly one `<select>` until "Custom offset…" adds a second (unit) dropdown. */
+async function reminderModalOptionTexts(): Promise<string[]> {
+	return browser.execute((modalCls) => {
+		const select = document.querySelector(`.${modalCls} select`);
+		return select === null ? [] : Array.from(select.querySelectorAll("option")).map((option) => option.textContent);
+	}, cssClass("reminder-modal"));
+}
+
+async function reminderModalDescriptionText(): Promise<string | null> {
+	return browser.execute(
+		(descCls) => document.querySelector(`.${descCls}`)?.textContent ?? null,
+		cssClass("reminder-modal-description"),
+	);
+}
+
+/** Obsidian's `DropdownComponent` listens for `change`, not `input` — setting `.value` alone never notifies it. */
+async function selectReminderModalOption(text: string): Promise<void> {
+	await browser.execute(
+		(modalCls, wanted) => {
+			const select = document.querySelector(`.${modalCls} select`);
+			if (!(select instanceof HTMLSelectElement)) {
+				return;
+			}
+			const option = Array.from(select.querySelectorAll("option")).find((o) => o.textContent === wanted);
+			if (option === undefined) {
+				return;
+			}
+			select.value = option.value;
+			select.dispatchEvent(new Event("change", { bubbles: true }));
+		},
+		cssClass("reminder-modal"),
+		text,
+	);
+}
+
+async function clickReminderModalButton(text: string): Promise<void> {
+	const buttons = await browser.$$(`.${cssClass("reminder-modal")} button`).getElements();
+	for (const button of buttons) {
+		if ((await button.getText()) === text) {
+			await button.click();
+			return;
+		}
+	}
+	throw new Error(`no reminder modal button with text "${text}"`);
+}
+
+/** Best-effort cleanup for a test that fails mid-modal — an open modal left behind would block every later test's commands. */
+async function closeLeftoverReminderModal(): Promise<void> {
+	if (await browser.$(`.${cssClass("reminder-modal")}`).isExisting()) {
+		await browser.keys("Escape");
+	}
 }
 
 describe("Task panel", function () {
@@ -199,7 +267,13 @@ describe("Task panel", function () {
 		expect(await panelTitleText()).toEqual(task.title);
 
 		const fieldNames = await panelFieldNames();
-		expect(fieldNames).toEqual(["Done", "Priority", "Due", "Scheduled", "Duration", "Repeat", "Project", "Tags"]);
+		expect(fieldNames).toEqual(["Done", "Priority", "Due", "Scheduled", "Duration", "Repeat", "Reminder", "Project", "Tags"]);
+
+		// "Today task" has no `remind`, so the row falls back to the vault
+		// default preset ("At time") and carries the default-value class.
+		const reminderDesc = await panelRowDesc("Reminder");
+		expect(reminderDesc.text).toEqual("At time");
+		expect(reminderDesc.classes).toContain(cssClass("panel__default"));
 
 		// Taken here, not after the later tests in this file switch the panel
 		// to a non-task note: the Bases containerEl-reuse pitfall (a screenshot
@@ -233,6 +307,91 @@ describe("Task panel", function () {
 		} finally {
 			await restoreFixtureNote(path, task.frontmatter, task.body);
 			await waitForFrontmatter(path, "status", (v) => v === "todo", `${path} status never restored to its fixture value`);
+		}
+	});
+
+	it("sets a reminder preset from the modal and writes remind to frontmatter", async function () {
+		try {
+			// Reopens the panel rather than assuming an earlier test left it
+			// open — needed for this test to pass standalone (e.g. under
+			// `E2E_GREP`, which can filter out the test that first opens it).
+			await openTaskPanel();
+			await browser.executeObsidianCommand("isotask:set-reminder");
+			await browser.$(`.${cssClass("reminder-modal")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			expect(await reminderModalOptionTexts()).toEqual([
+				"At time",
+				"15 min before",
+				"1 hour before",
+				"1 day before",
+				"None",
+				"Custom offset…",
+				"At a specific time…",
+			]);
+			expect(await reminderModalDescriptionText()).toEqual("At time");
+
+			if (process.env["E2E_SCREENSHOT"] === "1") {
+				await saveScreenshot("reminder-modal");
+			}
+
+			await selectReminderModalOption("1 day before");
+			expect(await reminderModalDescriptionText()).toEqual("1 day before");
+
+			await clickReminderModalButton("Save");
+
+			await waitForFrontmatter(
+				path,
+				"remind",
+				(v) => Array.isArray(v) && v[0] === "1d",
+				`${path} remind never became ["1d"] via the reminder modal`,
+			);
+
+			await browser.waitUntil(
+				async () => {
+					const desc = await panelRowDesc("Reminder");
+					return desc.text === "1 day before" && !desc.classes.includes(cssClass("panel__default"));
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: 'task panel Reminder row never became "1 day before"' },
+			);
+		} finally {
+			await closeLeftoverReminderModal();
+			await restoreFixtureNote(path, task.frontmatter, task.body);
+			await waitForFrontmatter(path, "remind", (v) => v === undefined, `${path} remind never restored to its fixture value`);
+		}
+	});
+
+	it("Use default removes the remind property", async function () {
+		try {
+			await openTaskPanel();
+			await restoreFixtureNote(path, { ...task.frontmatter, remind: "15m" }, task.body);
+			await waitForFrontmatter(path, "remind", (v) => v === "15m", `${path} remind never seeded to "15m"`);
+
+			await browser.waitUntil(
+				async () => {
+					const desc = await panelRowDesc("Reminder");
+					return desc.text === "15 min before" && !desc.classes.includes(cssClass("panel__default"));
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: 'task panel Reminder row never became "15 min before"' },
+			);
+
+			await browser.executeObsidianCommand("isotask:set-reminder");
+			await browser.$(`.${cssClass("reminder-modal")}`).waitForExist({ timeout: SELECT_TIMEOUT });
+
+			await clickReminderModalButton("Use default");
+
+			await waitForFrontmatter(path, "remind", (v) => v === undefined, `${path} remind never removed via "Use default"`);
+
+			await browser.waitUntil(
+				async () => {
+					const desc = await panelRowDesc("Reminder");
+					return desc.text === "At time" && desc.classes.includes(cssClass("panel__default"));
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: 'task panel Reminder row never reverted to "At time" default' },
+			);
+		} finally {
+			await closeLeftoverReminderModal();
+			await restoreFixtureNote(path, task.frontmatter, task.body);
+			await waitForFrontmatter(path, "remind", (v) => v === undefined, `${path} remind never restored to its fixture value`);
 		}
 	});
 
