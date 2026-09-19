@@ -10,6 +10,24 @@ import type { TaskPath } from "@/domain/task";
 // in a later wave than the first, so the gate opens on a quiet period, not the first firing.
 const RESOLUTION_QUIET_MS = 1000;
 
+/** Calls `onOpen` once indexing goes quiet after a `resolved` wave; shared with `reminder-ticker.ts`, which needs the same "vault is fully indexed" signal. */
+export function registerResolvedGate(plugin: Plugin, onOpen: () => void): void {
+	let quietTimer: number | undefined;
+	plugin.registerEvent(
+		plugin.app.metadataCache.on("resolved", () => {
+			if (quietTimer !== undefined) {
+				window.clearTimeout(quietTimer);
+			}
+			quietTimer = window.setTimeout(onOpen, RESOLUTION_QUIET_MS);
+		}),
+	);
+	plugin.register(() => {
+		if (quietTimer !== undefined) {
+			window.clearTimeout(quietTimer);
+		}
+	});
+}
+
 /**
  * Reconciles `completed` with `status` on any frontmatter edit, not just the plugin's own toggle.
  * Only reconciles live edits: one made while Obsidian is closed is not caught up at next startup.
@@ -20,21 +38,8 @@ export function registerCompletionWatcher(plugin: Plugin, deps: AppDeps): void {
 	const inFlight = new Set<TaskPath>();
 
 	let gateOpen = false;
-	let quietTimer: number | undefined;
-	plugin.registerEvent(
-		plugin.app.metadataCache.on("resolved", () => {
-			if (quietTimer !== undefined) {
-				window.clearTimeout(quietTimer);
-			}
-			quietTimer = window.setTimeout(() => {
-				gateOpen = true;
-			}, RESOLUTION_QUIET_MS);
-		}),
-	);
-	plugin.register(() => {
-		if (quietTimer !== undefined) {
-			window.clearTimeout(quietTimer);
-		}
+	registerResolvedGate(plugin, () => {
+		gateOpen = true;
 	});
 
 	plugin.registerEvent(

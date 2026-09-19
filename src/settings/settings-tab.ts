@@ -43,7 +43,10 @@ const PROPERTY_KEY_CONTROLS: readonly PropertyKeyControlDef[] = [
 ];
 
 type ScalarSettingKey = "taskFolder" | "tasksBasePath" | "newTaskFilenameTemplate" | "spawnFilenameTemplate" | "weekStart" | "hapticsEnabled";
-type SettingKey = keyof PropertyKeys | ScalarSettingKey;
+type ReminderSettingKey = "remindByDefault" | "reminderDefaultTime" | "reminderCatchUpMinutes" | "ntfyEnabled" | "ntfyServerUrl" | "ntfyTopic";
+type SettingKey = keyof PropertyKeys | ScalarSettingKey | ReminderSettingKey;
+
+const TIME_OF_DAY_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function isPropertyKeySetting(key: string): key is keyof PropertyKeys {
 	return PROPERTY_KEY_CONTROLS.some((control) => control.key === key);
@@ -94,10 +97,51 @@ function isScalarSetting(key: string): key is ScalarSettingKey {
 	return Object.prototype.hasOwnProperty.call(SCALAR_SETTINGS, key);
 }
 
+/** Same shape as `SCALAR_SETTINGS`, but each entry reaches into the nested `reminders`/`reminders.ntfy` blocks. */
+const REMINDER_SETTINGS: Readonly<
+	Record<
+		ReminderSettingKey,
+		{
+			readonly get: (settings: IsotaskSettings) => unknown;
+			readonly set: (settings: IsotaskSettings, value: unknown) => IsotaskSettings;
+		}
+	>
+> = {
+	remindByDefault: {
+		get: (settings) => settings.reminders.remindByDefault,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, remindByDefault: Boolean(value) } }),
+	},
+	reminderDefaultTime: {
+		get: (settings) => settings.reminders.defaultTime,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, defaultTime: String(value) } }),
+	},
+	reminderCatchUpMinutes: {
+		get: (settings) => settings.reminders.catchUpMinutes,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, catchUpMinutes: Number(value) } }),
+	},
+	ntfyEnabled: {
+		get: (settings) => settings.reminders.ntfy.enabled,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, enabled: Boolean(value) } } }),
+	},
+	ntfyServerUrl: {
+		get: (settings) => settings.reminders.ntfy.serverUrl,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, serverUrl: String(value) } } }),
+	},
+	ntfyTopic: {
+		get: (settings) => settings.reminders.ntfy.topic,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, topic: String(value) } } }),
+	},
+};
+
+function isReminderSetting(key: string): key is ReminderSettingKey {
+	return Object.prototype.hasOwnProperty.call(REMINDER_SETTINGS, key);
+}
+
 export interface SettingsTabDeps {
 	readonly getSettings: () => IsotaskSettings;
 	readonly setSettings: (settings: IsotaskSettings) => Promise<void>;
 	readonly copyAgentInstructions: () => Promise<void>;
+	readonly sendTestNotification: () => Promise<void>;
 }
 
 /**
@@ -160,6 +204,74 @@ export class IsotaskSettingTab extends PluginSettingTab {
 			},
 			{
 				type: "group",
+				heading: "Reminders",
+				items: [
+					{
+						name: "Remind by default",
+						desc: "Every open task with a due or scheduled date gets one reminder unless its remind property says otherwise.",
+						control: { type: "toggle", key: "remindByDefault" },
+					},
+					{
+						name: "Default reminder time",
+						desc: "The time of day a date-only due/scheduled reminder fires.",
+						control: {
+							type: "text",
+							key: "reminderDefaultTime",
+							placeholder: "09:00",
+							validate: (value: string) => (TIME_OF_DAY_RE.test(value) ? undefined : "Use HH:mm (24-hour)."),
+						},
+					},
+					{
+						name: "Catch-up window",
+						desc: "Minutes of missed reminders to send after Obsidian was closed or asleep.",
+						control: { type: "number", key: "reminderCatchUpMinutes", min: 0, step: 1 },
+					},
+					{
+						name: "Send via ntfy",
+						desc: "Publish reminders to an ntfy topic from this device while Obsidian is open. Task titles and dates are sent to that server, and the token below is stored in the plugin's data file, which Obsidian Sync copies to every device.",
+						control: { type: "toggle", key: "ntfyEnabled" },
+					},
+					{
+						name: "Server URL",
+						desc: "The ntfy server to publish to.",
+						control: { type: "text", key: "ntfyServerUrl", placeholder: "https://ntfy.sh" },
+					},
+					{
+						name: "Topic",
+						desc: "The ntfy topic reminders are published to.",
+						control: { type: "text", key: "ntfyTopic" },
+					},
+					{
+						name: "Access token",
+						desc: "Optional. A bearer token, or user:password.",
+						// SettingControl's "text" variant has no password mode; "render" drops to
+						// imperative Setting/addText for just this row, rest of the tab stays declarative.
+						render: (setting) => {
+							setting.addText((text) => {
+								text.inputEl.type = "password";
+								text.setValue(this.deps.getSettings().reminders.ntfy.token);
+								text.onChange((value) => {
+									const settings = this.deps.getSettings();
+									void this.deps.setSettings({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, token: value } } });
+								});
+							});
+						},
+					},
+					{
+						name: "Send test notification",
+						desc: "Publishes one test push to confirm the server and topic are reachable.",
+						render: (setting) => {
+							setting.addButton((button) =>
+								button.setButtonText("Send").onClick(() => {
+									void this.deps.sendTestNotification();
+								}),
+							);
+						},
+					},
+				],
+			},
+			{
+				type: "group",
 				heading: "Property keys",
 				items: PROPERTY_KEY_CONTROLS.map((control) => ({
 					name: control.name,
@@ -198,6 +310,9 @@ export class IsotaskSettingTab extends PluginSettingTab {
 		if (isScalarSetting(key)) {
 			return SCALAR_SETTINGS[key].get(settings);
 		}
+		if (isReminderSetting(key)) {
+			return REMINDER_SETTINGS[key].get(settings);
+		}
 		return undefined;
 	}
 
@@ -212,6 +327,9 @@ export class IsotaskSettingTab extends PluginSettingTab {
 		}
 		if (isScalarSetting(key)) {
 			return this.deps.setSettings(SCALAR_SETTINGS[key].set(settings, value));
+		}
+		if (isReminderSetting(key)) {
+			return this.deps.setSettings(REMINDER_SETTINGS[key].set(settings, value));
 		}
 		return undefined;
 	}

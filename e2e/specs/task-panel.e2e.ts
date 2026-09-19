@@ -255,3 +255,50 @@ describe("Task panel", function () {
 		expect(await convertButtonText()).toEqual("Convert to task");
 	});
 });
+
+// Settings open in a separate Electron window this wdio session cannot see, so rows are read off the
+// tab's own `containerEl` (same renderer) instead of `document`. `app.setting` is not in the public types.
+interface AppWithSettingModal {
+	readonly setting: {
+		readonly open: () => void;
+		readonly close: () => void;
+		readonly openTabById: (id: string) => void;
+		readonly pluginTabs: readonly { readonly id?: string; readonly containerEl?: HTMLElement }[];
+	};
+}
+
+describe("Reminders", function () {
+	it('shows a notice pointing at "Send via ntfy" when reminders are off', async function () {
+		await browser.executeObsidianCommand("isotask:send-reminders-now");
+
+		// Poll rather than a single waitForExist — same rationale as the "Create
+		// tasks base" suite in views.e2e.ts: an earlier notice could still be around.
+		await browser.waitUntil(
+			async () => {
+				const notices = await browser.$$(".notice").getElements();
+				const texts = await notices.map((notice) => notice.getText());
+				return texts.some((text) => text.includes("Send via ntfy"));
+			},
+			{ timeout: SELECT_TIMEOUT, timeoutMsg: 'expected a notice mentioning "Send via ntfy"' },
+		);
+	});
+
+	it("shows the reminders controls in the Isotask settings tab", async function () {
+		await browser.executeObsidian(({ app }) => {
+			(app as unknown as AppWithSettingModal).setting.open();
+		});
+		try {
+			const names = await browser.executeObsidian(({ app }) => {
+				const setting = (app as unknown as AppWithSettingModal).setting;
+				setting.openTabById("isotask");
+				const tab = setting.pluginTabs.find((t) => t.id === "isotask");
+				return tab?.containerEl === undefined ? [] : Array.from(tab.containerEl.querySelectorAll(".setting-item-name")).map((el) => el.textContent);
+			});
+			expect(names).toEqual(expect.arrayContaining(["Send via ntfy", "Send test notification"]));
+		} finally {
+			await browser.executeObsidian(({ app }) => {
+				(app as unknown as AppWithSettingModal).setting.close();
+			});
+		}
+	});
+});

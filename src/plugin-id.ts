@@ -19,6 +19,9 @@ export const VIEW_TYPE_TASK_PANEL = `${PLUGIN_ID}-task-panel`;
 /** Prefix every plugin-defined CSS class must use (see `src/styles/isotask.css`). */
 export const CSS_PREFIX: string = PLUGIN_ID;
 
+/** The full path segment of the `obsidian://<id>/open` protocol action. */
+export const PROTOCOL_OPEN_ACTION = `${PLUGIN_ID}/open`;
+
 /** Builds a prefixed CSS class name, e.g. `cssClass("feed")` -> `"isotask-feed"`. */
 export function cssClass(name: string): string {
 	return `${CSS_PREFIX}-${name}`;

@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Platform, Plugin } from "obsidian";
 
 import "@/styles/calendar.css";
 import "@/styles/isotask.css";
@@ -10,8 +10,12 @@ import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { registerCompletionWatcher } from "@/adapters/obsidian/completion-watcher";
 import { createObsidianHaptics } from "@/adapters/obsidian/haptics";
+import { createLocalState } from "@/adapters/obsidian/local-state";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
+import { createNtfyChannel, describePushError } from "@/adapters/obsidian/ntfy-channel";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
+import { registerProtocolHandlers } from "@/adapters/obsidian/protocol-handler";
+import { registerReminderTicker } from "@/adapters/obsidian/reminder-ticker";
 import { VaultTaskStore } from "@/adapters/obsidian/task-store";
 import { registerTaskViewActions } from "@/adapters/obsidian/view-actions";
 import type { IsotaskApi } from "@/app/agent-instructions";
@@ -19,6 +23,7 @@ import { renderAgentInstructions } from "@/app/agent-instructions";
 import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import type { AppDeps } from "@/app/deps";
+import { makeFireDueReminders } from "@/app/fire-due-reminders";
 import { makeRescheduleTask } from "@/app/reschedule-task";
 import { makeSetDate } from "@/app/set-date";
 import { makeSetDuration } from "@/app/set-duration";
@@ -30,8 +35,10 @@ import { makeSetTags } from "@/app/set-tags";
 import { makeToggleDone } from "@/app/toggle-done";
 import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
+import type { ReminderId } from "@/domain/reminders";
 import { parseSettings } from "@/domain/settings";
 import type { IsotaskSettings } from "@/domain/settings";
+import type { TaskPath } from "@/domain/task";
 import { AGENT_GUIDE_URL, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { IsotaskSettingTab } from "@/settings/settings-tab";
 import { registerViews } from "@/views/bases/register";
@@ -63,6 +70,11 @@ export default class IsotaskPlugin extends Plugin {
 		const clock = createObsidianClock();
 		const notifier = createObsidianNotifier();
 		const haptics = createObsidianHaptics({ isEnabled: () => this.pluginSettings.hapticsEnabled });
+		const localState = createLocalState(this.app);
+		const channel = createNtfyChannel({
+			getConfig: () => this.pluginSettings.reminders.ntfy,
+			getVaultName: () => this.app.vault.getName(),
+		});
 		const calendarRenderer = new EventCalendarRenderer();
 		// Session-only: deliberately not persisted across reloads (see
 		// `adapters/history/reschedule-history.ts`), so it's built fresh here
@@ -93,6 +105,16 @@ export default class IsotaskPlugin extends Plugin {
 		const setTags = makeSetTags(appDeps);
 		const undoReschedule = makeUndoReschedule(appDeps);
 		const redoReschedule = makeRedoReschedule(appDeps);
+		const fireDueReminders = makeFireDueReminders({
+			store,
+			clock,
+			notifier,
+			haptics,
+			channel,
+			localState,
+			settings: () => this.pluginSettings,
+			isMobile: Platform.isMobile,
+		});
 
 		registerViews(this, {
 			app: this.app,
@@ -140,6 +162,8 @@ export default class IsotaskPlugin extends Plugin {
 			setTags,
 			undoReschedule,
 			redoReschedule,
+			fireDueReminders,
+			describePushError,
 		});
 
 		const taskMenuDeps = {
@@ -159,6 +183,8 @@ export default class IsotaskPlugin extends Plugin {
 		registerTaskMenus(this, taskMenuDeps);
 		registerTaskViewActions(this, taskMenuDeps);
 		registerCompletionWatcher(this, appDeps);
+		registerReminderTicker(this, { fire: fireDueReminders, notifier, describeError: describePushError });
+		registerProtocolHandlers(this);
 
 		this.registerView(VIEW_TYPE_TASK_PANEL, (leaf) => new TaskPanelView(leaf, { ...taskMenuDeps, convertNote }));
 
@@ -190,6 +216,22 @@ export default class IsotaskPlugin extends Plugin {
 				getSettings: () => this.pluginSettings,
 				setSettings: (settings) => this.saveSettings(settings),
 				copyAgentInstructions: () => copyToClipboard(this.api.agentInstructions(), notifier, "Agent instructions copied to clipboard."),
+				sendTestNotification: async () => {
+					const result = await channel.publish({
+						id: "isotask-test" as ReminderId,
+						path: "" as TaskPath,
+						at: clock.now(),
+						title: "Isotask test notification",
+						body: "Reminders from this vault will arrive here.",
+						priority: 3,
+						tags: ["white_check_mark"],
+					});
+					if (result.ok) {
+						notifier.info("Test notification sent.");
+					} else {
+						notifier.error(describePushError(result.error));
+					}
+				},
 			}),
 		);
 	}

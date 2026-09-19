@@ -3,7 +3,7 @@ import { getFrontMatterInfo, normalizePath } from "obsidian";
 
 import { applyFrontmatterPatch, extractBody, setAllFrontmatterValues } from "@/adapters/obsidian/task-store-helpers";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
-import { parseTask } from "@/domain/frontmatter";
+import { isTaskNote, parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
@@ -43,6 +43,23 @@ export class VaultTaskStore implements TaskStore {
 		const raw = this.deps.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
 		const result = parseTask(path, file.basename, raw, this.deps.getPropertyKeys(), this.deps.getStatuses());
 		return result.ok ? ok(result.value) : err({ kind: "invalid-task", path, errors: result.error });
+	}
+
+	async list(): Promise<readonly Task[]> {
+		const keys = this.deps.getPropertyKeys();
+		const statuses = this.deps.getStatuses();
+		const tasks: Task[] = [];
+		for (const file of this.deps.app.vault.getMarkdownFiles()) {
+			const raw = this.deps.app.metadataCache.getFileCache(file)?.frontmatter;
+			if (raw === undefined || !isTaskNote(raw, keys)) {
+				continue;
+			}
+			const result = parseTask(file.path as TaskPath, file.basename, raw, keys, statuses);
+			if (result.ok) {
+				tasks.push(result.value);
+			}
+		}
+		return tasks;
 	}
 
 	async updateProperties(path: TaskPath, patch: FrontmatterPatch): Promise<Result<void, TaskStoreError>> {
