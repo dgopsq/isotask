@@ -4,6 +4,9 @@
 
 Accepted, 2026-09-18
 
+Delivery-tiers paragraph superseded by ADR 0021 (2026-09-19); the property, anchor and id
+decisions stand.
+
 ## Context
 
 A task's `due`/`scheduled` sits in frontmatter, but nothing ever reminds the user of it.

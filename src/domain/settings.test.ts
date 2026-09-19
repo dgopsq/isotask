@@ -149,6 +149,15 @@ describe("parseSettings", () => {
 		expect(result.reminders.ntfy.lookaheadHours).toBe(DEFAULT_REMINDER_SETTINGS.ntfy.lookaheadHours);
 	});
 
+	it("drops removed ntfy fields (scheduleAhead, serverSupportsUpdates) and defaults lookaheadHours", () => {
+		const result = parseSettings({
+			reminders: { ntfy: { enabled: true, scheduleAhead: true, serverSupportsUpdates: true } },
+		});
+		expect(result.reminders.ntfy).not.toHaveProperty("scheduleAhead");
+		expect(result.reminders.ntfy).not.toHaveProperty("serverSupportsUpdates");
+		expect(result.reminders.ntfy.lookaheadHours).toBe(72);
+	});
+
 	it("falls back the whole ntfy block when it isn't an object", () => {
 		const result = parseSettings({ reminders: { ntfy: "x" } });
 		expect(result.reminders.ntfy).toEqual(DEFAULT_REMINDER_SETTINGS.ntfy);

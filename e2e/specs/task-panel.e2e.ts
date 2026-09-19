@@ -294,7 +294,7 @@ describe("Reminders", function () {
 				const tab = setting.pluginTabs.find((t) => t.id === "isotask");
 				return tab?.containerEl === undefined ? [] : Array.from(tab.containerEl.querySelectorAll(".setting-item-name")).map((el) => el.textContent);
 			});
-			expect(names).toEqual(expect.arrayContaining(["Send via ntfy", "Send test notification"]));
+			expect(names).toEqual(expect.arrayContaining(["Send via ntfy", "Lookahead", "Check ntfy server"]));
 		} finally {
 			await browser.executeObsidian(({ app }) => {
 				(app as unknown as AppWithSettingModal).setting.close();

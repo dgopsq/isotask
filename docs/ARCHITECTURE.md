@@ -12,7 +12,7 @@ src/
                transitions, settings (type + defaults + `parseSettings`). No `obsidian` import.
                100% unit-tested with vitest.
   ports/       interfaces the core needs: Clock, TaskStore, Notifier, Haptics,
-               CalendarRenderer, PathResolver, PushChannel, LocalState.
+               CalendarRenderer, PathResolver, PushChannel.
   app/         use-cases, each a `make*(deps: AppDeps) => (...) => Promise<Result<...>>` factory
                over `deps.ts`'s ports: `createTask`, `setStatus` (incl. complete -> spawn),
                `toggleDone`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the
@@ -24,8 +24,8 @@ src/
                Notifier (Notice); settings persistence (loadData/saveData; re-exports
                `domain/settings.ts`'s type/defaults/`parseSettings`, which do the actual
                valibot validation — see the note below); ntfy-channel.ts (PushChannel over
-               requestUrl); local-state.ts (LocalState over loadLocalStorage/saveLocalStorage);
-               reminder-ticker.ts (ticks fireDueReminders on a timer/focus/visibility);
+               requestUrl); reminder-reconciler.ts (runs reconcileReminders after indexing,
+               every 15 min, on focus/visibility and after task-note changes);
                protocol-handler.ts (obsidian://isotask/open, opens the task a reminder fired for).
     calendar/event-calendar/  CalendarRenderer implementation. Only file tree allowed to import
                `@event-calendar/*`.
@@ -376,12 +376,10 @@ use-cases (never imported directly by `domain`).
   boolean`, `normalize(path: string): TaskPath`, `resolveSpawnPath(seriesTitle: string, nextDue:
   TaskDate): TaskPath` (applies the configured spawned-occurrence filename template).
 - **PushChannel** — push delivery for reminders (`src/ports/push-channel.ts`). Methods:
-  `publish(message, options?)`, `cancel(id)`, `listScheduled()`, all `Result<_, PushError>`.
-  Implemented by `adapters/obsidian/ntfy-channel.ts`; `cancel` and a sequenced `publish` replace
-  are `unsupported` until ntfy ≥ 2.16 support lands (wave 2b).
-- **LocalState** — per-device key/value storage that must never sync with the vault, e.g. the
-  fired-reminder ledger (`src/ports/local-state.ts`). Methods: `get(key)`, `set(key, value)`.
-  Implemented by `adapters/obsidian/local-state.ts` over `app.loadLocalStorage`/`saveLocalStorage`.
+  `publish(message, {delayUntil?})` (always under the reminder id as sequence id), `cancel(id)`,
+  `listKnown({sinceSeconds})` (returns `{id, at}` per held or recently delivered message), all
+  `Result<_, PushError>`. Implemented by `adapters/obsidian/ntfy-channel.ts`; requires ntfy ≥ 2.16
+  (ADR 0021).
 
 ## Composition root
 

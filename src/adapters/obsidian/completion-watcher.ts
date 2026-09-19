@@ -10,7 +10,7 @@ import type { TaskPath } from "@/domain/task";
 // in a later wave than the first, so the gate opens on a quiet period, not the first firing.
 const RESOLUTION_QUIET_MS = 1000;
 
-/** Calls `onOpen` once indexing goes quiet after a `resolved` wave; shared with `reminder-ticker.ts`, which needs the same "vault is fully indexed" signal. */
+/** Calls `onOpen` once indexing goes quiet after a `resolved` wave; shared with `reminder-reconciler.ts`, which needs the same "vault is fully indexed" signal. */
 export function registerResolvedGate(plugin: Plugin, onOpen: () => void): void {
 	let quietTimer: number | undefined;
 	plugin.registerEvent(

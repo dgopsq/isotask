@@ -1,15 +1,19 @@
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
+import { compareTaskDate } from "@/domain/dates";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
 import { parseTask } from "@/domain/frontmatter";
 import type { History } from "@/domain/history";
 import { emptyHistory, pushRedone, pushUndone, record, takeRedo, takeUndo } from "@/domain/history";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { KnownReminder, PushMessage } from "@/domain/reminder-plan";
+import type { ReminderId } from "@/domain/reminders";
 import type { Option, Result } from "@/domain/result";
 import { err, none, ok, some } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskPath } from "@/domain/task";
 import type { Clock } from "@/ports/clock";
 import type { Notifier } from "@/ports/notifier";
+import type { PushChannel, PushError, PushListOptions, PushPublishOptions } from "@/ports/push-channel";
 import type { RescheduleEntry, RescheduleHistory } from "@/ports/reschedule-history";
 import type { NewTaskFile, TaskStore, TaskStoreError } from "@/ports/task-store";
 
@@ -180,6 +184,60 @@ export class FakeRescheduleHistory implements RescheduleHistory {
 
 	pushRedone = (entry: RescheduleEntry): void => {
 		this.history = pushRedone(this.history, entry);
+	};
+}
+
+/** In-memory `PushChannel` for `app/` use-case tests: records every call, defaults to success. */
+export class FakePushChannel implements PushChannel {
+	readonly publishCalls: { message: PushMessage; options: PushPublishOptions | undefined }[] = [];
+	readonly cancelCalls: ReminderId[] = [];
+	readonly listCalls: PushListOptions[] = [];
+	known: KnownReminder[] = [];
+
+	private pendingPublishFailure: PushError | undefined;
+	private delayLimit: IsoDateTime | undefined;
+	private listFailure: PushError | undefined;
+	private cancelFailure: PushError | undefined;
+
+	/** Exactly one subsequent publish fails with `error`. */
+	failNext(error: PushError = { kind: "network", message: "boom" }): void {
+		this.pendingPublishFailure = error;
+	}
+
+	/** Every delayed publish past `at` mimics ntfy's Delay cap with a 400. */
+	rejectDelaysBeyond(at: IsoDateTime): void {
+		this.delayLimit = at;
+	}
+
+	failListWith(error: PushError): void {
+		this.listFailure = error;
+	}
+
+	failCancelWith(error: PushError): void {
+		this.cancelFailure = error;
+	}
+
+	publish = async (message: PushMessage, options?: PushPublishOptions): Promise<Result<void, PushError>> => {
+		this.publishCalls.push({ message, options });
+		if (this.pendingPublishFailure !== undefined) {
+			const error = this.pendingPublishFailure;
+			this.pendingPublishFailure = undefined;
+			return err(error);
+		}
+		if (this.delayLimit !== undefined && options?.delayUntil !== undefined && compareTaskDate(options.delayUntil, this.delayLimit) > 0) {
+			return err({ kind: "server", status: 400, message: "delay too far" });
+		}
+		return ok(undefined);
+	};
+
+	cancel = async (id: ReminderId): Promise<Result<void, PushError>> => {
+		this.cancelCalls.push(id);
+		return this.cancelFailure !== undefined ? err(this.cancelFailure) : ok(undefined);
+	};
+
+	listKnown = async (options: PushListOptions): Promise<Result<readonly KnownReminder[], PushError>> => {
+		this.listCalls.push(options);
+		return this.listFailure !== undefined ? err(this.listFailure) : ok(this.known);
 	};
 }
 

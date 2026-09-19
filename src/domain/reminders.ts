@@ -171,7 +171,7 @@ export const DEFAULT_REMINDER_DEFAULTS: ReminderDefaults = {
 
 export type ReminderId = Brand<string, "ReminderId">;
 
-/** Deterministic id (`isotask-<hex djb2a>`) so re-scheduling the same reminder produces the same id — ntfy tiers 2/3 replace/cancel by it. */
+/** Deterministic id (`isotask-<hex djb2a>`) so re-scheduling the same reminder produces the same id; ntfy replaces and cancels by it. */
 export function reminderId(path: TaskPath, anchor: ReminderAnchorKind | "absolute", spec: ReminderSpec): ReminderId {
 	const hex = (djb2a(`${path}|${anchor}|${formatReminderSpec(spec)}`) >>> 0).toString(16);
 	return `isotask-${hex}` as ReminderId;

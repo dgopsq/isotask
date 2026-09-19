@@ -1,13 +1,13 @@
 import type { RequestUrlResponse } from "obsidian";
 import { requestUrl } from "obsidian";
 
-import { authHeaders, buildNtfyRequest, clickUrlFor, normalizeServerUrl, parseScheduledIds, serverUrlError } from "@/adapters/obsidian/ntfy-request";
+import { buildCancelRequest, buildNtfyRequest, buildPollRequest, clickUrlFor, normalizeServerUrl, parseKnownReminders, serverUrlError } from "@/adapters/obsidian/ntfy-request";
 import type { ReminderId } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
 import type { NtfySettings } from "@/domain/settings";
-import type { PushChannel, PushError, PushPublishOptions } from "@/ports/push-channel";
-import type { PushMessage } from "@/domain/reminder-plan";
+import type { PushChannel, PushError, PushListOptions, PushPublishOptions } from "@/ports/push-channel";
+import type { KnownReminder, PushMessage } from "@/domain/reminder-plan";
 
 export interface NtfyChannelDeps {
 	readonly getConfig: () => NtfySettings;
@@ -29,26 +29,34 @@ function statusError(response: RequestUrlResponse): PushError | undefined {
 	return undefined;
 }
 
-/** ntfy over `requestUrl` (CORS-free, unlike `fetch`). `publish`/`listScheduled` are tier 1; `cancel` and sequenced replace need ntfy ≥ 2.16 (tier 3, wave 2b). */
+/** `undefined` when `config` has a usable topic and server URL; otherwise the `unsupported` error to return. */
+function configError(config: NtfySettings): PushError | undefined {
+	if (config.topic.trim() === "") {
+		return { kind: "unsupported", message: "No ntfy topic configured." };
+	}
+	const urlError = serverUrlError(normalizeServerUrl(config.serverUrl));
+	return urlError === undefined ? undefined : { kind: "unsupported", message: urlError };
+}
+
+/** ntfy over `requestUrl` (CORS-free, unlike `fetch`); needs ntfy >= 2.16 for sequence ids. */
 export function createNtfyChannel(deps: NtfyChannelDeps): PushChannel {
 	return {
 		publish: async (message: PushMessage, options?: PushPublishOptions): Promise<Result<void, PushError>> => {
-			if (options?.sequenceId !== undefined) {
-				return err({ kind: "unsupported", message: "Server-side replace needs ntfy 2.16 support (wave 2b)." });
-			}
 			const config = deps.getConfig();
-			if (config.topic.trim() === "") {
-				return err({ kind: "unsupported", message: "No ntfy topic configured." });
-			}
-			const base = normalizeServerUrl(config.serverUrl);
-			const urlError = serverUrlError(base);
-			if (urlError !== undefined) {
-				return err({ kind: "unsupported", message: urlError });
+			const configErr = configError(config);
+			if (configErr !== undefined) {
+				return err(configErr);
 			}
 			const clickUrl = clickUrlFor(deps.getVaultName(), message);
 			const request = buildNtfyRequest(config, message, clickUrl, options);
 			try {
-				const response = await requestUrl({ url: request.url, method: request.method, headers: request.headers, body: request.body, throw: false });
+				const response = await requestUrl({
+					url: request.url,
+					method: request.method,
+					headers: request.headers,
+					throw: false,
+					...(request.body !== undefined ? { body: request.body } : {}),
+				});
 				const error = statusError(response);
 				return error === undefined ? ok(undefined) : err(error);
 			} catch (error) {
@@ -57,24 +65,39 @@ export function createNtfyChannel(deps: NtfyChannelDeps): PushChannel {
 		},
 
 		cancel: async (id: ReminderId): Promise<Result<void, PushError>> => {
-			return err({ kind: "unsupported", message: `Cancelling reminder ${id} needs ntfy 2.16 support (wave 2b).` });
+			const config = deps.getConfig();
+			const configErr = configError(config);
+			if (configErr !== undefined) {
+				return err(configErr);
+			}
+			const request = buildCancelRequest(config, id);
+			try {
+				const response = await requestUrl({ url: request.url, method: request.method, headers: request.headers, throw: false });
+				// 404 means already delivered or never held, not a failure to report.
+				if (response.status === 404) {
+					return ok(undefined);
+				}
+				const error = statusError(response);
+				return error === undefined ? ok(undefined) : err(error);
+			} catch (error) {
+				return err({ kind: "network", message: describeThrown(error) });
+			}
 		},
 
-		listScheduled: async (): Promise<Result<readonly ReminderId[], PushError>> => {
+		listKnown: async ({ sinceSeconds }: PushListOptions): Promise<Result<readonly KnownReminder[], PushError>> => {
 			const config = deps.getConfig();
 			if (config.topic.trim() === "") {
 				return ok([]);
 			}
-			const base = normalizeServerUrl(config.serverUrl);
-			const urlError = serverUrlError(base);
-			if (urlError !== undefined) {
-				return err({ kind: "unsupported", message: urlError });
+			const configErr = configError(config);
+			if (configErr !== undefined) {
+				return err(configErr);
 			}
-			const url = `${base}/${encodeURIComponent(config.topic)}/json?poll=1&sched=1`;
+			const request = buildPollRequest(config, sinceSeconds);
 			try {
-				const response = await requestUrl({ url, method: "GET", headers: authHeaders(config.token), throw: false });
+				const response = await requestUrl({ url: request.url, method: request.method, headers: request.headers, throw: false });
 				const error = statusError(response);
-				return error === undefined ? ok(parseScheduledIds(response.text)) : err(error);
+				return error === undefined ? ok(parseKnownReminders(response.text)) : err(error);
 			} catch (error) {
 				return err({ kind: "network", message: describeThrown(error) });
 			}
