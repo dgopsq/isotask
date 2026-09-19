@@ -4,7 +4,7 @@ import { normalizePath } from "obsidian";
 import type { makeConvertNote } from "@/app/convert-note";
 import type { makeCreateTask } from "@/app/create-task";
 import type { AppError } from "@/app/errors";
-import type { FireDueReminders } from "@/app/fire-due-reminders";
+import type { ReconcileReminders } from "@/app/reconcile-reminders";
 import type { makeToggleDone } from "@/app/toggle-done";
 import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { describeAppError, storeError } from "@/app/errors";
@@ -55,7 +55,7 @@ export interface RegisterCommandsDeps {
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly undoReschedule: UndoReschedule;
 	readonly redoReschedule: RedoReschedule;
-	readonly fireDueReminders: FireDueReminders;
+	readonly reconcileReminders: ReconcileReminders;
 	readonly describePushError: (error: PushError) => string;
 }
 
@@ -419,9 +419,13 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 		name: "Send reminders now",
 		callback: () => {
 			void (async () => {
-				const outcome = await deps.fireDueReminders();
+				const outcome = await deps.reconcileReminders();
 				if (outcome.kind === "disabled") {
 					deps.notifier.error("Turn on Send via ntfy in the Isotask settings first.");
+					return;
+				}
+				if (outcome.kind === "unreachable") {
+					deps.notifier.error(deps.describePushError(outcome.error));
 					return;
 				}
 				const firstFailure = outcome.failed[0];
@@ -429,11 +433,11 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 					deps.notifier.error(`${reminderCount(outcome.failed.length)} failed: ${deps.describePushError(firstFailure.error)}`);
 					return;
 				}
-				if (outcome.fired === 0) {
-					deps.notifier.info("No reminders due.");
+				if (outcome.published + outcome.cancelled === 0) {
+					deps.notifier.info("Reminders are up to date.");
 					return;
 				}
-				deps.notifier.info(`Sent ${reminderCount(outcome.fired)}.`);
+				deps.notifier.info(`Scheduled ${reminderCount(outcome.published)}, cancelled ${String(outcome.cancelled)}.`);
 			})();
 		},
 	});

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+import { fromJsDateTime } from "@/domain/dates";
 import type { IsoDateTime } from "@/domain/dates";
-import { buildNtfyRequest, clickUrlFor, encodeHeaderValue, normalizeServerUrl, parseScheduledIds, serverUrlError } from "@/adapters/obsidian/ntfy-request";
+import {
+	buildCancelRequest,
+	buildNtfyRequest,
+	buildPollRequest,
+	clickUrlFor,
+	encodeHeaderValue,
+	normalizeServerUrl,
+	parseKnownReminders,
+	serverUrlError,
+} from "@/adapters/obsidian/ntfy-request";
 import type { PushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { NtfySettings } from "@/domain/settings";
@@ -14,9 +24,7 @@ function config(overrides: Partial<NtfySettings> = {}): NtfySettings {
 		serverUrl: "https://ntfy.sh",
 		topic: "my-topic",
 		token: "",
-		scheduleAhead: false,
-		lookaheadHours: 24,
-		serverSupportsUpdates: false,
+		lookaheadHours: 72,
 		...overrides,
 	};
 }
@@ -120,6 +128,53 @@ describe("buildNtfyRequest Delay header", () => {
 	});
 });
 
+describe("buildNtfyRequest X-Message-ID header", () => {
+	it("sets it to the message id when there is no delayUntil", () => {
+		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), "obsidian://x");
+		expect(request.headers["X-Message-ID"]).toBe("isotask-abc123");
+	});
+
+	it("sets it to the message id when there is a delayUntil", () => {
+		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), "obsidian://x", {
+			delayUntil: "2026-09-18T10:00:00" as IsoDateTime,
+		});
+		expect(request.headers["X-Message-ID"]).toBe("isotask-abc123");
+	});
+});
+
+describe("buildCancelRequest", () => {
+	it("builds a DELETE to the topic/id path with auth headers only", () => {
+		const request = buildCancelRequest(config({ token: "tk_abc" }), "isotask-abc123" as ReminderId);
+		expect(request.method).toBe("DELETE");
+		expect(request.url).toBe("https://ntfy.sh/my-topic/isotask-abc123");
+		expect(request.headers).toEqual({ Authorization: "Bearer tk_abc" });
+	});
+
+	it("encodes topic and id", () => {
+		const request = buildCancelRequest(config({ topic: "my topic" }), "isotask-a/b" as ReminderId);
+		expect(request.url).toBe(`https://ntfy.sh/${encodeURIComponent("my topic")}/${encodeURIComponent("isotask-a/b")}`);
+	});
+});
+
+describe("buildPollRequest", () => {
+	it("builds a GET with poll/sched/since query params and auth headers", () => {
+		const request = buildPollRequest(config({ token: "tk_abc" }), 3600);
+		expect(request.method).toBe("GET");
+		expect(request.url).toBe("https://ntfy.sh/my-topic/json?poll=1&sched=1&since=3600s");
+		expect(request.headers).toEqual({ Authorization: "Bearer tk_abc" });
+	});
+
+	it("floors fractional seconds", () => {
+		const request = buildPollRequest(config(), 3600.7);
+		expect(request.url).toContain("since=3600s");
+	});
+
+	it("floors non-positive input to 1 second", () => {
+		expect(buildPollRequest(config(), 0).url).toContain("since=1s");
+		expect(buildPollRequest(config(), -5).url).toContain("since=1s");
+	});
+});
+
 describe("clickUrlFor", () => {
 	it("encodes a path with spaces and slashes", () => {
 		const url = clickUrlFor("My Vault", message({ path: "Tasks/Buy milk & eggs.md" as TaskPath, id: "isotask-xyz" as ReminderId }));
@@ -129,18 +184,22 @@ describe("clickUrlFor", () => {
 	});
 });
 
-describe("parseScheduledIds", () => {
-	it("keeps isotask ids from a mixed ndjson sample and skips the rest", () => {
+describe("parseKnownReminders", () => {
+	it("keeps only isotask entries from a mixed ndjson sample, with the right `at`", () => {
+		const heldTime = Math.floor(Date.now() / 1000) + 3600;
+		const deliveredTime = Math.floor(Date.now() / 1000) - 60;
 		const ndjson = [
-			JSON.stringify({ id: "a", click: "obsidian://isotask/open?vault=V&path=P&rid=isotask-one" }),
-			"",
-			"not json",
-			JSON.stringify({ id: "b", click: "https://example.com/no-query" }),
-			JSON.stringify({ id: "c", click: "obsidian://other-app/open?rid=not-ours" }),
+			JSON.stringify({ id: "a", sequence_id: "isotask-one", time: heldTime }),
+			JSON.stringify({ id: "b", sequence_id: "isotask-two", time: deliveredTime }),
+			JSON.stringify({ id: "c", sequence_id: "other-app-three", time: heldTime }),
 			JSON.stringify({ id: "d" }),
-			JSON.stringify({ id: "e", click: "obsidian://isotask/open?vault=V&path=P&rid=isotask-two" }),
+			"not json",
+			"",
 		].join("\n");
 
-		expect(parseScheduledIds(ndjson)).toEqual(["isotask-one", "isotask-two"]);
+		expect(parseKnownReminders(ndjson)).toEqual([
+			{ id: "isotask-one", at: fromJsDateTime(new Date(heldTime * 1000)) },
+			{ id: "isotask-two", at: fromJsDateTime(new Date(deliveredTime * 1000)) },
+		]);
 	});
 });

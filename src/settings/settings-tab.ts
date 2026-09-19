@@ -43,7 +43,14 @@ const PROPERTY_KEY_CONTROLS: readonly PropertyKeyControlDef[] = [
 ];
 
 type ScalarSettingKey = "taskFolder" | "tasksBasePath" | "newTaskFilenameTemplate" | "spawnFilenameTemplate" | "weekStart" | "hapticsEnabled";
-type ReminderSettingKey = "remindByDefault" | "reminderDefaultTime" | "reminderCatchUpMinutes" | "ntfyEnabled" | "ntfyServerUrl" | "ntfyTopic";
+type ReminderSettingKey =
+	| "remindByDefault"
+	| "reminderDefaultTime"
+	| "reminderCatchUpMinutes"
+	| "ntfyEnabled"
+	| "ntfyServerUrl"
+	| "ntfyTopic"
+	| "ntfyLookaheadHours";
 type SettingKey = keyof PropertyKeys | ScalarSettingKey | ReminderSettingKey;
 
 const TIME_OF_DAY_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -131,6 +138,10 @@ const REMINDER_SETTINGS: Readonly<
 		get: (settings) => settings.reminders.ntfy.topic,
 		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, topic: String(value) } } }),
 	},
+	ntfyLookaheadHours: {
+		get: (settings) => settings.reminders.ntfy.lookaheadHours,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, lookaheadHours: Number(value) } } }),
+	},
 };
 
 function isReminderSetting(key: string): key is ReminderSettingKey {
@@ -141,7 +152,7 @@ export interface SettingsTabDeps {
 	readonly getSettings: () => IsotaskSettings;
 	readonly setSettings: (settings: IsotaskSettings) => Promise<void>;
 	readonly copyAgentInstructions: () => Promise<void>;
-	readonly sendTestNotification: () => Promise<void>;
+	readonly checkNtfy: () => Promise<void>;
 }
 
 /**
@@ -228,7 +239,7 @@ export class IsotaskSettingTab extends PluginSettingTab {
 					},
 					{
 						name: "Send via ntfy",
-						desc: "Publish reminders to an ntfy topic from this device while Obsidian is open. Task titles and dates are sent to that server, and the token below is stored in the plugin's data file, which Obsidian Sync copies to every device.",
+						desc: "Requires ntfy 2.16 or newer. Reminders are scheduled on the server ahead of time from every device this is on, so they arrive even while Obsidian is closed. Task titles and dates are sent to that server, and the token below is stored in the plugin's data file, which Obsidian Sync copies to every device.",
 						control: { type: "toggle", key: "ntfyEnabled" },
 					},
 					{
@@ -240,6 +251,11 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						name: "Topic",
 						desc: "The ntfy topic reminders are published to.",
 						control: { type: "text", key: "ntfyTopic" },
+					},
+					{
+						name: "Lookahead",
+						desc: "Hours ahead reminders are scheduled on the server. ntfy.sh caps this at 3 days; a self-hosted server may allow more or less.",
+						control: { type: "number", key: "ntfyLookaheadHours", min: 1, step: 1 },
 					},
 					{
 						name: "Access token",
@@ -258,12 +274,12 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Send test notification",
-						desc: "Publishes one test push to confirm the server and topic are reachable.",
+						name: "Check ntfy server",
+						desc: "Publishes a test message held for two minutes, confirms the server echoes its id, then removes it.",
 						render: (setting) => {
 							setting.addButton((button) =>
-								button.setButtonText("Send").onClick(() => {
-									void this.deps.sendTestNotification();
+								button.setButtonText("Check").onClick(() => {
+									void this.deps.checkNtfy();
 								}),
 							);
 						},

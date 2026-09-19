@@ -4,9 +4,10 @@ vi.stubEnv("TZ", "Europe/Rome");
 
 import type { IsoDateTime, TaskDate } from "@/domain/dates";
 import { parseTaskDate } from "@/domain/dates";
-import { dueReminders, toPushMessage } from "@/domain/reminder-plan";
+import { dueReminders, planReminders, toPushMessage } from "@/domain/reminder-plan";
+import type { KnownReminder, PushMessage } from "@/domain/reminder-plan";
 import { DEFAULT_REMINDER_DEFAULTS, reminderTimes } from "@/domain/reminders";
-import type { ReminderInstance } from "@/domain/reminders";
+import type { ReminderId, ReminderInstance } from "@/domain/reminders";
 import type { StatusId, Task, TaskPath } from "@/domain/task";
 
 function date(value: string): TaskDate {
@@ -145,5 +146,120 @@ describe("toPushMessage", () => {
 		const t = task({ title: "Buy milk", remind: [{ kind: "absolute", at: iso("2026-09-20T09:00") }] });
 		const reminder = onlyReminder(t);
 		expect(toPushMessage(t, reminder).body).toBe("Reminder today 09:00");
+	});
+});
+
+function pushMessage(id: string, at: IsoDateTime): PushMessage {
+	return {
+		id: id as ReminderId,
+		path: "task.md" as TaskPath,
+		at,
+		title: "Task",
+		body: "Body",
+		priority: 3,
+		tags: [],
+	};
+}
+
+function knownReminder(id: string, at: IsoDateTime): KnownReminder {
+	return { id: id as ReminderId, at };
+}
+
+describe("planReminders", () => {
+	it("publishes every desired message when known is empty", () => {
+		const now = iso("2026-09-20T09:00");
+		const delayed = pushMessage("isotask-1", iso("2026-09-21T09:00"));
+		const immediate = pushMessage("isotask-2", iso("2026-09-20T09:00"));
+		const plan = planReminders([delayed, immediate], [], now);
+		expect(plan.publish[0]).toEqual({ message: delayed, delayUntil: delayed.at });
+		expect(plan.publish[1]).not.toHaveProperty("delayUntil");
+		expect(plan.publish[1]?.message).toEqual(immediate);
+	});
+
+	it("does not publish a delayed message already known at the same time", () => {
+		const now = iso("2026-09-20T09:00");
+		const message = pushMessage("isotask-1", iso("2026-09-21T09:00"));
+		const plan = planReminders([message], [knownReminder("isotask-1", iso("2026-09-21T09:00"))], now);
+		expect(plan.publish).toEqual([]);
+		expect(plan.cancel).toEqual([]);
+	});
+
+	it("republishes with the new delayUntil when the anchor moved", () => {
+		const now = iso("2026-09-20T09:00");
+		const message = pushMessage("isotask-1", iso("2026-09-20T11:00"));
+		const plan = planReminders([message], [knownReminder("isotask-1", iso("2026-09-20T10:00"))], now);
+		expect(plan.publish).toEqual([{ message, delayUntil: iso("2026-09-20T11:00") }]);
+	});
+
+	it("cancels a known future reminder that is no longer desired", () => {
+		const now = iso("2026-09-20T09:00");
+		const plan = planReminders([], [knownReminder("isotask-1", iso("2026-09-21T09:00"))], now);
+		expect(plan.cancel).toEqual(["isotask-1" as ReminderId]);
+		expect(plan.publish).toEqual([]);
+	});
+
+	it("does not cancel an already-delivered reminder", () => {
+		const now = iso("2026-09-20T09:00");
+		const plan = planReminders([], [knownReminder("isotask-1", iso("2026-09-20T08:00"))], now);
+		expect(plan.cancel).toEqual([]);
+	});
+
+	it("ignores a foreign (non-isotask) known id for cancellation", () => {
+		const now = iso("2026-09-20T09:00");
+		const plan = planReminders([], [knownReminder("abc123", iso("2026-09-21T09:00"))], now);
+		expect(plan.cancel).toEqual([]);
+	});
+
+	it("still publishes a desired message whose id matches a foreign known entry", () => {
+		const now = iso("2026-09-20T09:00");
+		const message = pushMessage("abc123", iso("2026-09-21T09:00"));
+		const plan = planReminders([message], [knownReminder("abc123", iso("2026-09-21T09:00"))], now);
+		expect(plan.publish).toEqual([{ message, delayUntil: message.at }]);
+	});
+
+	it("treats an exact cutoff match (now + 1 min) as immediate, one minute later as delayed", () => {
+		const now = iso("2026-09-20T09:00");
+		const atCutoff = pushMessage("isotask-1", iso("2026-09-20T09:01"));
+		const afterCutoff = pushMessage("isotask-2", iso("2026-09-20T09:02"));
+		const plan = planReminders([atCutoff, afterCutoff], [], now);
+		expect(plan.publish[0]).not.toHaveProperty("delayUntil");
+		expect(plan.publish[1]).toEqual({ message: afterCutoff, delayUntil: afterCutoff.at });
+	});
+
+	it("treats a same-minute catch-up publish as satisfied", () => {
+		const now = iso("2026-09-20T09:20");
+		const message = pushMessage("isotask-1", iso("2026-09-20T09:00"));
+		const plan = planReminders([message], [knownReminder("isotask-1", iso("2026-09-20T09:20"))], now);
+		expect(plan.publish).toEqual([]);
+	});
+
+	it("republishes an immediate reminder when the known publish was for a previous day", () => {
+		const now = iso("2026-09-20T09:20");
+		const message = pushMessage("isotask-1", iso("2026-09-20T09:00"));
+		const plan = planReminders([message], [knownReminder("isotask-1", iso("2026-09-19T09:00"))], now);
+		expect(plan.publish).toEqual([{ message }]);
+	});
+
+	it("publishes immediately when the known entry is scheduled for a later time, and does not cancel it", () => {
+		const now = iso("2026-09-20T09:05");
+		const message = pushMessage("isotask-1", iso("2026-09-20T09:00"));
+		const laterKnown = knownReminder("isotask-1", iso("2026-09-20T10:00"));
+		const plan = planReminders([message], [laterKnown], now);
+		expect(plan.publish).toEqual([{ message }]);
+		expect(plan.cancel).toEqual([]);
+	});
+
+	it("returns an empty plan for no desired and no known reminders", () => {
+		const plan = planReminders([], [], iso("2026-09-20T09:00"));
+		expect(plan).toEqual({ publish: [], cancel: [] });
+	});
+
+	it("preserves desired order in publish", () => {
+		const now = iso("2026-09-20T09:00");
+		const c = pushMessage("isotask-3", iso("2026-09-22T09:00"));
+		const a = pushMessage("isotask-1", iso("2026-09-20T09:00"));
+		const b = pushMessage("isotask-2", iso("2026-09-21T09:00"));
+		const plan = planReminders([c, a, b], [], now);
+		expect(plan.publish.map((p) => p.message.id)).toEqual([c.id, a.id, b.id]);
 	});
 });
