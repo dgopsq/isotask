@@ -1,7 +1,7 @@
 import type { AnimationController } from "@formkit/auto-animate";
 import autoAnimate from "@formkit/auto-animate";
 import type { App, BasesEntry, BasesPropertyId, QueryController } from "obsidian";
-import { BasesView, Component, Menu, NullValue, setIcon } from "obsidian";
+import { BasesView, Component, Menu, NullValue, setIcon, setTooltip } from "obsidian";
 
 import type { TaskWithEntry } from "@/adapters/obsidian/bases-entries";
 import { tasksFromBasesEntries } from "@/adapters/obsidian/bases-entries";
@@ -26,7 +26,9 @@ import type { FeedColumn, FeedRowAnchor } from "@/domain/feed-row";
 import { feedRowAnchor, feedRowColumns, feedRowDefaultDateField } from "@/domain/feed-row";
 import { COMPACT_FEED_WIDTH, parseFeedViewOptions } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
+import { describeReminders } from "@/domain/reminder-presets";
 import type { ReminderDefaults } from "@/domain/reminders";
+import { reminderAnchor } from "@/domain/reminders";
 import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
@@ -40,7 +42,7 @@ import type { Haptics } from "@/ports/haptics";
 import type { Notifier } from "@/ports/notifier";
 import { CreateTaskModal } from "@/ui/create-task-modal";
 import { DateModal } from "@/ui/date-modal";
-import { openProjectModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+import { openProjectModalFor, openReminderModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
 import { buildPriorityMenu, priorityIcon } from "@/ui/priority-menu";
 import { ProjectColorModal } from "@/ui/project-color-modal";
 import { buildTaskEditMenu } from "@/ui/task-edit-menu";
@@ -126,8 +128,9 @@ export interface FeedBasesViewDeps {
 /**
  * Feed view: renders bucket headers and rows (status control, title link,
  * then the columns the Bases toolbar's "Properties" menu selects — date
- * chip, priority chip, project link, tags, and a muted generic chip for
- * anything else — see `domain/feed-row.ts#feedRowColumns`) from parsed
+ * chip, priority chip, project link, tags, a bell chip for an explicit
+ * remind, and a muted generic chip for anything else — see
+ * `domain/feed-row.ts#feedRowColumns`) from parsed
  * tasks, honouring the three Bases-native view options
  * (`domain/feed-view-options.ts`) registered in `views/bases/register.ts`.
  * Row layout stays thin — pure domain code decides buckets/anchors/columns,
@@ -475,6 +478,9 @@ export class FeedBasesView extends BasesView {
 				case "tags":
 					this.renderTags(comp, metaEl, task);
 					break;
+				case "remind":
+					this.renderRemindChip(comp, metaEl, task);
+					break;
 				case "generic":
 					this.renderGenericChip(metaEl, entry, column.propertyId);
 					break;
@@ -735,6 +741,41 @@ export class FeedBasesView extends BasesView {
 		for (const tag of task.tags) {
 			container.createSpan({ text: `#${tag}`, cls: cssClass("feed__tag") });
 		}
+	}
+
+	/**
+	 * Bell chip for an explicit `remind` (opt-in column, `domain/feed-row.ts`
+	 * dedupes it like date/tags) — renders nothing when `task.remind` is
+	 * `undefined`, same as an absent generic property, so the vault-wide
+	 * reminder default never shows a chip it wasn't explicitly set for.
+	 * "bell-off" when the list is `[none]`, otherwise "bell". Opens
+	 * `ReminderModal` via `openReminderModalFor` on click/Enter/Space.
+	 */
+	private renderRemindChip(comp: Component, parent: HTMLElement, task: Task): void {
+		if (task.remind === undefined) {
+			return;
+		}
+		const isNone = task.remind.some((spec) => spec.kind === "none");
+
+		const chip = parent.createSpan({
+			cls: cssClass("feed__remind"),
+			attr: { role: "button", tabindex: "0" },
+		});
+		setIcon(chip, isNone ? "bell-off" : "bell");
+		setTooltip(chip, describeReminders(task.remind, reminderAnchor(task)?.at));
+
+		const openModal = (evt: MouseEvent | KeyboardEvent): void => {
+			evt.stopPropagation();
+			openReminderModalFor(this.deps.app, task, this.deps.setReminder, this.deps.getReminderDefaults, this.deps.notifier);
+		};
+
+		comp.registerDomEvent(chip, "click", openModal);
+		comp.registerDomEvent(chip, "keydown", (evt) => {
+			if (evt.key === "Enter" || evt.key === " ") {
+				evt.preventDefault();
+				openModal(evt);
+			}
+		});
 	}
 
 	/**

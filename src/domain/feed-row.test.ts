@@ -146,6 +146,15 @@ describe("feedRowColumns", () => {
 		expect(feedRowColumns(order, keys)).toEqual([{ kind: "date" }, { kind: "priority" }, { kind: "project" }, { kind: "tags" }]);
 	});
 
+	it("note.remind maps to the remind column", () => {
+		expect(feedRowColumns(["file.name", "note.priority", "note.remind"], DEFAULT_PROPERTY_KEYS)).toEqual([{ kind: "priority" }, { kind: "remind" }]);
+	});
+
+	it("note.remind twice in order -> one remind column, at the first position", () => {
+		const order = ["file.name", "note.remind", "note.priority", "note.remind"];
+		expect(feedRowColumns(order, DEFAULT_PROPERTY_KEYS)).toEqual([{ kind: "remind" }, { kind: "priority" }]);
+	});
+
 	it("keeps unknown properties as generic columns, in position", () => {
 		const order = ["file.name", "note.priority", "formula.effort", "note.tags", "note.customField"];
 		expect(feedRowColumns(order, DEFAULT_PROPERTY_KEYS)).toEqual([
