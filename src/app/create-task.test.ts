@@ -9,6 +9,7 @@ import { parseTaskDate } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import { DEFAULT_SETTINGS } from "@/domain/settings";
 import type { IsotaskSettings } from "@/domain/settings";
+import type { ReminderSpec } from "@/domain/reminders";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { Minutes, RRuleString, TaskPath } from "@/domain/task";
 
@@ -115,6 +116,25 @@ describe("makeCreateTask", () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("Tasks/Buy milk 3.md");
+		}
+	});
+
+	it("writes remind as canonical text, and omits the key when absent", async () => {
+		const { deps, store } = makeDeps();
+		const remind: readonly ReminderSpec[] = [
+			{ kind: "offset", minutes: 1440 },
+			{ kind: "offset", minutes: 15 },
+		];
+		const withRemind = await makeCreateTask(deps)({ title: "Buy milk", remind });
+		expect(withRemind.ok).toBe(true);
+		if (withRemind.ok) {
+			expect(store.notes.get(withRemind.value)?.frontmatter["remind"]).toEqual(["1d", "15m"]);
+		}
+
+		const withoutRemind = await makeCreateTask(deps)({ title: "Water plants" });
+		expect(withoutRemind.ok).toBe(true);
+		if (withoutRemind.ok) {
+			expect("remind" in (store.notes.get(withoutRemind.value)?.frontmatter ?? {})).toBe(false);
 		}
 	});
 
