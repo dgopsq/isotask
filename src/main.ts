@@ -30,12 +30,13 @@ import { makeSetDuration } from "@/app/set-duration";
 import { makeSetPriority } from "@/app/set-priority";
 import { makeSetProject } from "@/app/set-project";
 import { makeSetRecurrence } from "@/app/set-recurrence";
+import { makeSetReminder } from "@/app/set-reminder";
 import { makeSetStatus } from "@/app/set-status";
 import { makeSetTags } from "@/app/set-tags";
 import { makeToggleDone } from "@/app/toggle-done";
 import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
-import { parseSettings } from "@/domain/settings";
+import { parseSettings, reminderDefaultsOf } from "@/domain/settings";
 import type { IsotaskSettings } from "@/domain/settings";
 import { AGENT_GUIDE_URL, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
 import { IsotaskSettingTab } from "@/settings/settings-tab";
@@ -99,6 +100,8 @@ export default class IsotaskPlugin extends Plugin {
 		const setPriority = makeSetPriority(appDeps);
 		const setProject = makeSetProject(appDeps);
 		const setRecurrence = makeSetRecurrence(appDeps);
+		const setReminder = makeSetReminder(appDeps);
+		const getReminderDefaults = () => reminderDefaultsOf(this.pluginSettings.reminders);
 		const setTags = makeSetTags(appDeps);
 		const undoReschedule = makeUndoReschedule(appDeps);
 		const redoReschedule = makeRedoReschedule(appDeps);
@@ -124,6 +127,8 @@ export default class IsotaskPlugin extends Plugin {
 			setDate,
 			setDuration,
 			setRecurrence,
+			setReminder,
+			getReminderDefaults,
 			setProject,
 			setTags,
 			notifier,
@@ -147,6 +152,8 @@ export default class IsotaskPlugin extends Plugin {
 			setPriority,
 			setDuration,
 			setRecurrence,
+			setReminder,
+			getReminderDefaults,
 			setProject,
 			setTags,
 			undoReschedule,
@@ -164,6 +171,8 @@ export default class IsotaskPlugin extends Plugin {
 			setDate,
 			setDuration,
 			setRecurrence,
+			setReminder,
+			getReminderDefaults,
 			setProject,
 			setTags,
 			notifier,

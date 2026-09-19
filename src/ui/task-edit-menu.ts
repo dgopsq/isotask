@@ -7,8 +7,11 @@ import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
 import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
+import type { SetReminder } from "@/app/set-reminder";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
+import type { ReminderDefaults } from "@/domain/reminders";
+import { reminderAnchor } from "@/domain/reminders";
 import { fromNullable } from "@/domain/result";
 import type { Result } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
@@ -19,6 +22,7 @@ import { DurationModal } from "@/ui/duration-modal";
 import { buildPriorityMenu } from "@/ui/priority-menu";
 import { ProjectModal } from "@/ui/project-modal";
 import { RecurrenceModal } from "@/ui/recurrence-modal";
+import { ReminderModal } from "@/ui/reminder-modal";
 import { addDoneMenuItem } from "@/ui/status-menu";
 import { TagsModal } from "@/ui/tags-modal";
 
@@ -30,6 +34,8 @@ export interface TaskEditMenuCtx {
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setDuration: ReturnType<typeof makeSetDuration>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setReminder: SetReminder;
+	readonly getReminderDefaults: () => ReminderDefaults;
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
@@ -122,6 +128,22 @@ export function buildTaskEditMenu(menu: Menu, task: Task, ctx: TaskEditMenuCtx):
 					initial: fromNullable(task.repeat),
 					onSave: async (rule) => {
 						report(ctx.notifier, await ctx.setRecurrence(task.path, rule));
+					},
+				}).open();
+			}),
+	);
+
+	menu.addItem((item) =>
+		item
+			.setTitle("Reminder…")
+			.setIcon("bell")
+			.onClick(() => {
+				new ReminderModal(ctx.app, {
+					initial: task.remind,
+					anchor: reminderAnchor(task)?.at,
+					defaults: ctx.getReminderDefaults(),
+					onSave: async (specs) => {
+						report(ctx.notifier, await ctx.setReminder(task.path, specs));
 					},
 				}).open();
 			}),

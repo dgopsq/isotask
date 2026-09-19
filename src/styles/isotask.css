@@ -625,7 +625,8 @@
 }
 
 .isotask-recurrence-modal-description,
-.isotask-create-task-modal-repeat-description {
+.isotask-create-task-modal-repeat-description,
+.isotask-reminder-modal-description {
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 }
@@ -643,6 +644,10 @@
  */
 .isotask-panel {
 	padding: var(--size-4-2);
+}
+
+.isotask-panel__default {
+	font-style: italic;
 }
 
 .isotask-panel__title {

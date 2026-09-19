@@ -10,13 +10,23 @@ import { describeAppError } from "@/app/errors";
 import type { DateField } from "@/app/set-date";
 import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import { describeRRule } from "@/domain/recurrence";
+import { describeReminders } from "@/domain/reminder-presets";
+import type { ReminderDefaults } from "@/domain/reminders";
+import { defaultReminderSpecs, reminderAnchor } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { findStatus, isTerminal, toggleStatus } from "@/domain/status";
 import type { Priority, Task, TaskParseError, TaskPath } from "@/domain/task";
 import { describeTaskParseError, PRIORITIES, priorityLabel } from "@/domain/task";
 import { formatDurationMinutes } from "@/domain/task-display";
 import { cssClass, VIEW_TYPE_TASK_PANEL } from "@/plugin-id";
-import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+import {
+	openDateModalFor,
+	openDurationModalFor,
+	openProjectModalFor,
+	openRecurrenceModalFor,
+	openReminderModalFor,
+	openTagsModalFor,
+} from "@/ui/edit-field-modals";
 import { ProjectColorModal } from "@/ui/project-color-modal";
 
 /** Shared with the ribbon icon (`main.ts`) so the two never drift apart. */
@@ -254,6 +264,7 @@ export class TaskPanelView extends ItemView {
 		this.renderDateField(root, task, "scheduled", "Scheduled");
 		this.renderDurationField(root, task);
 		this.renderRepeatField(root, task);
+		this.renderReminderField(root, task);
 		this.renderProjectField(root, task);
 		this.renderTagsField(root, task);
 	}
@@ -337,6 +348,24 @@ export class TaskPanelView extends ItemView {
 					openRecurrenceModalFor(this.deps.app, task, this.deps.setRecurrence, this.deps.notifier);
 				}),
 			);
+	}
+
+	private renderReminderField(root: HTMLElement, task: Task): void {
+		const defaults: ReminderDefaults = this.deps.getReminderDefaults();
+		const specs = task.remind ?? defaultReminderSpecs(defaults);
+
+		const setting = new Setting(root)
+			.setName("Reminder")
+			.setDesc(describeReminders(specs, reminderAnchor(task)?.at))
+			.addButton((button) =>
+				button.setButtonText("Edit…").onClick(() => {
+					openReminderModalFor(this.deps.app, task, this.deps.setReminder, this.deps.getReminderDefaults, this.deps.notifier);
+				}),
+			);
+
+		if (task.remind === undefined) {
+			setting.descEl.addClass(cssClass("panel__default"));
+		}
 	}
 
 	private renderProjectField(root: HTMLElement, task: Task): void {

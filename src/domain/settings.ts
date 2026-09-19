@@ -3,6 +3,7 @@ import * as v from "valibot";
 import type { Weekday } from "@/domain/dates";
 import { DEFAULT_PROPERTY_KEYS } from "@/domain/property-keys";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { ReminderDefaults } from "@/domain/reminders";
 import { DEFAULT_STATUSES } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
@@ -57,6 +58,11 @@ export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
 		lookaheadHours: 72,
 	},
 };
+
+/** The `ReminderDefaults` view of `ReminderSettings` — shared by `reconcile-reminders.ts` and the reminder picker so both fall back the same way. */
+export function reminderDefaultsOf(settings: ReminderSettings): ReminderDefaults {
+	return { remindByDefault: settings.remindByDefault, timeOfDay: settings.defaultTime };
+}
 
 export const DEFAULT_SETTINGS: IsotaskSettings = {
 	version: 1,

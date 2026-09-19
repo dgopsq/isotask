@@ -14,11 +14,13 @@ import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
 import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
+import type { SetReminder } from "@/app/set-reminder";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
 import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
 import { isTaskNote } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { ReminderDefaults } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { err } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
@@ -28,7 +30,14 @@ import type { Notifier } from "@/ports/notifier";
 import type { PushError } from "@/ports/push-channel";
 import type { TaskStore } from "@/ports/task-store";
 import { CreateTaskModal } from "@/ui/create-task-modal";
-import { openDateModalFor, openDurationModalFor, openProjectModalFor, openRecurrenceModalFor, openTagsModalFor } from "@/ui/edit-field-modals";
+import {
+	openDateModalFor,
+	openDurationModalFor,
+	openProjectModalFor,
+	openRecurrenceModalFor,
+	openReminderModalFor,
+	openTagsModalFor,
+} from "@/ui/edit-field-modals";
 import { NoteSuggestModal } from "@/ui/note-suggest-modal";
 import { PrioritySuggestModal } from "@/ui/priority-suggest-modal";
 import { ProjectColorModal } from "@/ui/project-color-modal";
@@ -51,6 +60,8 @@ export interface RegisterCommandsDeps {
 	readonly setPriority: ReturnType<typeof makeSetPriority>;
 	readonly setDuration: ReturnType<typeof makeSetDuration>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setReminder: SetReminder;
+	readonly getReminderDefaults: () => ReminderDefaults;
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly undoReschedule: UndoReschedule;
@@ -133,6 +144,12 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 	async function openRecurrenceModal(file: TFile): Promise<void> {
 		await withTask(file, (task) => {
 			openRecurrenceModalFor(deps.app, task, deps.setRecurrence, deps.notifier);
+		});
+	}
+
+	async function openReminderModal(file: TFile): Promise<void> {
+		await withTask(file, (task) => {
+			openReminderModalFor(deps.app, task, deps.setReminder, deps.getReminderDefaults, deps.notifier);
 		});
 	}
 
@@ -288,6 +305,21 @@ export function registerCommands(plugin: Plugin, deps: RegisterCommandsDeps): vo
 			}
 			if (!checking) {
 				void openRecurrenceModal(file);
+			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "set-reminder",
+		name: "Set reminder…",
+		checkCallback: (checking) => {
+			const file = activeTaskFile(deps.app, deps.getPropertyKeys());
+			if (file === null) {
+				return false;
+			}
+			if (!checking) {
+				void openReminderModal(file);
 			}
 			return true;
 		},

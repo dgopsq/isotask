@@ -13,6 +13,7 @@ import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
 import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
+import type { SetReminder } from "@/app/set-reminder";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
 import { describeAppError } from "@/app/errors";
@@ -25,6 +26,7 @@ import type { FeedColumn, FeedRowAnchor } from "@/domain/feed-row";
 import { feedRowAnchor, feedRowColumns, feedRowDefaultDateField } from "@/domain/feed-row";
 import { COMPACT_FEED_WIDTH, parseFeedViewOptions } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { ReminderDefaults } from "@/domain/reminders";
 import { dotColorClasses, resolveDotColor } from "@/domain/project-color";
 import type { Option } from "@/domain/result";
 import { none, some } from "@/domain/result";
@@ -113,6 +115,8 @@ export interface FeedBasesViewDeps {
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setDuration: ReturnType<typeof makeSetDuration>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setReminder: SetReminder;
+	readonly getReminderDefaults: () => ReminderDefaults;
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
@@ -886,6 +890,8 @@ export class FeedBasesView extends BasesView {
 				setDate: this.deps.setDate,
 				setDuration: this.deps.setDuration,
 				setRecurrence: this.deps.setRecurrence,
+				setReminder: this.deps.setReminder,
+				getReminderDefaults: this.deps.getReminderDefaults,
 				setProject: this.deps.setProject,
 				setTags: this.deps.setTags,
 				notifier: this.deps.notifier,
