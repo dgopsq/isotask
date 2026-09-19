@@ -58,7 +58,9 @@ export function registerReminderReconciler(plugin: Plugin, deps: ReminderReconci
 					lastRunFailed = false;
 					return;
 				}
-				console.error(`Isotask: reminder ${firstFailure.id} failed`, firstFailure.error);
+				for (const failure of outcome.failed) {
+					console.error(`Isotask: reminder ${failure.id} failed`, failure.error);
+				}
 				noticeFailure(firstFailure.error);
 				return;
 			}
