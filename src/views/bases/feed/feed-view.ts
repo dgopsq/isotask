@@ -743,14 +743,7 @@ export class FeedBasesView extends BasesView {
 		}
 	}
 
-	/**
-	 * Bell chip for an explicit `remind` (opt-in column, `domain/feed-row.ts`
-	 * dedupes it like date/tags) — renders nothing when `task.remind` is
-	 * `undefined`, same as an absent generic property, so the vault-wide
-	 * reminder default never shows a chip it wasn't explicitly set for.
-	 * "bell-off" when the list is `[none]`, otherwise "bell". Opens
-	 * `ReminderModal` via `openReminderModalFor` on click/Enter/Space.
-	 */
+	/** Nothing for an absent `remind`: the vault-wide default must not look like a per-task setting. */
 	private renderRemindChip(comp: Component, parent: HTMLElement, task: Task): void {
 		if (task.remind === undefined) {
 			return;
