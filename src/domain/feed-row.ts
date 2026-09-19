@@ -64,6 +64,8 @@ export type FeedColumn =
 	| { readonly kind: "priority" }
 	| { readonly kind: "project" }
 	| { readonly kind: "tags" }
+	/** Bell chip for an explicit `remind`; opt-in via the Properties menu, unlike the always-shown date/priority chips. */
+	| { readonly kind: "remind" }
 	| { readonly kind: "generic"; readonly propertyId: string };
 
 /**
@@ -84,6 +86,7 @@ export type FeedColumn =
  *   the second is ignored, same dedupe as the date columns above).
  * - `note.<keys.markerKey>` contributes nothing (the task marker is noise
  *   in a feed row).
+ * - `note.<keys.remind>` -> `remind` (at most once, same dedupe as above).
  * - Anything else (`note.*`, `file.*`, `formula.*`) becomes a `generic`
  *   column carrying its raw property id, rendered as a label/value chip
  *   (`feed-view.ts#renderGenericChip`).
@@ -94,6 +97,7 @@ export function feedRowColumns(order: readonly string[], keys: PropertyKeys): re
 	const columns: FeedColumn[] = [];
 	let dateAdded = false;
 	let tagsAdded = false;
+	let remindAdded = false;
 
 	for (const id of order) {
 		if (id === "file.name" || id === notedId(keys.status) || id === notedId(keys.markerKey)) {
@@ -118,6 +122,13 @@ export function feedRowColumns(order: readonly string[], keys: PropertyKeys): re
 			if (!tagsAdded) {
 				columns.push({ kind: "tags" });
 				tagsAdded = true;
+			}
+			continue;
+		}
+		if (id === notedId(keys.remind)) {
+			if (!remindAdded) {
+				columns.push({ kind: "remind" });
+				remindAdded = true;
 			}
 			continue;
 		}

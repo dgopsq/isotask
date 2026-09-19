@@ -8,6 +8,8 @@ import type { TaskDate } from "@/domain/dates";
 import { isDateTime, parseTaskDate } from "@/domain/dates";
 import { projectFromWikilink } from "@/domain/frontmatter";
 import { describeRRule, parseRRule, RECURRENCE_PRESETS } from "@/domain/recurrence";
+import { matchReminderPreset, REMINDER_PRESETS } from "@/domain/reminder-presets";
+import type { ReminderSpec } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import type { Minutes, Priority, RRuleString, TaskPath } from "@/domain/task";
 import { PRIORITIES, priorityLabel } from "@/domain/task";
@@ -26,6 +28,7 @@ export interface CreateTaskModalDeps {
 
 const NO_REPEAT_ID = "none";
 const CUSTOM_REPEAT_ID = "custom";
+const DEFAULT_REMIND_ID = "default";
 
 interface DateFieldState {
 	readonly value: string;
@@ -49,6 +52,13 @@ function repeatSelectionFrom(initial: RRuleString | undefined): { readonly id: s
 	}
 	const preset = RECURRENCE_PRESETS.find((p) => p.rule === initial);
 	return preset !== undefined ? { id: preset.id, custom: "" } : { id: CUSTOM_REPEAT_ID, custom: initial };
+}
+
+function remindSelectionFrom(initial: readonly ReminderSpec[] | undefined): string {
+	if (initial === undefined) {
+		return DEFAULT_REMIND_ID;
+	}
+	return matchReminderPreset(initial)?.id ?? DEFAULT_REMIND_ID;
 }
 
 /** Parses a `DateFieldState`'s raw text into `TaskDate | undefined`, or `"invalid"` for an unparsable non-empty value. */
@@ -88,8 +98,8 @@ function hasMoreOptionsPrefill(initial: Partial<TaskDraft>): boolean {
  * fields update state in `onChange` without re-rendering, so typing never
  * loses focus.
  *
- * Kept short (default: Title, Due, Priority, Repeat, More options toggle,
- * buttons) so Obsidian doesn't render its full-height scrollbar on a `Modal`
+ * Kept short (default: Title, Due, Priority, Repeat, Reminder, More options
+ * toggle, buttons) so Obsidian doesn't render its full-height scrollbar on a `Modal`
  * taller than the viewport; the rarer fields (Folder, Scheduled, Duration,
  * Project, Tags) live behind "More options". A new task always gets the
  * first configured open status — there's no status field here.
@@ -105,6 +115,7 @@ export class CreateTaskModal extends Modal {
 	private durationText: string;
 	private repeatId: string;
 	private repeatCustom: string;
+	private remindId: string;
 	private project: string;
 	private tagsText: string;
 	private moreOptionsOpen: boolean;
@@ -124,6 +135,7 @@ export class CreateTaskModal extends Modal {
 		const repeat = repeatSelectionFrom(initial.repeat);
 		this.repeatId = repeat.id;
 		this.repeatCustom = repeat.custom;
+		this.remindId = remindSelectionFrom(initial.remind);
 		this.project = initial.project ?? "";
 		this.tagsText = initial.tags !== undefined ? initial.tags.join(", ") : "";
 		this.moreOptionsOpen = sessionMoreOptionsOpen || hasMoreOptionsPrefill(initial);
@@ -151,6 +163,7 @@ export class CreateTaskModal extends Modal {
 
 		this.renderPriorityField(contentEl);
 		this.renderRepeatField(contentEl);
+		this.renderReminderField(contentEl);
 
 		new Setting(contentEl)
 			.setName("More options")
@@ -365,6 +378,33 @@ export class CreateTaskModal extends Modal {
 		return RECURRENCE_PRESETS.find((p) => p.id === this.repeatId)?.rule;
 	}
 
+	/** No custom/absolute fields here — those live in `ReminderModal`, opened after creation from the task panel or edit menu. */
+	private renderReminderField(container: HTMLElement): void {
+		const options: Record<string, string> = { [DEFAULT_REMIND_ID]: "Default" };
+		for (const preset of REMINDER_PRESETS) {
+			options[preset.id] = preset.label;
+		}
+
+		new Setting(container)
+			.setName("Reminder")
+			.setDesc("Before the scheduled date, or the due date if there is none.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(this.remindId)
+					.onChange((value) => {
+						this.remindId = value;
+					}),
+			);
+	}
+
+	private resolveRemindSpecs(): readonly ReminderSpec[] | undefined {
+		if (this.remindId === DEFAULT_REMIND_ID) {
+			return undefined;
+		}
+		return REMINDER_PRESETS.find((p) => p.id === this.remindId)?.specs;
+	}
+
 	private async submit(): Promise<void> {
 		if (this.submitting) {
 			return;
@@ -409,6 +449,8 @@ export class CreateTaskModal extends Modal {
 			repeat = parsedRule.value;
 		}
 
+		const remind = this.resolveRemindSpecs();
+
 		const trimmedProject = this.project.trim();
 		const project = trimmedProject.length === 0 ? undefined : projectFromWikilink(trimmedProject);
 
@@ -427,6 +469,7 @@ export class CreateTaskModal extends Modal {
 			...(scheduled !== undefined ? { scheduled } : {}),
 			...(duration !== undefined ? { duration } : {}),
 			...(repeat !== undefined ? { repeat } : {}),
+			...(remind !== undefined ? { remind } : {}),
 			...(project !== undefined ? { project } : {}),
 			...(tags.length > 0 ? { tags } : {}),
 		};

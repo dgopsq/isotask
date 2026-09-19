@@ -8,6 +8,7 @@ import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
 import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
+import type { SetReminder } from "@/app/set-reminder";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
 import type { RedoReschedule, UndoReschedule } from "@/app/undo-reschedule";
@@ -15,6 +16,7 @@ import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "@/domain/calendar-view-options";
 import type { Weekday } from "@/domain/dates";
 import { DEFAULT_FEED_VIEW_OPTIONS } from "@/domain/feed-view-options";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { ReminderDefaults } from "@/domain/reminders";
 import type { StatusConfig } from "@/domain/status";
 import { PLUGIN_NAME, VIEW_TYPE_CALENDAR, VIEW_TYPE_FEED } from "@/plugin-id";
 import type { CalendarRenderer } from "@/ports/calendar-renderer";
@@ -136,6 +138,8 @@ export interface RegisterViewsDeps {
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setDuration: ReturnType<typeof makeSetDuration>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setReminder: SetReminder;
+	readonly getReminderDefaults: () => ReminderDefaults;
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
@@ -160,6 +164,8 @@ export function registerViews(plugin: Plugin, deps: RegisterViewsDeps): boolean 
 				setDate: deps.setDate,
 				setDuration: deps.setDuration,
 				setRecurrence: deps.setRecurrence,
+				setReminder: deps.setReminder,
+				getReminderDefaults: deps.getReminderDefaults,
 				setProject: deps.setProject,
 				setTags: deps.setTags,
 				notifier: deps.notifier,

@@ -208,7 +208,9 @@ ADR 0021 (ntfy >= 2.16, reconcile from every client).
   `<n>min`, `<n>h`, `<n>d`, `<n>w` before the anchor; a bare number, counted as minutes; or a
   full ISO local datetime (`domain/dates.ts`'s datetime form), an absolute reminder independent
   of any anchor. `none` anywhere in a list wins over every other entry. Canonical serialized
-  form (`formatReminderSpec`) is always a list of the largest unit that divides evenly.
+  form (`formatReminderSpec`) is always a list of the largest unit that divides evenly. The
+  picker (`ui/reminder-modal.ts`, `app/set-reminder.ts`) always writes this canonical list form,
+  e.g. `remind: [1d]`, `remind: [none]` — removing the property means "use the vault default".
 - **Anchor** (`reminderAnchor`): `scheduled` if present, else `due` — the REVERSE of recurrence's
   anchor (`transitions.ts#anchorOf`, `due`-then-`scheduled`). Recurrence anchors on the date a
   task is due *by*; a reminder anchors on when the user meant to *act*, which is `scheduled` when

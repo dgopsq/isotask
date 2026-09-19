@@ -6,10 +6,12 @@ import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetPriority } from "@/app/set-priority";
 import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
+import type { SetReminder } from "@/app/set-reminder";
 import type { makeSetStatus } from "@/app/set-status";
 import type { makeSetTags } from "@/app/set-tags";
 import { parseTask } from "@/domain/frontmatter";
 import type { PropertyKeys } from "@/domain/property-keys";
+import type { ReminderDefaults } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import type { StatusConfig } from "@/domain/status";
 import type { Task, TaskParseError, TaskPath } from "@/domain/task";
@@ -26,6 +28,8 @@ export interface RegisterTaskMenusDeps {
 	readonly setDate: ReturnType<typeof makeSetDate>;
 	readonly setDuration: ReturnType<typeof makeSetDuration>;
 	readonly setRecurrence: ReturnType<typeof makeSetRecurrence>;
+	readonly setReminder: SetReminder;
+	readonly getReminderDefaults: () => ReminderDefaults;
 	readonly setProject: ReturnType<typeof makeSetProject>;
 	readonly setTags: ReturnType<typeof makeSetTags>;
 	readonly notifier: Notifier;
@@ -64,6 +68,8 @@ export function taskEditMenuCtx(deps: RegisterTaskMenusDeps): TaskEditMenuCtx {
 		setDate: deps.setDate,
 		setDuration: deps.setDuration,
 		setRecurrence: deps.setRecurrence,
+		setReminder: deps.setReminder,
+		getReminderDefaults: deps.getReminderDefaults,
 		setProject: deps.setProject,
 		setTags: deps.setTags,
 		notifier: deps.notifier,

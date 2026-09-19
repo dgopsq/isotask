@@ -6,7 +6,10 @@ import type { DateField, makeSetDate } from "@/app/set-date";
 import type { makeSetDuration } from "@/app/set-duration";
 import type { makeSetProject } from "@/app/set-project";
 import type { makeSetRecurrence } from "@/app/set-recurrence";
+import type { SetReminder } from "@/app/set-reminder";
 import type { makeSetTags } from "@/app/set-tags";
+import type { ReminderDefaults } from "@/domain/reminders";
+import { reminderAnchor } from "@/domain/reminders";
 import { fromNullable } from "@/domain/result";
 import type { Result } from "@/domain/result";
 import type { Task } from "@/domain/task";
@@ -15,6 +18,7 @@ import { DateModal } from "@/ui/date-modal";
 import { DurationModal } from "@/ui/duration-modal";
 import { ProjectModal } from "@/ui/project-modal";
 import { RecurrenceModal } from "@/ui/recurrence-modal";
+import { ReminderModal } from "@/ui/reminder-modal";
 import { TagsModal } from "@/ui/tags-modal";
 
 /**
@@ -63,6 +67,23 @@ export function openRecurrenceModalFor(app: App, task: Task, setRecurrence: Retu
 		initial: fromNullable(task.repeat),
 		onSave: async (rule) => {
 			report(notifier, await setRecurrence(task.path, rule));
+		},
+	}).open();
+}
+
+export function openReminderModalFor(
+	app: App,
+	task: Task,
+	setReminder: SetReminder,
+	getReminderDefaults: () => ReminderDefaults,
+	notifier: Notifier,
+): void {
+	new ReminderModal(app, {
+		initial: task.remind,
+		anchor: reminderAnchor(task)?.at,
+		defaults: getReminderDefaults(),
+		onSave: async (specs) => {
+			report(notifier, await setReminder(task.path, specs));
 		},
 	}).open();
 }

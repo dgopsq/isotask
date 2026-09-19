@@ -299,6 +299,16 @@
 	font-style: italic;
 }
 
+/* Opt-in bell chip for an explicit `remind` (feed-view.ts#renderRemindChip) — icon-only, so it stays small next to the text chips. */
+.isotask-feed__remind {
+	display: inline-flex;
+	align-items: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	--icon-size: var(--icon-xs);
+	--icon-stroke: var(--icon-xs-stroke-width);
+}
+
 .isotask-feed__error {
 	font-size: var(--font-ui-small);
 }
@@ -362,7 +372,8 @@
 .isotask-feed__date:active,
 .isotask-feed__project--empty:active,
 .isotask-feed__tags--empty:active,
-.isotask-feed__priority:active {
+.isotask-feed__priority:active,
+.isotask-feed__remind:active {
 	transform: scale(0.96);
 }
 
@@ -469,12 +480,13 @@
 
 /*
  * Hover state for the plain-text click targets (date chip, "Set project",
- * "Set tags"): the text brightens from faint to normal, no background —
- * the row's own hover tint is the only surface change.
+ * "Set tags", the remind bell): the text/icon brightens from faint/muted to
+ * normal, no background — the row's own hover tint is the only surface change.
  */
 .isotask-feed__date,
 .isotask-feed__project--empty,
-.isotask-feed__tags--empty {
+.isotask-feed__tags--empty,
+.isotask-feed__remind {
 	/* `transform` for the shared `:active` press feedback below. */
 	transition:
 		color var(--isotask-motion, 120ms) ease,
@@ -483,7 +495,8 @@
 
 .isotask-feed__date:hover,
 .isotask-feed__project--empty:hover,
-.isotask-feed__tags--empty:hover {
+.isotask-feed__tags--empty:hover,
+.isotask-feed__remind:hover {
 	color: var(--text-normal);
 }
 
@@ -625,7 +638,8 @@
 }
 
 .isotask-recurrence-modal-description,
-.isotask-create-task-modal-repeat-description {
+.isotask-create-task-modal-repeat-description,
+.isotask-reminder-modal-description {
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 }
@@ -643,6 +657,10 @@
  */
 .isotask-panel {
 	padding: var(--size-4-2);
+}
+
+.isotask-panel__default {
+	font-style: italic;
 }
 
 .isotask-panel__title {

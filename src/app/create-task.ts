@@ -6,6 +6,8 @@ import type { TaskDate } from "@/domain/dates";
 import { toDateOnly } from "@/domain/dates";
 import type { FrontmatterValue } from "@/domain/frontmatter";
 import { toWikilink } from "@/domain/frontmatter";
+import { canonicalRemindValue } from "@/domain/reminder-presets";
+import type { ReminderSpec } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
 import { firstOpenStatus } from "@/domain/status";
@@ -22,6 +24,7 @@ export interface TaskDraft {
 	readonly repeat?: RRuleString;
 	readonly project?: string;
 	readonly tags?: readonly string[];
+	readonly remind?: readonly ReminderSpec[];
 }
 
 /** Characters not allowed in an Obsidian filename. */
@@ -94,6 +97,9 @@ export function makeCreateTask(deps: AppDeps) {
 		}
 		if (draft.tags !== undefined && draft.tags.length > 0) {
 			frontmatter[keys.tags] = draft.tags;
+		}
+		if (draft.remind !== undefined && draft.remind.length > 0) {
+			frontmatter[keys.remind] = canonicalRemindValue(draft.remind);
 		}
 
 		const templatedBasename = sanitizeFilename(expandFilenameTemplate(settings.newTaskFilenameTemplate, draft.title, draft.due));

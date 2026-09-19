@@ -169,6 +169,11 @@ export const DEFAULT_REMINDER_DEFAULTS: ReminderDefaults = {
 	timeOfDay: "09:00",
 };
 
+/** A task with no explicit `remind` falls back to this: an at-time reminder if the setting is on, else none. */
+export function defaultReminderSpecs(defaults: ReminderDefaults): readonly ReminderSpec[] {
+	return defaults.remindByDefault ? [{ kind: "offset", minutes: 0 }] : [];
+}
+
 export type ReminderId = Brand<string, "ReminderId">;
 
 /** Deterministic id (`isotask-<hex djb2a>`) so re-scheduling the same reminder produces the same id; ntfy replaces and cancels by it. */
@@ -236,7 +241,7 @@ export function reminderTimes(task: Task, defaults: ReminderDefaults, isOpen: bo
 		return [];
 	}
 
-	const specs: readonly ReminderSpec[] = remind ?? (defaults.remindByDefault ? [{ kind: "offset", minutes: 0 }] : []);
+	const specs: readonly ReminderSpec[] = remind ?? defaultReminderSpecs(defaults);
 	if (specs.length === 0) {
 		return [];
 	}

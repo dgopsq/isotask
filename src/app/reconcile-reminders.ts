@@ -3,6 +3,7 @@ import { addMinutes, compareTaskDate } from "@/domain/dates";
 import { dueReminders, planReminders, toPushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { IsotaskSettings } from "@/domain/settings";
+import { reminderDefaultsOf } from "@/domain/settings";
 import { findStatus, isTerminal } from "@/domain/status";
 import type { StatusConfig } from "@/domain/status";
 import type { StatusId } from "@/domain/task";
@@ -71,7 +72,7 @@ export function makeReconcileReminders(deps: ReconcileRemindersDeps): () => Prom
 			tasksWithIsOpen,
 			addMinutes(now, -catchUp) as IsoDateTime,
 			addMinutes(now, lookahead * 60) as IsoDateTime,
-			{ remindByDefault: settings.reminders.remindByDefault, timeOfDay: settings.reminders.defaultTime },
+			reminderDefaultsOf(settings.reminders),
 		);
 		const desired = due.map(({ task, reminder }) => toPushMessage(task, reminder));
 
