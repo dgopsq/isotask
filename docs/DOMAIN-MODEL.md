@@ -202,7 +202,10 @@ new name/path.
 ## Reminders
 
 `domain/reminders.ts`. See ADR 0020 for why (no Obsidian notification API, ntfy push) and
-ADR 0021 (ntfy >= 2.16, reconcile from every client).
+ADR 0021 (ntfy >= 2.16, reconcile from every client). Wave 4 added a second, independent
+delivery path: a desktop OS notification fired directly from a running instance (see
+"Desktop notifications" below) — the browser `Notification` API Electron exposes, not an
+Obsidian-provided one, so it doesn't contradict ADR 0020's premise.
 
 - **Tokens** (`remind`, scalar or list): `none`; `0` (fire at the anchor); an offset `<n>m`/
   `<n>min`, `<n>h`, `<n>d`, `<n>w` before the anchor; a bare number, counted as minutes; or a
@@ -241,6 +244,17 @@ fired-reminder store — so two clients on the same topic converge instead of do
 Lookahead (`reminders.ntfy.lookaheadHours`, default 72) is clamped to ntfy's `Delay` cap (3 days
 on `ntfy.sh`); an HTTP 400 on a delayed publish halves the effective lookahead for the session
 (floor 1 h) and notices once.
+
+### Desktop notifications
+
+`app/fire-desktop-reminders.ts`, `domain/desktop-reminders.ts`. Desktop only, off by default
+(`reminders.desktopNotifications`), and independent of ntfy — both can be on at once. On
+vault-ready, every 30 s, and on window focus, it builds the same desired set as the ntfy
+reconciler but over a fixed `(now - catchUpMinutes, now]` window (no lookahead: nothing to
+schedule ahead of time for), and shows any reminder in it not already recorded in a per-device
+fired-reminder ledger (`localStorage`, not `data.json`, so it isn't synced — each device fires
+independently). The ledger key is `<reminderId>@<fireTime>`, so a rescheduled reminder (new fire
+time, same id) fires again. Clicking the notification opens the task note.
 
 ## Feed buckets
 
