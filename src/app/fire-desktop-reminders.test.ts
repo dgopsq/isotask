@@ -109,6 +109,13 @@ describe("makeFireDesktopReminders", () => {
 		expect(await fire()).toBe(0);
 	});
 
+	it("still fires a reminder due this minute when catch-up is 0", async () => {
+		const { store, fire } = makeHarness({ reminders: reminderSettings({ catchUpMinutes: 0 }), now: "2026-09-20T09:00" });
+		store.seed(path("Tasks/Now.md"), { type: "task", status: "todo", due: "2026-09-20T09:00" });
+
+		expect(await fire()).toBe(1);
+	});
+
 	it("does not fire a reminder for a closed task", async () => {
 		const { store, fire } = makeHarness({ now: "2026-09-20T09:00" });
 		store.seed(path("Tasks/Done.md"), { type: "task", status: "done", due: "2026-09-20T08:40" });

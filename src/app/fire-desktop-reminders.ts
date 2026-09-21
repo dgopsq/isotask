@@ -11,6 +11,9 @@ import type { Clock } from "@/ports/clock";
 import type { FiredReminderLedger, SystemNotifier } from "@/ports/system-notifier";
 import type { TaskStore } from "@/ports/task-store";
 
+/** Floor on the look-back: with a catch-up of 0 the window `(now, now]` would be empty and nothing would ever fire. */
+const MIN_WINDOW_MINUTES = 1;
+
 export interface FireDesktopRemindersDeps {
 	readonly store: TaskStore;
 	readonly clock: Clock;
@@ -31,7 +34,7 @@ export function makeFireDesktopReminders(deps: FireDesktopRemindersDeps): () => 
 		}
 
 		const now = deps.clock.now();
-		const cutoff = addMinutes(now, -settings.reminders.catchUpMinutes) as IsoDateTime;
+		const cutoff = addMinutes(now, -Math.max(settings.reminders.catchUpMinutes, MIN_WINDOW_MINUTES)) as IsoDateTime;
 		const loaded = deps.ledger.load();
 		const fired = pruneFired(loaded, cutoff);
 

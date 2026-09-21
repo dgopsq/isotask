@@ -13,7 +13,6 @@ export function firedKey(id: ReminderId, at: IsoDateTime): string {
 	return `${id}@${at}`;
 }
 
-/** The due items not already recorded as fired. */
 export function remindersToShow<T extends { readonly reminder: ReminderInstance }>(
 	due: readonly T[],
 	fired: readonly FiredReminder[],
