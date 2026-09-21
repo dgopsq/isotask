@@ -4,9 +4,7 @@ import { dueReminders, planReminders, toPushMessage } from "@/domain/reminder-pl
 import type { ReminderId } from "@/domain/reminders";
 import type { IsotaskSettings } from "@/domain/settings";
 import { reminderDefaultsOf } from "@/domain/settings";
-import { findStatus, isTerminal } from "@/domain/status";
-import type { StatusConfig } from "@/domain/status";
-import type { StatusId } from "@/domain/task";
+import { isOpenStatus } from "@/domain/status";
 import type { Clock } from "@/ports/clock";
 import type { PushChannel, PushError, PushPublishOptions } from "@/ports/push-channel";
 import type { TaskStore } from "@/ports/task-store";
@@ -36,14 +34,6 @@ export type ReconcileOutcome =
 	  };
 
 export const MIN_LOOKAHEAD_HOURS = 1;
-
-function isOpenStatus(statuses: readonly StatusConfig[], statusId: StatusId): boolean {
-	const found = findStatus(statuses, statusId);
-	if (!found.some) {
-		return true;
-	}
-	return !isTerminal(found.value.kind);
-}
 
 /** The poll is the ledger. The Delay cap lives in the closure because ntfy exposes no way to read its limit: it is only learned from a 400 in this session. */
 export function makeReconcileReminders(deps: ReconcileRemindersDeps): () => Promise<ReconcileOutcome> {

@@ -1,5 +1,6 @@
 import type { IsoDate, IsoDateTime } from "@/domain/dates";
 import { compareTaskDate } from "@/domain/dates";
+import type { FiredReminder } from "@/domain/desktop-reminders";
 import type { FrontmatterPatch, FrontmatterValue } from "@/domain/frontmatter";
 import { parseTask } from "@/domain/frontmatter";
 import type { History } from "@/domain/history";
@@ -15,6 +16,7 @@ import type { Clock } from "@/ports/clock";
 import type { Notifier } from "@/ports/notifier";
 import type { PushChannel, PushError, PushListOptions, PushPublishOptions } from "@/ports/push-channel";
 import type { RescheduleEntry, RescheduleHistory } from "@/ports/reschedule-history";
+import type { FiredReminderLedger, SystemNotification, SystemNotifier } from "@/ports/system-notifier";
 import type { NewTaskFile, TaskStore, TaskStoreError } from "@/ports/task-store";
 
 interface FakeNote {
@@ -252,5 +254,39 @@ export class FakeNotifier implements Notifier {
 
 	error = (message: string): void => {
 		this.errorMessages.push(message);
+	};
+}
+
+/** In-memory `SystemNotifier` for `app/` use-case tests: records every shown notification and its click callback. */
+export class FakeSystemNotifier implements SystemNotifier {
+	readonly shown: { notification: SystemNotification; onClick: () => void }[] = [];
+	private available = true;
+	private permissionGranted = true;
+
+	setAvailable(value: boolean): void {
+		this.available = value;
+	}
+
+	setPermissionGranted(value: boolean): void {
+		this.permissionGranted = value;
+	}
+
+	isAvailable = (): boolean => this.available;
+
+	requestPermission = async (): Promise<boolean> => this.permissionGranted;
+
+	show = (notification: SystemNotification, onClick: () => void): void => {
+		this.shown.push({ notification, onClick });
+	};
+}
+
+/** In-memory `FiredReminderLedger` for `app/` use-case tests, backed by a plain array rather than `localStorage`. */
+export class FakeFiredReminderLedger implements FiredReminderLedger {
+	private entries: readonly FiredReminder[] = [];
+
+	load = (): readonly FiredReminder[] => this.entries;
+
+	save = (entries: readonly FiredReminder[]): void => {
+		this.entries = entries;
 	};
 }
