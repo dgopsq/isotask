@@ -55,3 +55,12 @@ export function toggleStatus(configs: readonly StatusConfig[], currentId: Status
 	}
 	return firstDoneStatus(configs);
 }
+
+/** An unconfigured/unknown status id counts as open, so a task never silently stops reminding. */
+export function isOpenStatus(configs: readonly StatusConfig[], id: StatusId): boolean {
+	const found = findStatus(configs, id);
+	if (!found.some) {
+		return true;
+	}
+	return !isTerminal(found.value.kind);
+}

@@ -43,6 +43,8 @@ export interface ReminderSettings {
 	readonly defaultTime: string;
 	/** Reminders missed while the app was closed are replayed at most this far back. */
 	readonly catchUpMinutes: number;
+	/** Desktop-only: fires a system Notification for a due reminder while this Obsidian instance is open. */
+	readonly desktopNotifications: boolean;
 	readonly ntfy: NtfySettings;
 }
 
@@ -50,6 +52,7 @@ export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
 	remindByDefault: true,
 	defaultTime: "09:00",
 	catchUpMinutes: 60,
+	desktopNotifications: false,
 	ntfy: {
 		enabled: false,
 		serverUrl: "https://ntfy.sh",
@@ -147,6 +150,7 @@ const ReminderSettingsSchema = v.fallback(
 		remindByDefault: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.remindByDefault),
 		defaultTime: v.fallback(v.pipe(v.string(), v.regex(TIME_OF_DAY_RE)), DEFAULT_REMINDER_SETTINGS.defaultTime),
 		catchUpMinutes: v.fallback(v.pipe(v.number(), v.integer(), v.minValue(0)), DEFAULT_REMINDER_SETTINGS.catchUpMinutes),
+		desktopNotifications: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.desktopNotifications),
 		ntfy: NtfySettingsSchema,
 	}),
 	DEFAULT_REMINDER_SETTINGS,
