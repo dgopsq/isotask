@@ -9,11 +9,14 @@ import { makeNavigationMemory } from "@/adapters/navigation/navigation-memory";
 import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
 import { registerCompletionWatcher } from "@/adapters/obsidian/completion-watcher";
+import { createDesktopNotifier } from "@/adapters/obsidian/desktop-notifier";
+import { createDesktopReminderLedger } from "@/adapters/obsidian/desktop-reminder-ledger";
+import { registerDesktopReminderTicker } from "@/adapters/obsidian/desktop-reminder-ticker";
 import { createObsidianHaptics } from "@/adapters/obsidian/haptics";
 import { registerTaskMenus } from "@/adapters/obsidian/menus";
 import { createNtfyChannel, describePushError } from "@/adapters/obsidian/ntfy-channel";
 import { createObsidianNotifier } from "@/adapters/obsidian/notifier";
-import { registerProtocolHandlers } from "@/adapters/obsidian/protocol-handler";
+import { openTaskNote, registerProtocolHandlers } from "@/adapters/obsidian/protocol-handler";
 import { registerReminderReconciler } from "@/adapters/obsidian/reminder-reconciler";
 import { VaultTaskStore } from "@/adapters/obsidian/task-store";
 import { registerTaskViewActions } from "@/adapters/obsidian/view-actions";
@@ -23,6 +26,7 @@ import { makeCheckNtfyCapability } from "@/app/check-ntfy-capability";
 import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import type { AppDeps } from "@/app/deps";
+import { makeFireDesktopReminders } from "@/app/fire-desktop-reminders";
 import { makeReconcileReminders } from "@/app/reconcile-reminders";
 import { makeRescheduleTask } from "@/app/reschedule-task";
 import { makeSetDate } from "@/app/set-date";
@@ -73,6 +77,8 @@ export default class IsotaskPlugin extends Plugin {
 			getConfig: () => this.pluginSettings.reminders.ntfy,
 			getVaultName: () => this.app.vault.getName(),
 		});
+		const desktopNotifier = createDesktopNotifier();
+		const firedReminderLedger = createDesktopReminderLedger(this.app);
 		const calendarRenderer = new EventCalendarRenderer();
 		// Session-only: deliberately not persisted across reloads (see
 		// `adapters/history/reschedule-history.ts`), so it's built fresh here
@@ -107,6 +113,16 @@ export default class IsotaskPlugin extends Plugin {
 		const redoReschedule = makeRedoReschedule(appDeps);
 		const reconcileReminders = makeReconcileReminders({ store, clock, channel, settings: () => this.pluginSettings });
 		const checkNtfy = makeCheckNtfyCapability({ channel, clock });
+		const fireDesktopReminders = makeFireDesktopReminders({
+			store,
+			clock,
+			notifier: desktopNotifier,
+			ledger: firedReminderLedger,
+			settings: () => this.pluginSettings,
+			openTask: (path) => {
+				openTaskNote(this.app, path);
+			},
+		});
 
 		registerViews(this, {
 			app: this.app,
@@ -183,6 +199,7 @@ export default class IsotaskPlugin extends Plugin {
 		registerCompletionWatcher(this, appDeps);
 		registerReminderReconciler(this, { reconcile: reconcileReminders, notifier, describeError: describePushError, getPropertyKeys: () => this.pluginSettings.propertyKeys });
 		registerProtocolHandlers(this);
+		registerDesktopReminderTicker(this, fireDesktopReminders);
 
 		this.registerView(VIEW_TYPE_TASK_PANEL, (leaf) => new TaskPanelView(leaf, { ...taskMenuDeps, convertNote }));
 
@@ -226,6 +243,7 @@ export default class IsotaskPlugin extends Plugin {
 						notifier.error("This server is older than ntfy 2.16.");
 					}
 				},
+				requestDesktopNotificationPermission: () => desktopNotifier.requestPermission(),
 			}),
 		);
 	}
