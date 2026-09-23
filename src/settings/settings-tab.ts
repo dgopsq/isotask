@@ -1,5 +1,5 @@
 import type { App, Plugin, SettingDefinitionItem } from "obsidian";
-import { Platform, PluginSettingTab } from "obsidian";
+import { Notice, Platform, PluginSettingTab } from "obsidian";
 
 import type { IsotaskSettings } from "@/adapters/obsidian/settings";
 import type { Weekday } from "@/domain/dates";
@@ -51,7 +51,9 @@ type ReminderSettingKey =
 	| "ntfyServerUrl"
 	| "ntfyTopic"
 	| "ntfyLookaheadHours";
-type SettingKey = keyof PropertyKeys | ScalarSettingKey | ReminderSettingKey;
+/** Handled outside `REMINDER_SETTINGS`: turning it on is async (requests OS permission) and can be refused. */
+const DESKTOP_NOTIFICATIONS_KEY = "desktopNotifications" as const;
+type SettingKey = keyof PropertyKeys | ScalarSettingKey | ReminderSettingKey | typeof DESKTOP_NOTIFICATIONS_KEY;
 
 const TIME_OF_DAY_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -153,6 +155,7 @@ export interface SettingsTabDeps {
 	readonly setSettings: (settings: IsotaskSettings) => Promise<void>;
 	readonly copyAgentInstructions: () => Promise<void>;
 	readonly checkNtfy: () => Promise<void>;
+	readonly enableDesktopNotifications: () => Promise<boolean>;
 }
 
 /**
@@ -238,6 +241,12 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						control: { type: "number", key: "reminderCatchUpMinutes", min: 0, step: 1 },
 					},
 					{
+						name: "Desktop notifications",
+						desc: "Show a system notification when a reminder fires while Obsidian is open on this computer.",
+						control: { type: "toggle", key: DESKTOP_NOTIFICATIONS_KEY },
+						visible: () => Platform.isDesktopApp,
+					},
+					{
 						name: "Send via ntfy",
 						desc: "Requires ntfy 2.16 or newer. Reminders are scheduled on the server ahead of time from every device this is on, so they arrive even while Obsidian is closed. Task titles and dates are sent to that server, and the token below is stored in the plugin's data file, which Obsidian Sync copies to every device.",
 						control: { type: "toggle", key: "ntfyEnabled" },
@@ -320,6 +329,9 @@ export class IsotaskSettingTab extends PluginSettingTab {
 	override getControlValue(key: string): unknown {
 		const settings = this.deps.getSettings();
 
+		if (key === DESKTOP_NOTIFICATIONS_KEY) {
+			return settings.reminders.desktopNotifications;
+		}
 		if (isPropertyKeySetting(key)) {
 			return settings.propertyKeys[key];
 		}
@@ -335,6 +347,9 @@ export class IsotaskSettingTab extends PluginSettingTab {
 	override setControlValue(key: string, value: unknown): void | Promise<void> {
 		const settings = this.deps.getSettings();
 
+		if (key === DESKTOP_NOTIFICATIONS_KEY) {
+			return this.setDesktopNotifications(Boolean(value));
+		}
 		if (isPropertyKeySetting(key)) {
 			return this.deps.setSettings({
 				...settings,
@@ -348,5 +363,21 @@ export class IsotaskSettingTab extends PluginSettingTab {
 			return this.deps.setSettings(REMINDER_SETTINGS[key].set(settings, value));
 		}
 		return undefined;
+	}
+
+	/** Turning it off is unconditional; turning it on requests OS permission first and leaves the setting off on denial. */
+	private async setDesktopNotifications(enabled: boolean): Promise<void> {
+		const settings = this.deps.getSettings();
+		if (!enabled) {
+			await this.deps.setSettings({ ...settings, reminders: { ...settings.reminders, desktopNotifications: false } });
+			return;
+		}
+
+		const granted = await this.deps.enableDesktopNotifications();
+		if (!granted) {
+			new Notice("Isotask: desktop notifications must be allowed for Obsidian in your system settings.");
+			return;
+		}
+		await this.deps.setSettings({ ...settings, reminders: { ...settings.reminders, desktopNotifications: true } });
 	}
 }

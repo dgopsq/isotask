@@ -168,4 +168,15 @@ describe("parseSettings", () => {
 		expect(result.reminders.remindByDefault).toBe(false);
 		expect(result.reminders.catchUpMinutes).toBe(DEFAULT_REMINDER_SETTINGS.catchUpMinutes);
 	});
+
+	it("keeps a valid reminders.desktopNotifications flag and falls back an invalid one", () => {
+		expect(parseSettings({ reminders: { desktopNotifications: true } }).reminders.desktopNotifications).toBe(true);
+		expect(parseSettings({ reminders: { desktopNotifications: "yes" } }).reminders.desktopNotifications).toBe(
+			DEFAULT_REMINDER_SETTINGS.desktopNotifications,
+		);
+	});
+
+	it("defaults reminders.desktopNotifications to false", () => {
+		expect(DEFAULT_REMINDER_SETTINGS.desktopNotifications).toBe(false);
+	});
 });

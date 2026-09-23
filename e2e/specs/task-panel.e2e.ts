@@ -451,11 +451,96 @@ describe("Reminders", function () {
 				const tab = setting.pluginTabs.find((t) => t.id === "isotask");
 				return tab?.containerEl === undefined ? [] : Array.from(tab.containerEl.querySelectorAll(".setting-item-name")).map((el) => el.textContent);
 			});
-			expect(names).toEqual(expect.arrayContaining(["Send via ntfy", "Lookahead", "Check ntfy server"]));
+			expect(names).toEqual(expect.arrayContaining(["Send via ntfy", "Lookahead", "Check ntfy server", "Desktop notifications"]));
 		} finally {
 			await browser.executeObsidian(({ app }) => {
 				(app as unknown as AppWithSettingModal).setting.close();
 			});
+		}
+	});
+
+	// Settings tab rows with a `control` are driven through `getControlValue`/`setControlValue`
+	// (see `settings-tab.ts`), so exercising the toggle through that same entry point covers the
+	// real production path without needing to reach into the settings window's DOM (see the
+	// `AppWithSettingModal` comment above).
+	interface AppWithSettingControls {
+		readonly setting: {
+			readonly openTabById: (id: string) => void;
+			readonly pluginTabs: readonly { readonly id?: string; readonly setControlValue?: (key: string, value: unknown) => void | Promise<void> }[];
+		};
+	}
+
+	it("fires a desktop notification for a due reminder and opens the task on click", async function () {
+		const path = "Tasks/Desktop notification test.md";
+		const pad = (n: number): string => String(n).padStart(2, "0");
+		// 10 minutes ago: inside the default 60-minute catch-up window, already due.
+		const due = new Date(Date.now() - 10 * 60_000);
+		const dueValue = `${String(due.getFullYear())}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}T${pad(due.getHours())}:${pad(due.getMinutes())}`;
+
+		try {
+			await browser.executeObsidian(
+				async ({ app }, p: string, content: string) => {
+					await app.vault.create(p, content);
+				},
+				path,
+				noteContent({ type: "task", status: "todo", due: dueValue }, ""),
+			);
+
+			// Stub the OS Notification API before enabling the setting: `permission` already
+			// "granted" so `requestPermission()` (`desktop-notifier.ts`) resolves without a real
+			// system prompt, and every constructed notification is recorded on `window` for the
+			// assertion below.
+			await browser.executeObsidian(() => {
+				interface Recorded {
+					readonly title: string;
+					readonly body: string;
+				}
+				const recorded: Recorded[] = [];
+				(window as unknown as { __isotaskNotifications: Recorded[] }).__isotaskNotifications = recorded;
+				class StubNotification {
+					static permission = "granted";
+					static requestPermission = async (): Promise<string> => "granted";
+					onclick: (() => void) | null = null;
+					constructor(title: string, options?: { body?: string }) {
+						recorded.push({ title, body: options?.body ?? "" });
+					}
+				}
+				(window as unknown as { Notification: unknown }).Notification = StubNotification;
+			});
+
+			await browser.executeObsidian(async ({ app }) => {
+				const setting = (app as unknown as AppWithSettingControls).setting;
+				setting.openTabById("isotask");
+				const tab = setting.pluginTabs.find((t) => t.id === "isotask");
+				await tab?.setControlValue?.("desktopNotifications", true);
+			});
+
+			// The ticker (`desktop-reminder-ticker.ts`) also fires on window focus.
+			await browser.execute(() => {
+				window.dispatchEvent(new Event("focus"));
+			});
+
+			await browser.waitUntil(
+				async () => {
+					const recorded = await browser.execute(() => (window as unknown as { __isotaskNotifications?: { title: string }[] }).__isotaskNotifications ?? []);
+					return recorded.some((n) => n.title === "Desktop notification test");
+				},
+				{ timeout: SELECT_TIMEOUT, timeoutMsg: "expected a desktop notification for the due reminder" },
+			);
+
+			const recorded = await browser.execute(() => (window as unknown as { __isotaskNotifications: { title: string }[] }).__isotaskNotifications);
+			// Enabling the setting fires reminders for the whole fixture vault, not just this task
+			// (e.g. "Standup" is due whenever the suite runs between 11:00-12:00 local) — filter to this test's own titles.
+			const relevant = recorded.filter((n) => n.title === "Desktop notifications are on" || n.title === "Desktop notification test");
+			expect(relevant.map((n) => n.title)).toEqual(["Desktop notifications are on", "Desktop notification test"]);
+		} finally {
+			await browser.executeObsidian(async ({ app }) => {
+				const setting = (app as unknown as AppWithSettingControls).setting;
+				setting.openTabById("isotask");
+				const tab = setting.pluginTabs.find((t) => t.id === "isotask");
+				await tab?.setControlValue?.("desktopNotifications", false);
+			});
+			await deleteNoteIfExists(path);
 		}
 	});
 });

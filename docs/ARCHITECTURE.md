@@ -12,10 +12,11 @@ src/
                transitions, settings (type + defaults + `parseSettings`). No `obsidian` import.
                100% unit-tested with vitest.
   ports/       interfaces the core needs: Clock, TaskStore, Notifier, Haptics,
-               CalendarRenderer, PathResolver, PushChannel.
+               CalendarRenderer, PathResolver, PushChannel, SystemNotifier, FiredReminderLedger.
   app/         use-cases, each a `make*(deps: AppDeps) => (...) => Promise<Result<...>>` factory
                over `deps.ts`'s ports: `createTask`, `setStatus` (incl. complete -> spawn),
-               `toggleDone`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`, plus the
+               `toggleDone`, `convertNote`, `setDate`, `setDuration`, `setRecurrence`,
+               `reconcileReminders` (ntfy), `fireDesktopReminders` (OS notification), plus the
                pure `generateBase#renderTasksBase`. `errors.ts` holds the shared `AppError` union
                and `describeAppError`/`describeRecurrenceError`. Pure orchestration over ports;
                unit-tested with in-memory fakes (`app/test/fakes.ts`).
@@ -26,7 +27,12 @@ src/
                valibot validation — see the note below); ntfy-channel.ts (PushChannel over
                requestUrl); reminder-reconciler.ts (runs reconcileReminders after indexing,
                every 15 min, on focus/visibility and after task-note changes);
-               protocol-handler.ts (obsidian://isotask/open, opens the task a reminder fired for).
+               desktop-notifier.ts (SystemNotifier over the browser Notification API, desktop
+               only); desktop-reminder-ledger.ts (FiredReminderLedger over loadLocalStorage/
+               saveLocalStorage, per device); desktop-reminder-ticker.ts (runs
+               fireDesktopReminders after indexing, every 30 s, and on focus);
+               protocol-handler.ts (obsidian://isotask/open, opens the task a reminder fired for;
+               `openTaskNote` is shared with the desktop notifier's click-through).
     calendar/event-calendar/  CalendarRenderer implementation. Only file tree allowed to import
                `@event-calendar/*`.
   views/bases/feed/, views/bases/calendar/   BasesView subclasses: thin, map entries -> domain,
@@ -380,6 +386,15 @@ use-cases (never imported directly by `domain`).
   `listKnown({sinceSeconds})` (returns `{id, at}` per held or recently delivered message), all
   `Result<_, PushError>`. Implemented by `adapters/obsidian/ntfy-channel.ts`; requires ntfy ≥ 2.16
   (ADR 0021).
+- **SystemNotifier** — desktop-only OS notifications, independent of ntfy (`src/ports/
+  system-notifier.ts`). Methods: `isAvailable()`, `requestPermission(): Promise<boolean>`,
+  `show({id, title, body}, onClick)`. Implemented by `adapters/obsidian/desktop-notifier.ts` over
+  the browser `Notification` API; `isAvailable()` is false on mobile, without permission, or
+  without the API at all.
+- **FiredReminderLedger** — the dedup source for `fireDesktopReminders`, since there's no server
+  poll to converge on (`src/ports/system-notifier.ts`). Methods: `load()`, `save(entries)`, each
+  entry `{key, at}`. Implemented by `adapters/obsidian/desktop-reminder-ledger.ts` over
+  `loadLocalStorage`/`saveLocalStorage`, so it's per device, not synced.
 
 ## Composition root
 

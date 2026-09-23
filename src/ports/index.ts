@@ -11,4 +11,5 @@ export type {
 export type { Notifier } from "@/ports/notifier";
 export type { PushChannel, PushError, PushListOptions, PushPublishOptions } from "@/ports/push-channel";
 export type { NavigationMemory } from "@/ports/navigation-memory";
+export type { FiredReminderLedger, SystemNotification, SystemNotifier } from "@/ports/system-notifier";
 export type { NewTaskFile, TaskStore, TaskStoreError } from "@/ports/task-store";

@@ -37,6 +37,10 @@ migrate away from: the notes are still just notes.
 - **Priorities** are normal, high, or urgent.
 - **Projects** are a wikilink to a project note; that note's `color` property colours the task in
   the feed and on the calendar.
+- **Reminders**: every dated open task reminds once by default (`remind` property to customize or
+  opt out). Delivered as a desktop system notification while Obsidian is open (toggle in
+  settings), and/or pushed via [ntfy](https://ntfy.sh) so they still arrive while Obsidian is
+  closed. See [reminders](docs/DOMAIN-MODEL.md#reminders).
 - **Task panel** is a sidebar form for the active note, with a command for every field.
 - **Mobile** ready: no desktop-only APIs, long-press to drag events on the calendar, haptic feedback on iOS (toggle in settings).
 - **Your property names** every frontmatter key is renameable in settings, not just the ones shown
@@ -50,6 +54,8 @@ migrate away from: the notes are still just notes.
 - **New task filename template**, **spawn filename template**: filename for a new or spawned task
   note, supporting `{{title}}` and (spawn only) `{{due}}`.
 - **Week starts on**: which day the feed's this week / next week buckets split on.
+- **Reminders**: remind-by-default, default reminder time, catch-up window, desktop notifications
+  (desktop only), and ntfy server/topic/token/lookahead.
 - **Property keys**: every frontmatter key above, plus the marker key/value that identifies a note
   as a task, individually renameable.
 
@@ -84,8 +90,8 @@ Download `main.js`, `manifest.json`, and `styles.css` from the
 [latest release](https://github.com/dgopsq/isotask/releases/latest) into
 `<vault>/.obsidian/plugins/isotask/`, then reload Obsidian and enable Isotask in Settings.
 
-Isotask requires Obsidian 1.13.0 or later (Bases). Push reminders need an ntfy server running
-2.16 or newer (ntfy.sh qualifies).
+Isotask requires Obsidian 1.13.0 or later (Bases). Desktop notifications work standalone on
+desktop; push reminders need an ntfy server running 2.16 or newer (ntfy.sh qualifies).
 
 To update, repeat the manual steps above with the new release's files.
 

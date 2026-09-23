@@ -1,4 +1,4 @@
-import type { Plugin } from "obsidian";
+import type { App, Plugin } from "obsidian";
 import { normalizePath, Notice } from "obsidian";
 
 import { PROTOCOL_OPEN_ACTION } from "@/plugin-id";
@@ -9,6 +9,16 @@ export function parseOpenParams(params: Record<string, string>): { readonly path
 	return path === undefined || path === "" ? undefined : { path };
 }
 
+/** Shared by the protocol handler and the desktop reminder notifier's click-through. Notices, rather than throwing, when the note is gone. */
+export function openTaskNote(app: App, path: string): void {
+	const normalized = normalizePath(path);
+	if (app.vault.getFileByPath(normalized) === null) {
+		new Notice(`Isotask: could not find ${normalized}.`);
+		return;
+	}
+	void app.workspace.openLinkText(normalized, "", false);
+}
+
 /** `obsidian://<id>/open?vault=…&path=…&rid=…` — the click-through URL `ntfy-request.ts#clickUrlFor` builds. `rid` isn't used yet (no per-reminder action on open); reserved for wave 2b. */
 export function registerProtocolHandlers(plugin: Plugin): void {
 	plugin.registerObsidianProtocolHandler(PROTOCOL_OPEN_ACTION, (params) => {
@@ -16,11 +26,6 @@ export function registerProtocolHandlers(plugin: Plugin): void {
 		if (parsed === undefined) {
 			return;
 		}
-		const path = normalizePath(parsed.path);
-		if (plugin.app.vault.getFileByPath(path) === null) {
-			new Notice(`Isotask: could not find ${path}.`);
-			return;
-		}
-		void plugin.app.workspace.openLinkText(path, "", false);
+		openTaskNote(plugin.app, parsed.path);
 	});
 }
