@@ -523,13 +523,16 @@ describe("Reminders", function () {
 			await browser.waitUntil(
 				async () => {
 					const recorded = await browser.execute(() => (window as unknown as { __isotaskNotifications?: { title: string }[] }).__isotaskNotifications ?? []);
-					return recorded.length > 0;
+					return recorded.some((n) => n.title === "Desktop notification test");
 				},
 				{ timeout: SELECT_TIMEOUT, timeoutMsg: "expected a desktop notification for the due reminder" },
 			);
 
 			const recorded = await browser.execute(() => (window as unknown as { __isotaskNotifications: { title: string }[] }).__isotaskNotifications);
-			expect(recorded.map((n) => n.title)).toEqual(["Desktop notification test"]);
+			// Enabling the setting fires reminders for the whole fixture vault, not just this task
+			// (e.g. "Standup" is due whenever the suite runs between 11:00-12:00 local) — filter to this test's own titles.
+			const relevant = recorded.filter((n) => n.title === "Desktop notifications are on" || n.title === "Desktop notification test");
+			expect(relevant.map((n) => n.title)).toEqual(["Desktop notifications are on", "Desktop notification test"]);
 		} finally {
 			await browser.executeObsidian(async ({ app }) => {
 				const setting = (app as unknown as AppWithSettingControls).setting;

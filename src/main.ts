@@ -243,7 +243,16 @@ export default class IsotaskPlugin extends Plugin {
 						notifier.error("This server is older than ntfy 2.16.");
 					}
 				},
-				requestDesktopNotificationPermission: () => desktopNotifier.requestPermission(),
+				enableDesktopNotifications: async () => {
+					const granted = await desktopNotifier.requestPermission();
+					if (granted) {
+						desktopNotifier.show(
+							{ id: "desktop-notifications-enabled", title: "Desktop notifications are on", body: "Reminders will appear here when they're due." },
+							() => undefined,
+						);
+					}
+					return granted;
+				},
 			}),
 		);
 	}

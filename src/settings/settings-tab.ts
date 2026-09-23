@@ -155,7 +155,7 @@ export interface SettingsTabDeps {
 	readonly setSettings: (settings: IsotaskSettings) => Promise<void>;
 	readonly copyAgentInstructions: () => Promise<void>;
 	readonly checkNtfy: () => Promise<void>;
-	readonly requestDesktopNotificationPermission: () => Promise<boolean>;
+	readonly enableDesktopNotifications: () => Promise<boolean>;
 }
 
 /**
@@ -373,7 +373,7 @@ export class IsotaskSettingTab extends PluginSettingTab {
 			return;
 		}
 
-		const granted = await this.deps.requestDesktopNotificationPermission();
+		const granted = await this.deps.enableDesktopNotifications();
 		if (!granted) {
 			new Notice("Isotask: desktop notifications must be allowed for Obsidian in your system settings.");
 			return;
