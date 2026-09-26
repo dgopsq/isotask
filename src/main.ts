@@ -23,6 +23,7 @@ import { registerTaskViewActions } from "@/adapters/obsidian/view-actions";
 import type { IsotaskApi } from "@/app/agent-instructions";
 import { renderAgentInstructions } from "@/app/agent-instructions";
 import { makeCheckNtfyCapability } from "@/app/check-ntfy-capability";
+import { makeCompleteTask } from "@/app/complete-task";
 import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import type { AppDeps } from "@/app/deps";
@@ -37,6 +38,7 @@ import { makeSetRecurrence } from "@/app/set-recurrence";
 import { makeSetReminder } from "@/app/set-reminder";
 import { makeSetStatus } from "@/app/set-status";
 import { makeSetTags } from "@/app/set-tags";
+import { makeSnoozeReminder } from "@/app/snooze-reminder";
 import { makeToggleDone } from "@/app/toggle-done";
 import { makeRedoReschedule, makeUndoReschedule } from "@/app/undo-reschedule";
 import { registerCommands } from "@/commands/register-commands";
@@ -109,6 +111,8 @@ export default class IsotaskPlugin extends Plugin {
 		const setReminder = makeSetReminder(appDeps);
 		const getReminderDefaults = () => reminderDefaultsOf(this.pluginSettings.reminders);
 		const setTags = makeSetTags(appDeps);
+		const completeTask = makeCompleteTask(appDeps);
+		const snoozeReminder = makeSnoozeReminder(appDeps);
 		const undoReschedule = makeUndoReschedule(appDeps);
 		const redoReschedule = makeRedoReschedule(appDeps);
 		const reconcileReminders = makeReconcileReminders({ store, clock, channel, settings: () => this.pluginSettings });
@@ -198,7 +202,7 @@ export default class IsotaskPlugin extends Plugin {
 		registerTaskViewActions(this, taskMenuDeps);
 		registerCompletionWatcher(this, appDeps);
 		registerReminderReconciler(this, { reconcile: reconcileReminders, notifier, describeError: describePushError, getPropertyKeys: () => this.pluginSettings.propertyKeys });
-		registerProtocolHandlers(this);
+		registerProtocolHandlers(this, { completeTask, snoozeReminder, notifier });
 		registerDesktopReminderTicker(this, fireDesktopReminders);
 
 		this.registerView(VIEW_TYPE_TASK_PANEL, (leaf) => new TaskPanelView(leaf, { ...taskMenuDeps, convertNote }));

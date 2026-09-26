@@ -1,7 +1,7 @@
 import type { RequestUrlResponse } from "obsidian";
 import { requestUrl } from "obsidian";
 
-import { buildCancelRequest, buildNtfyRequest, buildPollRequest, clickUrlFor, normalizeServerUrl, parseKnownReminders, serverUrlError } from "@/adapters/obsidian/ntfy-request";
+import { buildCancelRequest, buildNtfyRequest, buildPollRequest, normalizeServerUrl, parseKnownReminders, serverUrlError } from "@/adapters/obsidian/ntfy-request";
 import type { ReminderId } from "@/domain/reminders";
 import type { Result } from "@/domain/result";
 import { err, ok } from "@/domain/result";
@@ -47,8 +47,7 @@ export function createNtfyChannel(deps: NtfyChannelDeps): PushChannel {
 			if (configErr !== undefined) {
 				return err(configErr);
 			}
-			const clickUrl = clickUrlFor(deps.getVaultName(), message);
-			const request = buildNtfyRequest(config, message, clickUrl, options);
+			const request = buildNtfyRequest(config, message, deps.getVaultName(), options);
 			try {
 				const response = await requestUrl({
 					url: request.url,

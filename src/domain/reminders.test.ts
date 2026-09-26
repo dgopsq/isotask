@@ -10,6 +10,7 @@ import type { ReminderDefaults, ReminderSpec } from "@/domain/reminders";
 import {
 	DEFAULT_REMINDER_DEFAULTS,
 	formatReminderSpec,
+	parseOffsetToken,
 	parseRemind,
 	reminderAnchor,
 	reminderId,
@@ -294,5 +295,37 @@ describe("reminderTimes", () => {
 			],
 		});
 		expect(reminderTimes(t, defaults, true)).toHaveLength(1);
+	});
+});
+
+describe("parseOffsetToken", () => {
+	it("parses each unit", () => {
+		expect(parseOffsetToken("30m")).toBe(30);
+		expect(parseOffsetToken("1h")).toBe(60);
+		expect(parseOffsetToken("2d")).toBe(2880);
+		expect(parseOffsetToken("1w")).toBe(10080);
+	});
+
+	it("is case-insensitive and trims whitespace", () => {
+		expect(parseOffsetToken(" 1H ")).toBe(60);
+	});
+
+	it("rejects 0", () => {
+		expect(parseOffsetToken("0")).toBeUndefined();
+		expect(parseOffsetToken("0m")).toBeUndefined();
+	});
+
+	it("rejects a negative amount", () => {
+		expect(parseOffsetToken("-1h")).toBeUndefined();
+	});
+
+	it("rejects garbage", () => {
+		expect(parseOffsetToken("soon")).toBeUndefined();
+		expect(parseOffsetToken("")).toBeUndefined();
+		expect(parseOffsetToken("1y")).toBeUndefined();
+	});
+
+	it("rejects an absolute datetime (not an offset)", () => {
+		expect(parseOffsetToken("2026-09-20T15:00")).toBeUndefined();
 	});
 });

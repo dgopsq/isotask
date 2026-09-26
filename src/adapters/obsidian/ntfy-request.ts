@@ -2,7 +2,7 @@ import { fromJsDateTime, toJsDate } from "@/domain/dates";
 import type { KnownReminder, PushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { NtfySettings } from "@/domain/settings";
-import { PROTOCOL_OPEN_ACTION } from "@/plugin-id";
+import { PROTOCOL_DONE_ACTION, PROTOCOL_OPEN_ACTION, PROTOCOL_SNOOZE_ACTION } from "@/plugin-id";
 import type { PushPublishOptions } from "@/ports/push-channel";
 
 // No `obsidian` import on purpose: keeps request building unit-testable without mocking the plugin API.
@@ -53,10 +53,36 @@ export function authHeaders(token: string): Record<string, string> {
 	return trimmed.includes(":") ? { Authorization: `Basic ${btoa(trimmed)}` } : { Authorization: `Bearer ${trimmed}` };
 }
 
+/** Every param must stay `encodeURIComponent`'d: a raw comma or semicolon breaks the ntfy Actions header. */
+function reminderActionUrl(action: string, vaultName: string, message: PushMessage, extra: readonly (readonly [string, string])[] = []): string {
+	const params = [["vault", vaultName], ["path", message.path], ["rid", message.id], ...extra]
+		.map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+		.join("&");
+	return `obsidian://${action}?${params}`;
+}
+
 /** The deep link a fired notification opens; `protocol-handler.ts` parses it back on the receiving device. */
 export function clickUrlFor(vaultName: string, message: PushMessage): string {
-	const params = `vault=${encodeURIComponent(vaultName)}&path=${encodeURIComponent(message.path)}&rid=${encodeURIComponent(message.id)}`;
-	return `obsidian://${PROTOCOL_OPEN_ACTION}?${params}`;
+	return reminderActionUrl(PROTOCOL_OPEN_ACTION, vaultName, message);
+}
+
+export function doneUrlFor(vaultName: string, message: PushMessage): string {
+	return reminderActionUrl(PROTOCOL_DONE_ACTION, vaultName, message);
+}
+
+/** Fixed at 1h: ntfy allows three actions, so there's room for only one snooze duration. */
+export function snoozeUrlFor(vaultName: string, message: PushMessage): string {
+	return reminderActionUrl(PROTOCOL_SNOOZE_ACTION, vaultName, message, [["for", "1h"]]);
+}
+
+/** ntfy's "simple" Actions format: up to 3 `view, <label>, <url>, clear=true` entries, `;`-separated. */
+function buildActionsHeader(vaultName: string, message: PushMessage): string {
+	const actions: readonly (readonly [string, string])[] = [
+		["Done", doneUrlFor(vaultName, message)],
+		["Snooze 1h", snoozeUrlFor(vaultName, message)],
+		["Open", clickUrlFor(vaultName, message)],
+	];
+	return actions.map(([label, url]) => `view, ${label}, ${url}, clear=true`).join("; ");
 }
 
 export interface NtfyRequest {
@@ -67,13 +93,14 @@ export interface NtfyRequest {
 }
 
 /** Builds the `POST` publish request, always keyed by `message.id` as the sequence id (ntfy >= 2.16). */
-export function buildNtfyRequest(config: NtfySettings, message: PushMessage, clickUrl: string, options?: PushPublishOptions): NtfyRequest {
+export function buildNtfyRequest(config: NtfySettings, message: PushMessage, vaultName: string, options?: PushPublishOptions): NtfyRequest {
 	const base = normalizeServerUrl(config.serverUrl);
 	const headers: Record<string, string> = {
 		Title: encodeHeaderValue(message.title),
 		Priority: String(message.priority),
 		Tags: message.tags.join(","),
-		Click: clickUrl,
+		Click: clickUrlFor(vaultName, message),
+		Actions: buildActionsHeader(vaultName, message),
 		"X-Sequence-ID": message.id,
 		...authHeaders(config.token),
 	};

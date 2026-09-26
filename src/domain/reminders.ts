@@ -85,6 +85,23 @@ function parseToken(raw: FrontmatterValue): Result<ReminderSpec, ReminderParseEr
 	return err({ kind: "invalid-remind", value: raw });
 }
 
+/** A bare offset token (`<n>m|h|d|w`), same grammar `parseRemind` uses; rejects `0`, negative amounts and garbage. Used by snooze's `for` param. */
+export function parseOffsetToken(raw: string): number | undefined {
+	const match = OFFSET_RE.exec(raw.trim().toLowerCase());
+	if (match === null) {
+		return undefined;
+	}
+	const amountText: string | undefined = match[1];
+	const unitText: string | undefined = match[2];
+	const amount = amountText === undefined ? 0 : Number(amountText);
+	const unitMinutes = unitText === undefined ? undefined : UNIT_MINUTES[unitText];
+	if (amount > 0 && Number.isSafeInteger(amount) && unitMinutes !== undefined) {
+		const minutes = amount * unitMinutes;
+		return isValidOffsetMinutes(minutes) ? minutes : undefined;
+	}
+	return undefined;
+}
+
 /**
  * Parses a `remind` frontmatter value into its spec list. `undefined`/`null`/empty -> `[]`.
  * A list containing `none` (anywhere, case-insensitive) collapses to `[none]` only.
