@@ -21,12 +21,6 @@ function keptSpecs(base: readonly ReminderSpec[], now: IsoDateTime): readonly Re
 	return base.filter((spec) => spec.kind === "offset" || (spec.kind === "absolute" && compareTaskDate(spec.at, now) > 0));
 }
 
-/**
- * Snoozes a reminder push by appending a fresh absolute entry `minutes` from
- * now to the task's `remind` list (materialising the vault default first if
- * `remind` was absent), pruning stale absolutes and `none`. Rejects a
- * non-task note, same as `set-reminder.ts`.
- */
 export function makeSnoozeReminder(deps: AppDeps) {
 	return async (path: TaskPath, minutes: number): Promise<Result<SnoozeReminderOutcome, AppError>> => {
 		const taskResult = await deps.store.read(path);

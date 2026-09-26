@@ -53,7 +53,7 @@ export function authHeaders(token: string): Record<string, string> {
 	return trimmed.includes(":") ? { Authorization: `Basic ${btoa(trimmed)}` } : { Authorization: `Bearer ${trimmed}` };
 }
 
-/** Every reminder-push deep link's shared param set; `encodeURIComponent` on `path` also keeps a comma/semicolon in it from breaking the ntfy Actions header, which uses both as delimiters. */
+/** Every param must stay `encodeURIComponent`'d: a raw comma or semicolon breaks the ntfy Actions header. */
 function reminderActionUrl(action: string, vaultName: string, message: PushMessage, extra: readonly (readonly [string, string])[] = []): string {
 	const params = [["vault", vaultName], ["path", message.path], ["rid", message.id], ...extra]
 		.map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
@@ -66,12 +66,11 @@ export function clickUrlFor(vaultName: string, message: PushMessage): string {
 	return reminderActionUrl(PROTOCOL_OPEN_ACTION, vaultName, message);
 }
 
-/** The reminder push's "Done" action link. */
 export function doneUrlFor(vaultName: string, message: PushMessage): string {
 	return reminderActionUrl(PROTOCOL_DONE_ACTION, vaultName, message);
 }
 
-/** The reminder push's "Snooze" action link; fixed at 1h — the Actions header only has room for one quick duration. */
+/** Fixed at 1h: ntfy allows three actions, so there's room for only one snooze duration. */
 export function snoozeUrlFor(vaultName: string, message: PushMessage): string {
 	return reminderActionUrl(PROTOCOL_SNOOZE_ACTION, vaultName, message, [["for", "1h"]]);
 }

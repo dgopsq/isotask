@@ -12,13 +12,7 @@ export interface CompleteTaskOutcome {
 	readonly alreadyDone: boolean;
 }
 
-/**
- * Idempotent "mark done" for the reminder push's Done action: a task that's
- * already closed is a no-op (never reopened), so tapping the action twice
- * is safe. Goes through the same status-transition path as `set-status.ts`/
- * `toggle-done.ts`, so recurrence spawning and the `completed` stamp behave
- * identically.
- */
+/** Never reopens a closed task: the Done action can be tapped twice, from two notifications. */
 export function makeCompleteTask(deps: AppDeps) {
 	const writeStatusTransition = makeWriteStatusTransition(deps);
 
