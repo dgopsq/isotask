@@ -45,10 +45,36 @@ describe("makeSnoozeReminder", () => {
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value).toEqual({ title: "Buy milk", until: "2026-09-02T11:00" });
+			expect(result.value).toEqual({ status: "snoozed", title: "Buy milk", until: "2026-09-02T11:00" });
 		}
 		// DEFAULT_REMINDER_SETTINGS.remindByDefault -> the "at time" (offset 0) default is kept alongside the new absolute.
 		expect(store.notes.get(path("Tasks/Buy milk.md"))?.frontmatter["remind"]).toEqual(["0", "2026-09-02T11:00"]);
+	});
+
+	it("refuses to snooze a task that's already done, without writing anything", async () => {
+		const { deps, store } = makeDeps();
+		store.seed(path("Tasks/Buy milk.md"), { type: "task", status: "done", remind: ["1h"] });
+
+		const result = await makeSnoozeReminder(deps)(path("Tasks/Buy milk.md"), 60);
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toEqual({ status: "already-done", title: "Buy milk" });
+		}
+		expect(store.notes.get(path("Tasks/Buy milk.md"))?.frontmatter["remind"]).toEqual(["1h"]);
+	});
+
+	it("refuses to snooze when remind failed to parse, without overwriting it with the default", async () => {
+		const { deps, store } = makeDeps();
+		store.seed(path("Tasks/Buy milk.md"), { type: "task", status: "todo", remind: ["30m", "2 hrs"] });
+
+		const result = await makeSnoozeReminder(deps)(path("Tasks/Buy milk.md"), 60);
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toEqual({ status: "invalid-remind", title: "Buy milk" });
+		}
+		expect(store.notes.get(path("Tasks/Buy milk.md"))?.frontmatter["remind"]).toEqual(["30m", "2 hrs"]);
 	});
 
 	it("keeps every existing offset spec", async () => {

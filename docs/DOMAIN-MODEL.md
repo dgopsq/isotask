@@ -265,7 +265,9 @@ reminder push carries a ntfy Actions header with Done/Snooze 1h/Open, each an
 toggle, so recurrence spawning and the `completed` stamp behave identically. Snooze appends a
 fresh absolute `remind` entry `now + duration`; it materialises the vault default first if `remind`
 was absent, prunes `none` and any absolute entry already in the past, and keeps every offset entry
-untouched (an offset may fire again after a later reschedule).
+untouched (an offset may fire again after a later reschedule). Snooze refuses to write, notifying
+instead, when the task is already done or when `remind` is present but failed to parse (so a
+typo'd list isn't silently overwritten with the default).
 
 ## Feed buckets
 

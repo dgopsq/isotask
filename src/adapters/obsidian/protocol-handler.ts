@@ -80,7 +80,18 @@ export function registerProtocolHandlers(plugin: Plugin, deps: ProtocolHandlerDe
 				deps.notifier.error(describeAppError(result.error));
 				return;
 			}
-			deps.notifier.info(`Snoozed "${result.value.title}" until ${formatTime(result.value.until)}.`);
+			const outcome = result.value;
+			switch (outcome.status) {
+				case "snoozed":
+					deps.notifier.info(`Snoozed "${outcome.title}" until ${formatTime(outcome.until)}.`);
+					break;
+				case "already-done":
+					deps.notifier.info(`"${outcome.title}" is already done.`);
+					break;
+				case "invalid-remind":
+					deps.notifier.error(`Isotask: fix the reminder on "${outcome.title}" before snoozing.`);
+					break;
+			}
 		})();
 	});
 }
