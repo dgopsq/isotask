@@ -21,6 +21,10 @@ export const CSS_PREFIX: string = PLUGIN_ID;
 
 /** The full path segment of the `obsidian://<id>/open` protocol action. */
 export const PROTOCOL_OPEN_ACTION = `${PLUGIN_ID}/open`;
+/** `obsidian://<id>/done` — the reminder push's "Done" action. */
+export const PROTOCOL_DONE_ACTION = `${PLUGIN_ID}/done`;
+/** `obsidian://<id>/snooze` — the reminder push's "Snooze" action. */
+export const PROTOCOL_SNOOZE_ACTION = `${PLUGIN_ID}/snooze`;
 
 /** Builds a prefixed CSS class name, e.g. `cssClass("feed")` -> `"isotask-feed"`. */
 export function cssClass(name: string): string {

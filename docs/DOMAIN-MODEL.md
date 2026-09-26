@@ -256,6 +256,17 @@ fired-reminder ledger (`localStorage`, not `data.json`, so it isn't synced — e
 independently). The ledger key is `<reminderId>@<fireTime>`, so a rescheduled reminder (new fire
 time, same id) fires again. Clicking the notification opens the task note.
 
+### Actions (Done/Snooze)
+
+`app/complete-task.ts`, `app/snooze-reminder.ts`, `adapters/obsidian/protocol-handler.ts`. Every
+reminder push carries a ntfy Actions header with Done/Snooze 1h/Open, each an
+`obsidian://isotask/<action>` deep link. Done is idempotent: a task already closed is left alone
+(never reopened by a second tap), otherwise it transitions through the same path as the feed's
+toggle, so recurrence spawning and the `completed` stamp behave identically. Snooze appends a
+fresh absolute `remind` entry `now + duration`; it materialises the vault default first if `remind`
+was absent, prunes `none` and any absolute entry already in the past, and keeps every offset entry
+untouched (an offset may fire again after a later reschedule).
+
 ## Feed buckets
 
 Buckets are computed by `domain/buckets.ts` from a configurable *date source* view option (`due`

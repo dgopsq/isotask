@@ -7,16 +7,20 @@ import {
 	buildNtfyRequest,
 	buildPollRequest,
 	clickUrlFor,
+	doneUrlFor,
 	encodeHeaderValue,
 	normalizeServerUrl,
 	parseKnownReminders,
 	serverUrlError,
+	snoozeUrlFor,
 } from "@/adapters/obsidian/ntfy-request";
 import type { PushMessage } from "@/domain/reminder-plan";
 import type { ReminderId } from "@/domain/reminders";
 import type { NtfySettings } from "@/domain/settings";
-import { PROTOCOL_OPEN_ACTION } from "@/plugin-id";
+import { PROTOCOL_DONE_ACTION, PROTOCOL_OPEN_ACTION, PROTOCOL_SNOOZE_ACTION } from "@/plugin-id";
 import type { TaskPath } from "@/domain/task";
+
+const VAULT = "My Vault";
 
 function config(overrides: Partial<NtfySettings> = {}): NtfySettings {
 	return {
@@ -84,22 +88,22 @@ describe("serverUrlError", () => {
 
 describe("buildNtfyRequest auth header", () => {
 	it("omits Authorization when the token is empty", () => {
-		const request = buildNtfyRequest(config({ token: "" }), message(), "obsidian://x");
+		const request = buildNtfyRequest(config({ token: "" }), message(), VAULT);
 		expect(request.headers["Authorization"]).toBeUndefined();
 	});
 
 	it("sends Bearer for a plain token", () => {
-		const request = buildNtfyRequest(config({ token: "tk_abc" }), message(), "obsidian://x");
+		const request = buildNtfyRequest(config({ token: "tk_abc" }), message(), VAULT);
 		expect(request.headers["Authorization"]).toBe("Bearer tk_abc");
 	});
 
 	it("sends Basic for a user:pass token", () => {
-		const request = buildNtfyRequest(config({ token: "alice:secret" }), message(), "obsidian://x");
+		const request = buildNtfyRequest(config({ token: "alice:secret" }), message(), VAULT);
 		expect(request.headers["Authorization"]).toBe(`Basic ${btoa("alice:secret")}`);
 	});
 
 	it("trims the token before deciding bearer vs basic", () => {
-		const request = buildNtfyRequest(config({ token: "  tk_abc  " }), message(), "obsidian://x");
+		const request = buildNtfyRequest(config({ token: "  tk_abc  " }), message(), VAULT);
 		expect(request.headers["Authorization"]).toBe("Bearer tk_abc");
 	});
 });
@@ -117,25 +121,25 @@ describe("encodeHeaderValue", () => {
 
 describe("buildNtfyRequest Delay header", () => {
 	it("omits Delay when no delayUntil is given", () => {
-		const request = buildNtfyRequest(config(), message(), "obsidian://x");
+		const request = buildNtfyRequest(config(), message(), VAULT);
 		expect(request.headers["Delay"]).toBeUndefined();
 	});
 
 	it("converts delayUntil to a unix-seconds string", () => {
 		const delayUntil = "2026-09-18T10:00:00" as IsoDateTime;
-		const request = buildNtfyRequest(config(), message(), "obsidian://x", { delayUntil });
+		const request = buildNtfyRequest(config(), message(), VAULT, { delayUntil });
 		expect(request.headers["Delay"]).toBe(String(Math.floor(new Date(delayUntil).getTime() / 1000)));
 	});
 });
 
 describe("buildNtfyRequest X-Sequence-ID header", () => {
 	it("sets it to the message id when there is no delayUntil", () => {
-		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), "obsidian://x");
+		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), VAULT);
 		expect(request.headers["X-Sequence-ID"]).toBe("isotask-abc123");
 	});
 
 	it("sets it to the message id when there is a delayUntil", () => {
-		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), "obsidian://x", {
+		const request = buildNtfyRequest(config(), message({ id: "isotask-abc123" as ReminderId }), VAULT, {
 			delayUntil: "2026-09-18T10:00:00" as IsoDateTime,
 		});
 		expect(request.headers["X-Sequence-ID"]).toBe("isotask-abc123");
@@ -181,6 +185,45 @@ describe("clickUrlFor", () => {
 		expect(url).toBe(
 			`obsidian://${PROTOCOL_OPEN_ACTION}?vault=${encodeURIComponent("My Vault")}&path=${encodeURIComponent("Tasks/Buy milk & eggs.md")}&rid=${encodeURIComponent("isotask-xyz")}`,
 		);
+	});
+});
+
+describe("doneUrlFor", () => {
+	it("builds the done action link with the same param shape as open", () => {
+		const url = doneUrlFor(VAULT, message({ id: "isotask-xyz" as ReminderId }));
+		expect(url).toBe(
+			`obsidian://${PROTOCOL_DONE_ACTION}?vault=${encodeURIComponent(VAULT)}&path=${encodeURIComponent("Tasks/Foo.md")}&rid=${encodeURIComponent("isotask-xyz")}`,
+		);
+	});
+});
+
+describe("snoozeUrlFor", () => {
+	it("builds the snooze action link with a fixed for=1h", () => {
+		const url = snoozeUrlFor(VAULT, message({ id: "isotask-xyz" as ReminderId }));
+		expect(url).toBe(
+			`obsidian://${PROTOCOL_SNOOZE_ACTION}?vault=${encodeURIComponent(VAULT)}&path=${encodeURIComponent("Tasks/Foo.md")}&rid=${encodeURIComponent("isotask-xyz")}&for=1h`,
+		);
+	});
+});
+
+describe("buildNtfyRequest Actions header", () => {
+	it("lists done, snooze, then open, each with clear=true", () => {
+		const msg = message();
+		const request = buildNtfyRequest(config(), msg, VAULT);
+		expect(request.headers["Actions"]).toBe(
+			`view, Done, ${doneUrlFor(VAULT, msg)}, clear=true; view, Snooze 1h, ${snoozeUrlFor(VAULT, msg)}, clear=true; view, Open, ${clickUrlFor(VAULT, msg)}, clear=true`,
+		);
+	});
+
+	it("keeps each action well-formed when the path has a comma, semicolon, space and non-ASCII characters", () => {
+		const msg = message({ path: "Tasks/Café, meeting; notes.md" as TaskPath });
+		const request = buildNtfyRequest(config(), msg, VAULT);
+		const entries = request.headers["Actions"]?.split("; ") ?? [];
+		expect(entries).toHaveLength(3);
+		for (const entry of entries) {
+			expect(entry.split(", ")).toHaveLength(4);
+		}
+		expect(request.headers["Actions"]).not.toContain("Café");
 	});
 });
 
