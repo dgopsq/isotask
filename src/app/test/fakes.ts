@@ -16,6 +16,7 @@ import type { Clock } from "@/ports/clock";
 import type { Notifier } from "@/ports/notifier";
 import type { PushChannel, PushError, PushListOptions, PushPublishOptions } from "@/ports/push-channel";
 import type { RescheduleEntry, RescheduleHistory } from "@/ports/reschedule-history";
+import type { AppBadge } from "@/ports/app-badge";
 import type { FiredReminderLedger, SystemNotification, SystemNotifier } from "@/ports/system-notifier";
 import type { NewTaskFile, TaskStore, TaskStoreError } from "@/ports/task-store";
 
@@ -288,5 +289,25 @@ export class FakeFiredReminderLedger implements FiredReminderLedger {
 
 	save = (entries: readonly FiredReminder[]): void => {
 		this.entries = entries;
+	};
+}
+
+/** In-memory `AppBadge` for `app/` use-case tests: `count` is the last value shown, `undefined` when cleared. */
+export class FakeAppBadge implements AppBadge {
+	count: number | undefined;
+	private available = true;
+
+	setAvailable(value: boolean): void {
+		this.available = value;
+	}
+
+	isAvailable = (): boolean => this.available;
+
+	set = (count: number): void => {
+		this.count = count;
+	};
+
+	clear = (): void => {
+		this.count = undefined;
 	};
 }

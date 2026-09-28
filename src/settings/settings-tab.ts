@@ -47,6 +47,7 @@ type ReminderSettingKey =
 	| "remindByDefault"
 	| "reminderDefaultTime"
 	| "reminderCatchUpMinutes"
+	| "appBadge"
 	| "ntfyEnabled"
 	| "ntfyServerUrl"
 	| "ntfyTopic"
@@ -128,6 +129,10 @@ const REMINDER_SETTINGS: Readonly<
 		get: (settings) => settings.reminders.catchUpMinutes,
 		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, catchUpMinutes: Number(value) } }),
 	},
+	appBadge: {
+		get: (settings) => settings.reminders.appBadge,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, appBadge: Boolean(value) } }),
+	},
 	ntfyEnabled: {
 		get: (settings) => settings.reminders.ntfy.enabled,
 		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, enabled: Boolean(value) } } }),
@@ -156,6 +161,7 @@ export interface SettingsTabDeps {
 	readonly copyAgentInstructions: () => Promise<void>;
 	readonly checkNtfy: () => Promise<void>;
 	readonly enableDesktopNotifications: () => Promise<boolean>;
+	readonly isAppBadgeAvailable: () => boolean;
 }
 
 /**
@@ -245,6 +251,12 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						desc: "Show a system notification when a reminder fires while Obsidian is open on this computer.",
 						control: { type: "toggle", key: DESKTOP_NOTIFICATIONS_KEY },
 						visible: () => Platform.isDesktopApp,
+					},
+					{
+						name: "Show count on app icon",
+						desc: "Number of open tasks that are overdue or due today, on the Obsidian dock or taskbar icon.",
+						control: { type: "toggle", key: "appBadge" },
+						visible: () => this.deps.isAppBadgeAvailable(),
 					},
 					{
 						name: "Send via ntfy",

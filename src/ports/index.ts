@@ -1,3 +1,4 @@
+export type { AppBadge } from "@/ports/app-badge";
 export type { Clock } from "@/ports/clock";
 export type { Haptics, HapticKind } from "@/ports/haptics";
 export type {
