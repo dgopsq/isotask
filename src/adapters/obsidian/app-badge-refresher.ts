@@ -24,11 +24,17 @@ export function registerAppBadgeRefresher(plugin: Plugin, refresh: () => void): 
 		refresh();
 	});
 
-	plugin.registerInterval(window.setInterval(refresh, REFRESH_INTERVAL_MS));
-	plugin.registerDomEvent(window, "focus", refresh);
+	// Gated too: before the metadata cache resolves, the count would be too low.
+	const refreshIfReady = (): void => {
+		if (gateOpen) {
+			refresh();
+		}
+	};
+	plugin.registerInterval(window.setInterval(refreshIfReady, REFRESH_INTERVAL_MS));
+	plugin.registerDomEvent(window, "focus", refreshIfReady);
 	plugin.registerDomEvent(document, "visibilitychange", () => {
 		if (document.visibilityState === "visible") {
-			refresh();
+			refreshIfReady();
 		}
 	});
 
