@@ -260,8 +260,8 @@ time, same id) fires again. Clicking the notification opens the task note.
 
 `app/refresh-app-badge.ts`, `domain/attention.ts`. Desktop only, off by default
 (`reminders.appBadge`). Counts open tasks whose `due` date part is today or earlier, so a datetime
-due later today counts and `scheduled` does not. Refreshes on the ntfy reconciler's triggers even
-when ntfy is off.
+due later today counts and `scheduled` does not. Refreshes on note changes, window focus, a
+15-minute tick and any settings change.
 
 ### Actions (Done/Snooze)
 

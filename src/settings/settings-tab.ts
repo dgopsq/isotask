@@ -161,7 +161,7 @@ export interface SettingsTabDeps {
 	readonly copyAgentInstructions: () => Promise<void>;
 	readonly checkNtfy: () => Promise<void>;
 	readonly enableDesktopNotifications: () => Promise<boolean>;
-	readonly refreshAppBadge: () => Promise<void>;
+	readonly isAppBadgeAvailable: () => boolean;
 }
 
 /**
@@ -256,7 +256,7 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						name: "Show count on app icon",
 						desc: "Number of open tasks that are overdue or due today, on the Obsidian dock or taskbar icon.",
 						control: { type: "toggle", key: "appBadge" },
-						visible: () => Platform.isDesktopApp,
+						visible: () => this.deps.isAppBadgeAvailable(),
 					},
 					{
 						name: "Send via ntfy",
@@ -371,18 +371,10 @@ export class IsotaskSettingTab extends PluginSettingTab {
 		if (isScalarSetting(key)) {
 			return this.deps.setSettings(SCALAR_SETTINGS[key].set(settings, value));
 		}
-		if (key === "appBadge") {
-			return this.setAppBadge(value);
-		}
 		if (isReminderSetting(key)) {
 			return this.deps.setSettings(REMINDER_SETTINGS[key].set(settings, value));
 		}
 		return undefined;
-	}
-
-	private async setAppBadge(value: unknown): Promise<void> {
-		await this.deps.setSettings(REMINDER_SETTINGS.appBadge.set(this.deps.getSettings(), value));
-		await this.deps.refreshAppBadge();
 	}
 
 	/** Turning it off is unconditional; turning it on requests OS permission first and leaves the setting off on denial. */

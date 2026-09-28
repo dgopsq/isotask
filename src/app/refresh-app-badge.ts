@@ -11,7 +11,6 @@ export interface RefreshAppBadgeDeps {
 	readonly settings: () => IsotaskSettings;
 }
 
-/** Sets the icon badge to the overdue-or-due-today count, or clears it when the setting is off. */
 export function makeRefreshAppBadge(deps: RefreshAppBadgeDeps): () => Promise<void> {
 	return async () => {
 		if (!deps.badge.isAvailable()) {
@@ -23,7 +22,7 @@ export function makeRefreshAppBadge(deps: RefreshAppBadgeDeps): () => Promise<vo
 			return;
 		}
 		const tasks = await deps.store.list();
-		deps.badge.set(countNeedingAttention(tasks, settings.statuses, deps.clock.today()));
+		deps.badge.set(countNeedingAttention(tasks, settings.statuses, deps.clock.today(), settings.weekStart));
 	};
 }
 

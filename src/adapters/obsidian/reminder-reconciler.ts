@@ -16,8 +16,6 @@ export interface ReminderReconcilerDeps {
 	readonly notifier: Notifier;
 	readonly describeError: (error: PushError) => string;
 	readonly getPropertyKeys: () => PropertyKeys;
-	/** Runs on every trigger, before and regardless of the ntfy reconcile. */
-	readonly onTrigger?: () => void;
 }
 
 /** Task-note events are debounced: one edit fires several `changed` events. */
@@ -45,7 +43,6 @@ export function registerReminderReconciler(plugin: Plugin, deps: ReminderReconci
 		if (!gateOpen) {
 			return;
 		}
-		deps.onTrigger?.();
 		const outcome = await deps.reconcile();
 		switch (outcome.kind) {
 			case "disabled":
