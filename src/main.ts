@@ -8,6 +8,7 @@ import { makeRescheduleHistory } from "@/adapters/history/reschedule-history";
 import { makeNavigationMemory } from "@/adapters/navigation/navigation-memory";
 import { copyToClipboard } from "@/adapters/obsidian/clipboard";
 import { createObsidianClock } from "@/adapters/obsidian/clock";
+import { createAppBadge } from "@/adapters/obsidian/app-badge";
 import { registerCompletionWatcher } from "@/adapters/obsidian/completion-watcher";
 import { createDesktopNotifier } from "@/adapters/obsidian/desktop-notifier";
 import { createDesktopReminderLedger } from "@/adapters/obsidian/desktop-reminder-ledger";
@@ -28,6 +29,7 @@ import { makeConvertNote } from "@/app/convert-note";
 import { makeCreateTask } from "@/app/create-task";
 import type { AppDeps } from "@/app/deps";
 import { makeFireDesktopReminders } from "@/app/fire-desktop-reminders";
+import { makeRefreshAppBadge } from "@/app/refresh-app-badge";
 import { makeReconcileReminders } from "@/app/reconcile-reminders";
 import { makeRescheduleTask } from "@/app/reschedule-task";
 import { makeSetDate } from "@/app/set-date";
@@ -81,6 +83,7 @@ export default class IsotaskPlugin extends Plugin {
 		});
 		const desktopNotifier = createDesktopNotifier();
 		const firedReminderLedger = createDesktopReminderLedger(this.app);
+		const appBadge = createAppBadge();
 		const calendarRenderer = new EventCalendarRenderer();
 		// Session-only: deliberately not persisted across reloads (see
 		// `adapters/history/reschedule-history.ts`), so it's built fresh here
@@ -127,6 +130,13 @@ export default class IsotaskPlugin extends Plugin {
 				openTaskNote(this.app, path);
 			},
 		});
+
+		const refreshAppBadge = makeRefreshAppBadge({ store, clock, badge: appBadge, settings: () => this.pluginSettings });
+		const refreshAppBadgeQuietly = (): void => {
+			refreshAppBadge().catch((error: unknown) => {
+				console.error("Isotask: app badge refresh failed", error);
+			});
+		};
 
 		registerViews(this, {
 			app: this.app,
@@ -201,7 +211,16 @@ export default class IsotaskPlugin extends Plugin {
 		registerTaskMenus(this, taskMenuDeps);
 		registerTaskViewActions(this, taskMenuDeps);
 		registerCompletionWatcher(this, appDeps);
-		registerReminderReconciler(this, { reconcile: reconcileReminders, notifier, describeError: describePushError, getPropertyKeys: () => this.pluginSettings.propertyKeys });
+		registerReminderReconciler(this, {
+			reconcile: reconcileReminders,
+			notifier,
+			describeError: describePushError,
+			getPropertyKeys: () => this.pluginSettings.propertyKeys,
+			onTrigger: refreshAppBadgeQuietly,
+		});
+		this.register(() => {
+			appBadge.clear();
+		});
 		registerProtocolHandlers(this, { completeTask, snoozeReminder, notifier });
 		registerDesktopReminderTicker(this, fireDesktopReminders);
 
@@ -247,6 +266,7 @@ export default class IsotaskPlugin extends Plugin {
 						notifier.error("This server is older than ntfy 2.16.");
 					}
 				},
+				refreshAppBadge,
 				enableDesktopNotifications: async () => {
 					const granted = await desktopNotifier.requestPermission();
 					if (granted) {

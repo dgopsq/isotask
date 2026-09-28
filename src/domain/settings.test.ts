@@ -179,4 +179,14 @@ describe("parseSettings", () => {
 	it("defaults reminders.desktopNotifications to false", () => {
 		expect(DEFAULT_REMINDER_SETTINGS.desktopNotifications).toBe(false);
 	});
+
+	it("keeps a valid reminders.appBadge flag and falls back an invalid one", () => {
+		expect(parseSettings({ reminders: { appBadge: true } }).reminders.appBadge).toBe(true);
+		expect(parseSettings({ reminders: { appBadge: "yes" } }).reminders.appBadge).toBe(DEFAULT_REMINDER_SETTINGS.appBadge);
+	});
+
+	it("fills reminders.appBadge with false for settings saved before it existed", () => {
+		expect(parseSettings({ reminders: { desktopNotifications: true } }).reminders.appBadge).toBe(false);
+		expect(parseSettings(undefined).reminders.appBadge).toBe(false);
+	});
 });

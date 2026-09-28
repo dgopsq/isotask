@@ -47,6 +47,7 @@ type ReminderSettingKey =
 	| "remindByDefault"
 	| "reminderDefaultTime"
 	| "reminderCatchUpMinutes"
+	| "appBadge"
 	| "ntfyEnabled"
 	| "ntfyServerUrl"
 	| "ntfyTopic"
@@ -128,6 +129,10 @@ const REMINDER_SETTINGS: Readonly<
 		get: (settings) => settings.reminders.catchUpMinutes,
 		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, catchUpMinutes: Number(value) } }),
 	},
+	appBadge: {
+		get: (settings) => settings.reminders.appBadge,
+		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, appBadge: Boolean(value) } }),
+	},
 	ntfyEnabled: {
 		get: (settings) => settings.reminders.ntfy.enabled,
 		set: (settings, value) => ({ ...settings, reminders: { ...settings.reminders, ntfy: { ...settings.reminders.ntfy, enabled: Boolean(value) } } }),
@@ -156,6 +161,7 @@ export interface SettingsTabDeps {
 	readonly copyAgentInstructions: () => Promise<void>;
 	readonly checkNtfy: () => Promise<void>;
 	readonly enableDesktopNotifications: () => Promise<boolean>;
+	readonly refreshAppBadge: () => Promise<void>;
 }
 
 /**
@@ -244,6 +250,12 @@ export class IsotaskSettingTab extends PluginSettingTab {
 						name: "Desktop notifications",
 						desc: "Show a system notification when a reminder fires while Obsidian is open on this computer.",
 						control: { type: "toggle", key: DESKTOP_NOTIFICATIONS_KEY },
+						visible: () => Platform.isDesktopApp,
+					},
+					{
+						name: "Show count on app icon",
+						desc: "Number of open tasks that are overdue or due today, on the Obsidian dock or taskbar icon.",
+						control: { type: "toggle", key: "appBadge" },
 						visible: () => Platform.isDesktopApp,
 					},
 					{
@@ -359,10 +371,18 @@ export class IsotaskSettingTab extends PluginSettingTab {
 		if (isScalarSetting(key)) {
 			return this.deps.setSettings(SCALAR_SETTINGS[key].set(settings, value));
 		}
+		if (key === "appBadge") {
+			return this.setAppBadge(value);
+		}
 		if (isReminderSetting(key)) {
 			return this.deps.setSettings(REMINDER_SETTINGS[key].set(settings, value));
 		}
 		return undefined;
+	}
+
+	private async setAppBadge(value: unknown): Promise<void> {
+		await this.deps.setSettings(REMINDER_SETTINGS.appBadge.set(this.deps.getSettings(), value));
+		await this.deps.refreshAppBadge();
 	}
 
 	/** Turning it off is unconditional; turning it on requests OS permission first and leaves the setting off on denial. */

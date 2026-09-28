@@ -45,6 +45,8 @@ export interface ReminderSettings {
 	readonly catchUpMinutes: number;
 	/** Desktop-only: fires a system Notification for a due reminder while this Obsidian instance is open. */
 	readonly desktopNotifications: boolean;
+	/** Desktop-only: shows the count of open tasks due today or earlier on the app icon. */
+	readonly appBadge: boolean;
 	readonly ntfy: NtfySettings;
 }
 
@@ -53,6 +55,7 @@ export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
 	defaultTime: "09:00",
 	catchUpMinutes: 60,
 	desktopNotifications: false,
+	appBadge: false,
 	ntfy: {
 		enabled: false,
 		serverUrl: "https://ntfy.sh",
@@ -151,6 +154,7 @@ const ReminderSettingsSchema = v.fallback(
 		defaultTime: v.fallback(v.pipe(v.string(), v.regex(TIME_OF_DAY_RE)), DEFAULT_REMINDER_SETTINGS.defaultTime),
 		catchUpMinutes: v.fallback(v.pipe(v.number(), v.integer(), v.minValue(0)), DEFAULT_REMINDER_SETTINGS.catchUpMinutes),
 		desktopNotifications: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.desktopNotifications),
+		appBadge: v.fallback(v.boolean(), DEFAULT_REMINDER_SETTINGS.appBadge),
 		ntfy: NtfySettingsSchema,
 	}),
 	DEFAULT_REMINDER_SETTINGS,

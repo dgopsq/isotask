@@ -256,6 +256,13 @@ fired-reminder ledger (`localStorage`, not `data.json`, so it isn't synced — e
 independently). The ledger key is `<reminderId>@<fireTime>`, so a rescheduled reminder (new fire
 time, same id) fires again. Clicking the notification opens the task note.
 
+### App icon badge
+
+`app/refresh-app-badge.ts`, `domain/attention.ts`. Desktop only, off by default
+(`reminders.appBadge`). Counts open tasks whose `due` date part is today or earlier, so a datetime
+due later today counts and `scheduled` does not. Refreshes on the ntfy reconciler's triggers even
+when ntfy is off.
+
 ### Actions (Done/Snooze)
 
 `app/complete-task.ts`, `app/snooze-reminder.ts`, `adapters/obsidian/protocol-handler.ts`. Every

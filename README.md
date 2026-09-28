@@ -55,7 +55,8 @@ migrate away from: the notes are still just notes.
   note, supporting `{{title}}` and (spawn only) `{{due}}`.
 - **Week starts on**: which day the feed's this week / next week buckets split on.
 - **Reminders**: remind-by-default, default reminder time, catch-up window, desktop notifications
-  (desktop only), and ntfy server/topic/token/lookahead.
+  and an overdue/due-today count on the app icon (both desktop only), and ntfy
+  server/topic/token/lookahead.
 - **Property keys**: every frontmatter key above, plus the marker key/value that identifies a note
   as a task, individually renameable.
 
